@@ -1,4 +1,4 @@
-# Setup Guide
+﻿# Setup Guide
 
 This repository is your personal job-hunt workspace. It stores your resume,
 story bank, project instructions, config files, workflow files, and generated
