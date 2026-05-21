@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.12.8 - 2026-05-21
+
+- Synced updates from the private source repository.
+
+Source commits:
+- \`acd774c\` docs: add CORE_REPO_PAT back to setup — template repo is private
+
+
 ## 2.12.7 - 2026-05-21
 
 - Synced updates from the private source repository.

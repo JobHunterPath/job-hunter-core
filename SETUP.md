@@ -171,11 +171,11 @@ You can override the image with a repository variable:
 JOB_HUNTER_CORE_IMAGE=ghcr.io/OWNER/REPO/job-hunter-core:tag
 ```
 
-## 8. Configure Repository Update Token
+## 8. Configure Repository Update Tokens
 
-The workflows need permission to commit results back to your repository and to
-pull future updates from the template. This requires one token you create
-yourself.
+Two tokens are needed: one you create yourself so workflows can write to your
+repository, and one shared token provided by the maintainer so the **Update
+From Core** workflow can read updates from the private template repository.
 
 **`GH_PAT`** — your own personal access token.
 
@@ -191,8 +191,20 @@ yourself.
 5. Click **Generate token** and copy it immediately — GitHub only shows it once.
 6. Add it as a repository secret named `GH_PAT` (same steps as Step 6).
 
-If this token is missing, workflows will fail with a clear error message telling
-you to add it.
+**`CORE_REPO_PAT`** — a shared read-only token provided by the maintainer.
+The template repository is private, so the **Update From Core** workflow needs
+this token to fetch updates from it. You cannot create this yourself — ask the
+maintainer for the value.
+
+Add it as a repository secret:
+
+```
+Name:  CORE_REPO_PAT
+Value: <token from maintainer>
+```
+
+If either token is missing, **Update From Core** will fail with a clear error
+message telling you which one to add.
 
 ## 9. Optional Local Smoke Test
 
