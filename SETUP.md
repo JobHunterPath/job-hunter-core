@@ -18,11 +18,14 @@ Open Docker Desktop once and wait until the Docker engine is running.
 
 ## 2. Create Your Private Repository
 
-1. Open the shared template repository on GitHub.
-2. Click **Use this template**.
+1. Open the shared template repository on GitHub. Use the link provided to you
+   by the maintainer — it will look like
+   `https://github.com/Job-Network-Projects/job-hunter-template`.
+2. Click **Use this template** (green button, top right).
 3. Choose **Create a new repository**.
 4. Set visibility to **Private**.
-5. Create the repository.
+5. Give it any name you like (e.g. `my-job-hunt`).
+6. Click **Create repository**.
 
 Your new repository is your personal workspace. Keep it private because it will
 contain resume material, story-bank details, generated job artifacts, and API
@@ -98,28 +101,49 @@ maintained centrally and your changes would be overwritten by the next update.
 
 ## 6. Configure API Keys
 
-Choose one primary LLM provider in `config/api_config.yml`, then add the matching
-GitHub secret:
+The pipeline needs at least one LLM provider key to score jobs and write cover
+letters.
 
-| Provider | GitHub Secret |
+**Get an API key** from one of these providers:
+
+| Provider | Sign-up page | GitHub Secret name |
+|---|---|---|
+| Anthropic (recommended) | `https://console.anthropic.com` → API Keys | `ANTHROPIC_API_KEY` |
+| OpenAI | `https://platform.openai.com/api-keys` | `OPENAI_API_KEY` |
+| Google | `https://aistudio.google.com/apikey` | `GOOGLE_API_KEY` |
+
+Optional job-search providers (add only the ones you use):
+
+| Provider | GitHub Secret name |
 |---|---|
-| `anthropic` | `ANTHROPIC_API_KEY` |
-| `openai` | `OPENAI_API_KEY` |
-| `google` | `GOOGLE_API_KEY` |
-
-Optional search providers use these secrets:
-
-| Provider | GitHub Secret |
-|---|---|
-| Brave | `BRAVE_API_KEY` |
+| Brave Search | `BRAVE_API_KEY` |
 | Tavily | `TAVILY_API_KEY` |
 | Exa | `EXA_API_KEY` |
 | RapidAPI / JobSpy | `RAPIDAPI_KEY` |
 
-Add secrets in **Settings -> Secrets and variables -> Actions -> New repository
-secret**.
+**Add each key as a GitHub secret:**
 
-Set `secrets.<provider>.required: true` only for providers you actually use.
+1. In your repository, click **Settings** (top menu bar).
+2. In the left sidebar click **Secrets and variables → Actions**.
+3. Click **New repository secret**.
+4. Enter the secret name (e.g. `ANTHROPIC_API_KEY`) and paste your key as the
+   value.
+5. Click **Add secret**.
+
+**Tell the pipeline which provider you are using.** Open
+`config/api_config.yml` and find the `secrets:` section. Set
+`required: true` for your chosen provider and `required: false` for all
+others. For example, if you are using Anthropic:
+
+```yaml
+secrets:
+  anthropic:
+    required: true
+  openai:
+    required: false
+  google:
+    required: false
+```
 
 ## 7. Grant Access To The Private Core Image
 
@@ -149,26 +173,37 @@ JOB_HUNTER_CORE_IMAGE=ghcr.io/OWNER/REPO/job-hunter-core:tag
 
 ## 8. Configure Repository Update Tokens
 
-Most daily workflows can commit with GitHub's built-in `GITHUB_TOKEN` when your
-repository allows Actions write access. For stricter repositories, add:
+Two tokens are needed so the workflows can commit results back to your repository
+and pull future updates from the core.
 
-```text
-GH_PAT
+**`GH_PAT`** — your own personal access token so workflows can write to your
+repository.
+
+1. Go to `https://github.com/settings/personal-access-tokens/new`
+   (GitHub → Settings → Developer settings → Personal access tokens →
+   Fine-grained tokens → Generate new token).
+2. Under **Repository access**, choose **Only select repositories** and pick
+   your job-hunt repository.
+3. Under **Permissions → Repository permissions**, set:
+   - **Contents**: Read and write
+   - **Workflows**: Read and write (required for **Update From Core**)
+4. Generate the token and copy it immediately — GitHub only shows it once.
+5. Add it as a repository secret named `GH_PAT` (same steps as Step 6).
+
+**`CORE_REPO_PAT`** — a shared read-only token provided by the maintainer so
+the **Update From Core** workflow can download updates from the private core
+repository. You cannot create this yourself because the core repository is
+private.
+
+Add the token provided by the maintainer as a repository secret:
+
+```
+Name:  CORE_REPO_PAT
+Value: <token from maintainer>
 ```
 
-Use a fine-grained GitHub personal access token scoped only to this repository
-with **Contents: Read and write**. Add **Workflows: Read and write** if you want
-to run **Update From Core**, because that workflow updates files under
-`.github/workflows/`.
-
-The core repository is private, so future core updates also need:
-
-```text
-CORE_REPO_PAT
-```
-
-Create it from an account that is a member of `Job-Network-Projects` and grant
-**Contents: Read-only** access to `Job-Network-Projects/job-hunter-core`.
+If either token is missing, **Update From Core** will fail with a clear error
+message telling you which one to add.
 
 ## 9. Optional Local Smoke Test
 
@@ -213,7 +248,9 @@ If Git says `nothing to commit`, continue.
 
 ## 11. Run The Automation In GitHub
 
-Open the **Actions** tab in your repository. Enable workflows if GitHub asks.
+Open the **Actions** tab in your repository (top menu bar). If you see a yellow
+banner asking you to enable workflows, click **I understand my workflows, go
+ahead and enable them**.
 
 Common workflows:
 
