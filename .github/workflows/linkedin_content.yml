@@ -1,4 +1,4 @@
-name: LinkedIn Content
+﻿name: LinkedIn Content
 
 on:
   schedule:
@@ -47,13 +47,13 @@ jobs:
         id: core_image
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          GH_TOKEN: ${{ secrets.CORE_REPO_PAT || github.token }}
           CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           echo "image=$CORE_IMAGE" >> "$GITHUB_OUTPUT"
           if ! echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || ! docker pull "$CORE_IMAGE"; then
             echo "::error::Could not pull job-hunter core image: $CORE_IMAGE"
-            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            echo "::error::Grant this repository package access or set CORE_REPO_PAT with repo and read:packages scope."
             exit 1
           fi
 
@@ -110,13 +110,13 @@ jobs:
         id: core_image
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          GH_TOKEN: ${{ secrets.CORE_REPO_PAT || github.token }}
           CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           echo "image=$CORE_IMAGE" >> "$GITHUB_OUTPUT"
           if ! echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || ! docker pull "$CORE_IMAGE"; then
             echo "::error::Could not pull job-hunter core image: $CORE_IMAGE"
-            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            echo "::error::Grant this repository package access or set CORE_REPO_PAT with repo and read:packages scope."
             exit 1
           fi
 
@@ -173,13 +173,13 @@ jobs:
         id: core_image
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          GH_TOKEN: ${{ secrets.CORE_REPO_PAT || github.token }}
           CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           echo "image=$CORE_IMAGE" >> "$GITHUB_OUTPUT"
           if ! echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || ! docker pull "$CORE_IMAGE"; then
             echo "::error::Could not pull job-hunter core image: $CORE_IMAGE"
-            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            echo "::error::Grant this repository package access or set CORE_REPO_PAT with repo and read:packages scope."
             exit 1
           fi
 
@@ -242,3 +242,4 @@ jobs:
           git diff --staged --quiet || git commit -m "linkedin: discover engagement"
           git pull --rebase origin main
           git push
+

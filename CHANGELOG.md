@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.12.9 - 2026-05-21
+
+- Synced updates from the private source repository.
+
+Source commits:
+- \`fa04bf0\` refactor: consolidate CORE_IMAGE_PAT and CORE_REPO_PAT into CORE_REPO_PAT
+
+
 ## 2.12.8 - 2026-05-21
 
 - Synced updates from the private source repository.

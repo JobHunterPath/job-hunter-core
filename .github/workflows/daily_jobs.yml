@@ -1,4 +1,4 @@
-name: Job Hunt Pipeline
+﻿name: Job Hunt Pipeline
 
 on:
   schedule:
@@ -43,7 +43,7 @@ concurrency:
 
 jobs:
 
-  # ── Daily job hunt ─────────────────────────────────────────────────────────
+  # â”€â”€ Daily job hunt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   hunt:
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -61,7 +61,7 @@ jobs:
         id: runner_image
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          GH_TOKEN: ${{ secrets.CORE_REPO_PAT || github.token }}
           CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           image="${CORE_IMAGE}"
@@ -72,7 +72,7 @@ jobs:
             echo "Using job-hunter core image: $image"
           else
             echo "::error::Could not pull job-hunter core image: $image"
-            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            echo "::error::Grant this repository package access or set CORE_REPO_PAT with repo and read:packages scope."
             exit 1
           fi
 
@@ -228,7 +228,7 @@ jobs:
           done
           git push
 
-  # ── Weekly company discovery ────────────────────────────────────────────────
+  # â”€â”€ Weekly company discovery â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   discover:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -246,7 +246,7 @@ jobs:
         id: runner_image
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          GH_TOKEN: ${{ secrets.CORE_REPO_PAT || github.token }}
           CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           image="${CORE_IMAGE}"
@@ -257,7 +257,7 @@ jobs:
             echo "Using job-hunter core image: $image"
           else
             echo "::error::Could not pull job-hunter core image: $image"
-            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            echo "::error::Grant this repository package access or set CORE_REPO_PAT with repo and read:packages scope."
             exit 1
           fi
 
@@ -345,3 +345,4 @@ jobs:
           git diff --staged --quiet || git commit -m "discover: $(date +%Y-%m-%d) added new companies"
           git pull --rebase origin main
           git push
+

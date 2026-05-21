@@ -1,7 +1,7 @@
-name: Tailor Links
+﻿name: Tailor Links
 
-# Manual-only — triggered from the GitHub Actions UI.
-# Enter up to 5 job URLs (URL 1 is required, URLs 2–5 are optional).
+# Manual-only â€” triggered from the GitHub Actions UI.
+# Enter up to 5 job URLs (URL 1 is required, URLs 2â€“5 are optional).
 # The pipeline fetches each JD, tailors the resume, generates a cover letter,
 # compiles PDFs, and registers each company in search_config.yml regions.
 
@@ -33,7 +33,7 @@ on:
         default: ''
         type: string
       skip_score:
-        description: 'Skip scoring threshold — tailor all fetched jobs'
+        description: 'Skip scoring threshold â€” tailor all fetched jobs'
         required: false
         default: false
         type: boolean
@@ -67,7 +67,7 @@ jobs:
         id: runner_image
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          GH_TOKEN: ${{ secrets.CORE_REPO_PAT || github.token }}
           CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           image="${CORE_IMAGE}"
@@ -78,7 +78,7 @@ jobs:
             echo "Using job-hunter core image: $image"
           else
             echo "::error::Could not pull job-hunter core image: $image"
-            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            echo "::error::Grant this repository package access or set CORE_REPO_PAT with repo and read:packages scope."
             exit 1
           fi
 
@@ -177,3 +177,4 @@ jobs:
           git diff --staged --quiet || git commit -m "tailor: $(date +%Y-%m-%d)"
           git pull --rebase origin main
           git push
+

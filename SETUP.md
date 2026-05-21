@@ -145,37 +145,36 @@ secrets:
     required: false
 ```
 
-## 7. Grant Access To The Private Core Image
+## 7. Add The Shared Access Token
 
-The workflows pull this maintained image:
+The workflows need a shared token provided by the maintainer for two things:
+pulling the private Docker image that runs the pipeline, and fetching updates
+from the private template repository.
 
-```text
-ghcr.io/job-network-projects/job-hunter-core:latest
+Add the token provided by the maintainer as a repository secret:
+
+1. In your repository, click **Settings**.
+2. In the left sidebar click **Secrets and variables → Actions**.
+3. Click **New repository secret**.
+4. Enter the name and value exactly as shown below, then click **Add secret**.
+
 ```
-
-Add the shared read-only token provided by the maintainer as a repository secret:
-
-**Settings → Secrets and variables → Actions → New repository secret**
-
-```
-Name:  CORE_IMAGE_PAT
+Name:  CORE_REPO_PAT
 Value: <token from maintainer>
 ```
 
-If the secret is missing or invalid, the workflow fails early with an image-pull
-error.
+If this secret is missing, workflows will fail with a clear error message.
 
-You can override the image with a repository variable:
+You can override the Docker image with a repository variable if needed:
 
 ```text
 JOB_HUNTER_CORE_IMAGE=ghcr.io/OWNER/REPO/job-hunter-core:tag
 ```
 
-## 8. Configure Repository Update Tokens
+## 8. Configure Your Personal Access Token
 
-Two tokens are needed: one you create yourself so workflows can write to your
-repository, and one shared token provided by the maintainer so the **Update
-From Core** workflow can read updates from the private template repository.
+The workflows also need a token you create yourself so they can commit results
+back to your repository and run **Update From Core**.
 
 **`GH_PAT`** — your own personal access token.
 
@@ -189,22 +188,10 @@ From Core** workflow can read updates from the private template repository.
    - **Contents**: Read and write
    - **Workflows**: Read and write (required for **Update From Core**)
 5. Click **Generate token** and copy it immediately — GitHub only shows it once.
-6. Add it as a repository secret named `GH_PAT` (same steps as Step 6).
+6. Add it as a repository secret named `GH_PAT` (same steps as above).
 
-**`CORE_REPO_PAT`** — a shared read-only token provided by the maintainer.
-The template repository is private, so the **Update From Core** workflow needs
-this token to fetch updates from it. You cannot create this yourself — ask the
-maintainer for the value.
-
-Add it as a repository secret:
-
-```
-Name:  CORE_REPO_PAT
-Value: <token from maintainer>
-```
-
-If either token is missing, **Update From Core** will fail with a clear error
-message telling you which one to add.
+If this token is missing, workflows will fail with a clear error message telling
+you to add it.
 
 ## 9. Optional Local Smoke Test
 
