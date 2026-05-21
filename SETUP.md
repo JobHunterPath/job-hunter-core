@@ -45,7 +45,58 @@ git config --global user.name "Your Name"
 git config --global user.email "your.email@example.com"
 ```
 
-## 4. Configure API Keys
+## 4. Fill In Your Source Material
+
+The automation works from four personal files you must complete before running
+any workflow. Open each file in VS Code and replace the placeholder content.
+
+**`project_instructions.md`** — the AI's primary reference for everything it
+generates. Fill in:
+- Your target roles, seniority level, and preferred locations
+- Industries and company types you want to work in
+- Industries, roles, or companies to exclude
+- Your job ID naming scheme (used for output folder names)
+- Tone and style preferences for cover letters
+
+**`story_bank.md`** — raw material the AI draws from when writing cover letters
+and tailoring resume bullets. Add:
+- One section per role or project in your history
+- Key achievements written as rough STAR notes (Situation, Task, Action, Result)
+- Numbers and metrics wherever you have them — the AI will not invent them
+
+**`resume_single_column.tex`** or **`resume_double_column.tex`** — your base
+LaTeX resume. The pipeline creates a tailored copy for each job without touching
+this file. Fill in your real experience, education, and skills. The AI will
+adjust wording and reorder bullets but will never add content that is not
+already in your resume or story bank.
+
+**`config/`** — configure the search and scoring behaviour:
+- `search_config.yml`: target companies, regions, and job titles to search
+- `scoring_config.yml`: minimum fit score and maximum years of experience
+- `cover_letter_config.yml`: your background summary and cover letter tone
+- `tailoring_config.yml`: what the AI is allowed to change in your resume
+- `api_config.yml`: set `profile.resume_tex`, `profile.story_bank`, and
+  `profile.project_instructions` to point at the files you actually use
+
+## 5. Use An AI Helper To Fill In Personal Files
+
+An AI coding assistant in VS Code can speed up filling in the files above
+significantly. Recommended options:
+
+- **Claude Code** — install the VS Code extension or CLI from Anthropic's docs,
+  then open a conversation in your repo folder
+- **GitHub Copilot** — install the GitHub Copilot extension and sign in
+- **Codex** — install Node.js, then run `npm install -g @openai/codex`
+
+Use the AI helper to draft your `project_instructions.md`, populate
+`story_bank.md` from your CV or LinkedIn, and fill in config files. It can see
+your files and preserve their exact format.
+
+Only use AI helpers for your personal files listed above. Do not ask them to
+edit workflow files, scripts, or anything under `.github/` — those are
+maintained centrally and your changes would be overwritten by the next update.
+
+## 6. Configure API Keys
 
 Choose one primary LLM provider in `config/api_config.yml`, then add the matching
 GitHub secret:
@@ -70,7 +121,7 @@ secret**.
 
 Set `secrets.<provider>.required: true` only for providers you actually use.
 
-## 5. Grant Access To The Private Core Image
+## 7. Grant Access To The Private Core Image
 
 The workflows pull this maintained image:
 
@@ -96,7 +147,7 @@ You can override the image with a repository variable:
 JOB_HUNTER_CORE_IMAGE=ghcr.io/OWNER/REPO/job-hunter-core:tag
 ```
 
-## 6. Configure Repository Update Tokens
+## 8. Configure Repository Update Tokens
 
 Most daily workflows can commit with GitHub's built-in `GITHUB_TOKEN` when your
 repository allows Actions write access. For stricter repositories, add:
@@ -119,7 +170,7 @@ CORE_REPO_PAT
 Create it from an account that is a member of `Job-Network-Projects` and grant
 **Contents: Read-only** access to `Job-Network-Projects/job-hunter-core`.
 
-## 7. Optional Local Smoke Test
+## 9. Optional Local Smoke Test
 
 After package access is configured, you can test the config locally with Docker.
 
@@ -147,7 +198,7 @@ docker run --rm \
   job-hunter config check
 ```
 
-## 8. Commit And Push Your Setup
+## 10. Commit And Push Your Setup
 
 GitHub Actions only sees files that have been pushed.
 
@@ -160,7 +211,7 @@ git push origin main
 
 If Git says `nothing to commit`, continue.
 
-## 9. Run The Automation In GitHub
+## 11. Run The Automation In GitHub
 
 Open the **Actions** tab in your repository. Enable workflows if GitHub asks.
 
@@ -176,7 +227,7 @@ Scheduled weekday hunts run the primary enabled region. Secondary enabled
 regions run on their configured weekday slots. Empty slots exit before expensive
 pipeline work.
 
-## 10. Pull Future Core Updates
+## 12. Pull Future Core Updates
 
 Run **Actions -> Update From Core** in your personal repo. After it finishes,
 run locally:
