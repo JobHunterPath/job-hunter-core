@@ -6,7 +6,7 @@ on:
       upstream_repo:
         description: "Core repository to pull updates from"
         required: true
-        default: "Job-Network-Projects/job-hunter-core"
+        default: "Job-Network-Projects/job-hunter-template"
         type: string
       upstream_branch:
         description: "Core branch to pull updates from"
@@ -59,36 +59,40 @@ jobs:
             exit 1
           fi
 
-          if [ -z "${CORE_REPO_PAT}" ]; then
-            echo "::error::CORE_REPO_PAT is not available to this workflow run."
-            echo "::error::Add CORE_REPO_PAT as a repository secret with read access to Job-Network-Projects/job-hunter-core."
-            exit 1
-          fi
-
           UPSTREAM_REPO="${UPSTREAM_REPO#https://github.com/}"
           UPSTREAM_REPO="${UPSTREAM_REPO#http://github.com/}"
           UPSTREAM_REPO="${UPSTREAM_REPO%.git}"
           UPSTREAM_REPO="${UPSTREAM_REPO%/}"
 
-          token_user="$(curl -fsS \
-            -H "Authorization: Bearer ${CORE_REPO_PAT}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/user | jq -r '.login // empty')"
-          if [ -z "$token_user" ]; then
-            echo "::error::CORE_REPO_PAT is not a valid GitHub token."
-            exit 1
+          # Probe the upstream repo. Use CORE_REPO_PAT only if provided (needed
+          # for private upstreams). The default upstream (job-hunter-template) is
+          # public and needs no token.
+          probe_auth=()
+          upstream_url="https://github.com/${UPSTREAM_REPO}.git"
+          if [ -n "${CORE_REPO_PAT}" ]; then
+            token_user="$(curl -fsS \
+              -H "Authorization: Bearer ${CORE_REPO_PAT}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/user | jq -r '.login // empty')"
+            if [ -z "$token_user" ]; then
+              echo "::error::CORE_REPO_PAT is not a valid GitHub token."
+              exit 1
+            fi
+            echo "CORE_REPO_PAT authenticates as ${token_user}."
+            probe_auth=(-H "Authorization: Bearer ${CORE_REPO_PAT}")
+            upstream_url="https://${token_user}:${CORE_REPO_PAT}@github.com/${UPSTREAM_REPO}.git"
           fi
-          echo "CORE_REPO_PAT authenticates as ${token_user}."
 
           repo_probe="$(mktemp)"
           repo_status="$(curl -sS -o "$repo_probe" -w "%{http_code}" \
-            -H "Authorization: Bearer ${CORE_REPO_PAT}" \
+            "${probe_auth[@]}" \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${UPSTREAM_REPO}")"
           if [ "$repo_status" != "200" ]; then
-            echo "::error::CORE_REPO_PAT cannot read ${UPSTREAM_REPO} via the GitHub API. HTTP ${repo_status}."
+            echo "::error::Cannot read ${UPSTREAM_REPO} via the GitHub API. HTTP ${repo_status}."
+            echo "::error::If this is a private repository, add CORE_REPO_PAT as a repository secret with read access to it."
             cat "$repo_probe"
             exit 1
           fi
@@ -96,11 +100,11 @@ jobs:
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           git remote remove upstream 2>/dev/null || true
-          git remote add upstream "https://${token_user}:${CORE_REPO_PAT}@github.com/${UPSTREAM_REPO}.git"
+          git remote add upstream "$upstream_url"
 
           if ! git fetch upstream "${UPSTREAM_BRANCH}"; then
             echo "::error::Could not fetch ${UPSTREAM_REPO}@${UPSTREAM_BRANCH}."
-            echo "::error::Check that CORE_REPO_PAT can read ${UPSTREAM_REPO}, and that the workflow input is owner/repo."
+            echo "::error::If the repository is private, add CORE_REPO_PAT with read access to it."
             exit 1
           fi
 

@@ -171,39 +171,28 @@ You can override the image with a repository variable:
 JOB_HUNTER_CORE_IMAGE=ghcr.io/OWNER/REPO/job-hunter-core:tag
 ```
 
-## 8. Configure Repository Update Tokens
+## 8. Configure Repository Update Token
 
-Two tokens are needed so the workflows can commit results back to your repository
-and pull future updates from the core.
+The workflows need permission to commit results back to your repository and to
+pull future updates from the template. This requires one token you create
+yourself.
 
-**`GH_PAT`** — your own personal access token so workflows can write to your
-repository.
+**`GH_PAT`** — your own personal access token.
 
 1. Go to `https://github.com/settings/personal-access-tokens/new`
    (GitHub → Settings → Developer settings → Personal access tokens →
    Fine-grained tokens → Generate new token).
-2. Under **Repository access**, choose **Only select repositories** and pick
+2. Give it a name like `job-hunt-actions`.
+3. Under **Repository access**, choose **Only select repositories** and pick
    your job-hunt repository.
-3. Under **Permissions → Repository permissions**, set:
+4. Under **Permissions → Repository permissions**, set:
    - **Contents**: Read and write
    - **Workflows**: Read and write (required for **Update From Core**)
-4. Generate the token and copy it immediately — GitHub only shows it once.
-5. Add it as a repository secret named `GH_PAT` (same steps as Step 6).
+5. Click **Generate token** and copy it immediately — GitHub only shows it once.
+6. Add it as a repository secret named `GH_PAT` (same steps as Step 6).
 
-**`CORE_REPO_PAT`** — a shared read-only token provided by the maintainer so
-the **Update From Core** workflow can download updates from the private core
-repository. You cannot create this yourself because the core repository is
-private.
-
-Add the token provided by the maintainer as a repository secret:
-
-```
-Name:  CORE_REPO_PAT
-Value: <token from maintainer>
-```
-
-If either token is missing, **Update From Core** will fail with a clear error
-message telling you which one to add.
+If this token is missing, workflows will fail with a clear error message telling
+you to add it.
 
 ## 9. Optional Local Smoke Test
 
