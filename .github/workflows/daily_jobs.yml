@@ -1,19 +1,20 @@
-﻿name: Job Hunt Pipeline
+name: Job Hunt Pipeline
 
 on:
   schedule:
-    # Slot 0: primary region, every weekday. Uncomment one secondary slot per
-    # additional enabled region. Discovery runs every Monday at 18:00 UTC.
+    # Daily job hunt slots. Slot 0 is the primary region and runs every weekday.
+    # Secondary regions run on Monday/Wednesday/Friday only. Keep one hunt cron
+    # per configured region slot; discovery has its own separate Monday cron.
     - cron: '0 4 * * 1-5'
     - cron: '0 5 * * 1,3,5'
-    #- cron: '0 6 * * 1,3,5'
-    #- cron: '0 7 * * 1,3,5'
-    #- cron: '0 8 * * 1,3,5'
-    #- cron: '0 9 * * 1,3,5'
-    #- cron: '0 10 * * 1,3,5'
-    #- cron: '0 11 * * 1,3,5'
-    #- cron: '0 12 * * 1,3,5'
-    #- cron: '0 13 * * 1,3,5'
+    - cron: '0 6 * * 1,3,5'
+    - cron: '0 7 * * 1,3,5'
+    - cron: '0 8 * * 1,3,5'
+    - cron: '0 9 * * 1,3,5'
+    - cron: '0 10 * * 1,3,5'
+    - cron: '0 11 * * 1,3,5'
+    - cron: '0 12 * * 1,3,5'
+    - cron: '0 13 * * 1,3,5'
     - cron: '0 18 * * 1'     # company discovery Mondays 18:00 UTC
   workflow_dispatch:
     inputs:
@@ -42,7 +43,7 @@ concurrency:
 
 jobs:
 
-  # â”€â”€ Daily job hunt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # ── Daily job hunt ─────────────────────────────────────────────────────────
   hunt:
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -61,7 +62,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
-          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           image="${CORE_IMAGE}"
           echo "image=$image" >> "$GITHUB_OUTPUT"
@@ -227,7 +228,7 @@ jobs:
           done
           git push
 
-  # â”€â”€ Weekly company discovery â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  # ── Weekly company discovery ────────────────────────────────────────────────
   discover:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -246,7 +247,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
-          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           image="${CORE_IMAGE}"
           echo "image=$image" >> "$GITHUB_OUTPUT"
