@@ -1,0 +1,141 @@
+name: Sync Template Repository
+
+# Syncs user-facing files from job-hunter-core to job-hunter-template.
+# Triggered after the private source repo pushes code and template updates here.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/daily_jobs.yml"
+      - ".github/workflows/tailor_links.yml"
+      - ".github/workflows/tailor_raw.yml"
+      - ".github/workflows/linkedin_content.yml"
+      - ".github/workflows/update_from_core.yml"
+      - ".github/searxng/**"
+      - ".dockerignore"
+      - "altacv.cls"
+      - "config/**"
+      - "jobs/**"
+      - "linkedin/**"
+      - "resume_double_column.tex"
+      - "resume_single_column.tex"
+      - "story_bank.md"
+      - "project_instructions.md"
+      - "README.md"
+      - "SETUP.md"
+      - "CHANGELOG.md"
+      - "VERSION"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: ${{ vars.TEMPLATE_REPO != '' }}
+
+    steps:
+      - name: Checkout job-hunter-core
+        uses: actions/checkout@v5
+        with:
+          path: source
+
+      - name: Clone job-hunter-template
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TEMPLATE_REPO_PAT }}
+        run: |
+          set -euo pipefail
+          gh repo clone "${{ vars.TEMPLATE_REPO }}" shared
+
+      - name: Prepare target branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TEMPLATE_REPO_PAT }}
+          TEMPLATE_BRANCH: ${{ vars.TEMPLATE_REPO_BRANCH || 'main' }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/shared"
+
+          git config user.name "core-sync-bot"
+          git config user.email "core-sync-bot@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ vars.TEMPLATE_REPO }}.git"
+
+          if git rev-parse --verify HEAD >/dev/null 2>&1; then
+            if git ls-remote --exit-code --heads origin "$TEMPLATE_BRANCH" >/dev/null 2>&1; then
+              git fetch origin "$TEMPLATE_BRANCH"
+              git checkout -B "$TEMPLATE_BRANCH" "origin/$TEMPLATE_BRANCH"
+            else
+              git checkout -b "$TEMPLATE_BRANCH"
+              git push -u origin "$TEMPLATE_BRANCH"
+            fi
+          else
+            git checkout --orphan "$TEMPLATE_BRANCH"
+          fi
+
+      - name: Copy user-facing files to template
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+
+          # Ensure no code or personal files leak into the template repo
+          rm -rf shared/scripts shared/tests shared/config shared/jobs shared/linkedin \
+                 shared/.github/workflows shared/.github/searxng
+
+          mkdir -p shared/config shared/jobs shared/linkedin \
+                   shared/.github/workflows shared/.github/searxng
+
+          rsync -a --delete source/config/ shared/config/
+          rsync -a --delete source/jobs/ shared/jobs/
+          rsync -a --delete source/linkedin/ shared/linkedin/
+
+          cp source/resume_double_column.tex shared/resume_double_column.tex
+          cp source/resume_single_column.tex shared/resume_single_column.tex
+          cp source/story_bank.md shared/story_bank.md
+          cp source/project_instructions.md shared/project_instructions.md
+          cp source/README.md shared/README.md
+          cp source/SETUP.md shared/SETUP.md
+          cp source/CHANGELOG.md shared/CHANGELOG.md
+          cp source/VERSION shared/VERSION
+          cp source/altacv.cls shared/altacv.cls
+          cp source/.dockerignore shared/.dockerignore
+
+          cp source/.github/workflows/daily_jobs.yml shared/.github/workflows/daily_jobs.yml
+          cp source/.github/workflows/tailor_links.yml shared/.github/workflows/tailor_links.yml
+          cp source/.github/workflows/tailor_raw.yml shared/.github/workflows/tailor_raw.yml
+          cp source/.github/workflows/linkedin_content.yml shared/.github/workflows/linkedin_content.yml
+          cp source/.github/workflows/update_from_core.yml shared/.github/workflows/update_from_core.yml
+          cp source/.github/searxng/settings.yml shared/.github/searxng/settings.yml
+
+          # Remove legacy files that no longer belong in user repos
+          rm -f shared/.github/workflows/update_from_template.yml \
+                shared/.github/workflows/build_runner_image.yml
+          rm -f shared/Dockerfile shared/requirements.txt
+          rm -rf shared/scripts shared/tests
+
+          find shared -type d -name "__pycache__" -prune -exec rm -rf {} +
+          find shared -type f -name "*.pyc" -delete
+
+      - name: Commit and push to template repo
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.TEMPLATE_REPO_PAT }}
+          TEMPLATE_BRANCH: ${{ vars.TEMPLATE_REPO_BRANCH || 'main' }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/shared"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No template changes to push."
+            exit 0
+          fi
+
+          version="$(cat VERSION 2>/dev/null || echo 'unknown')"
+          git commit -m "sync: update template from job-hunter-core v${version}"
+          git push origin "$TEMPLATE_BRANCH"
+          echo "Pushed template sync for v${version}."

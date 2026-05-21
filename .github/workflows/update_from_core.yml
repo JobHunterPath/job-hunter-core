@@ -1,0 +1,247 @@
+name: Update From Core
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_repo:
+        description: "Core repository to pull updates from"
+        required: true
+        default: "Job-Network-Projects/job-hunter-core"
+        type: string
+      upstream_branch:
+        description: "Core branch to pull updates from"
+        required: true
+        default: "main"
+        type: string
+      update_config:
+        description: "Also update config files from core"
+        required: true
+        default: false
+        type: boolean
+      update_linkedin:
+        description: "Also add/update the starter linkedin folder"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Merge core updates into this branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          CORE_REPO_PAT: ${{ secrets.CORE_REPO_PAT }}
+          UPSTREAM_REPO: ${{ inputs.upstream_repo }}
+          UPSTREAM_BRANCH: ${{ inputs.upstream_branch }}
+          UPDATE_CONFIG: ${{ inputs.update_config }}
+          UPDATE_LINKEDIN: ${{ inputs.update_linkedin }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "core-update-bot"
+          git config user.email "core-update-bot@users.noreply.github.com"
+
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::GH_PAT is not available to this workflow run."
+            echo "::error::Add GH_PAT as a repository secret with Contents and Workflows read/write access to this repository."
+            exit 1
+          fi
+
+          if [ -z "${CORE_REPO_PAT}" ]; then
+            echo "::error::CORE_REPO_PAT is not available to this workflow run."
+            echo "::error::Add CORE_REPO_PAT as a repository secret with read access to Job-Network-Projects/job-hunter-core."
+            exit 1
+          fi
+
+          UPSTREAM_REPO="${UPSTREAM_REPO#https://github.com/}"
+          UPSTREAM_REPO="${UPSTREAM_REPO#http://github.com/}"
+          UPSTREAM_REPO="${UPSTREAM_REPO%.git}"
+          UPSTREAM_REPO="${UPSTREAM_REPO%/}"
+
+          token_user="$(curl -fsS \
+            -H "Authorization: Bearer ${CORE_REPO_PAT}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/user | jq -r '.login // empty')"
+          if [ -z "$token_user" ]; then
+            echo "::error::CORE_REPO_PAT is not a valid GitHub token."
+            exit 1
+          fi
+          echo "CORE_REPO_PAT authenticates as ${token_user}."
+
+          repo_probe="$(mktemp)"
+          repo_status="$(curl -sS -o "$repo_probe" -w "%{http_code}" \
+            -H "Authorization: Bearer ${CORE_REPO_PAT}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${UPSTREAM_REPO}")"
+          if [ "$repo_status" != "200" ]; then
+            echo "::error::CORE_REPO_PAT cannot read ${UPSTREAM_REPO} via the GitHub API. HTTP ${repo_status}."
+            cat "$repo_probe"
+            exit 1
+          fi
+
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          git remote remove upstream 2>/dev/null || true
+          git remote add upstream "https://${token_user}:${CORE_REPO_PAT}@github.com/${UPSTREAM_REPO}.git"
+
+          if ! git fetch upstream "${UPSTREAM_BRANCH}"; then
+            echo "::error::Could not fetch ${UPSTREAM_REPO}@${UPSTREAM_BRANCH}."
+            echo "::error::Check that CORE_REPO_PAT can read ${UPSTREAM_REPO}, and that the workflow input is owner/repo."
+            exit 1
+          fi
+
+          paths=(
+            ".github/searxng"
+            ".github/workflows/daily_jobs.yml"
+            ".github/workflows/linkedin_content.yml"
+            ".github/workflows/tailor_links.yml"
+            ".github/workflows/tailor_raw.yml"
+            ".github/workflows/update_from_core.yml"
+            "CHANGELOG.md"
+            "README.md"
+            "SETUP.md"
+            "VERSION"
+            "altacv.cls"
+          )
+
+          if [ "$UPDATE_CONFIG" = "true" ]; then
+            paths+=("config")
+          fi
+
+          if [ "$UPDATE_LINKEDIN" = "true" ]; then
+            paths+=("linkedin")
+          fi
+
+          current_version="$(cat VERSION 2>/dev/null || true)"
+          upstream_version="$(git show "upstream/${UPSTREAM_BRANCH}:VERSION" 2>/dev/null || true)"
+          changelog_excerpt="$(git show "upstream/${UPSTREAM_BRANCH}:CHANGELOG.md" 2>/dev/null | sed -n '1,35p' || true)"
+
+          semver_level="unknown"
+          semver_summary="Could not compare core versions."
+          if [ -z "$current_version" ] && [ -n "$upstream_version" ]; then
+            semver_level="initial"
+            semver_summary="This repository does not have a recorded core version yet. It will be updated to ${upstream_version}."
+          elif [[ "$current_version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]] && \
+               [[ "$upstream_version" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            IFS='.' read -r current_major current_minor current_patch <<< "$current_version"
+            IFS='.' read -r upstream_major upstream_minor upstream_patch <<< "$upstream_version"
+            if [ "$upstream_major" -gt "$current_major" ]; then
+              semver_level="major"
+              semver_summary="Major update: review setup, workflow, and config changes carefully before merging."
+            elif [ "$upstream_major" -eq "$current_major" ] && [ "$upstream_minor" -gt "$current_minor" ]; then
+              semver_level="minor"
+              semver_summary="Minor update: new backward-compatible functionality."
+            elif [ "$upstream_major" -eq "$current_major" ] && \
+                 [ "$upstream_minor" -eq "$current_minor" ] && \
+                 [ "$upstream_patch" -gt "$current_patch" ]; then
+              semver_level="patch"
+              semver_summary="Patch update: fixes, cleanup, or documentation improvements."
+            elif [ "$upstream_version" = "$current_version" ]; then
+              semver_level="same"
+              semver_summary="Core version is unchanged, but maintained files may still differ."
+            else
+              semver_level="local-newer"
+              semver_summary="This repository appears to have a newer version than the selected upstream."
+            fi
+          fi
+
+          upstream_ref="upstream/${UPSTREAM_BRANCH}"
+          upstream_in_history=false
+          if git merge-base --is-ancestor "$upstream_ref" HEAD; then
+            upstream_in_history=true
+          fi
+
+          git checkout "$upstream_ref" -- "${paths[@]}"
+
+          # Migrate: remove old update_from_template.yml if still present
+          git rm -f --ignore-unmatch .github/workflows/update_from_template.yml
+
+          # Remove legacy code files if present (repos migrating from old structure)
+          if [ ! -f pyproject.toml ]; then
+            git rm -r --ignore-unmatch \
+              scripts tests Dockerfile requirements.txt .github/workflows/build_runner_image.yml
+          fi
+
+          git add "${paths[@]}"
+
+          if git diff --cached --quiet && [ "$upstream_in_history" = true ]; then
+            echo "This repository already has the selected core files."
+            exit 0
+          fi
+
+          if [ -n "$upstream_version" ]; then
+            commit_title="chore: update from job-hunter-core v${upstream_version}"
+          else
+            commit_title="chore: update from job-hunter-core"
+          fi
+
+          commit_body="$(mktemp)"
+          {
+            echo "$commit_title"
+            echo
+            echo "Merge maintained files from ${UPSTREAM_REPO}@${UPSTREAM_BRANCH}."
+            echo
+            echo "Preserved personal files by default:"
+            echo "- resumes"
+            echo "- story bank"
+            echo "- project instructions"
+            echo "- generated jobs"
+            echo "- config files, unless update_config was enabled"
+            echo "- LinkedIn workspace, unless update_linkedin was enabled"
+          } > "$commit_body"
+
+          tree="$(git write-tree)"
+          current_head="$(git rev-parse HEAD)"
+          merge_commit="$(git commit-tree "$tree" -p "$current_head" -p "$upstream_ref" -F "$commit_body")"
+          git update-ref HEAD "$merge_commit"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+          {
+            echo "## Core update"
+            echo
+            echo "Updated maintained files from \`${UPSTREAM_REPO}@${UPSTREAM_BRANCH}\`."
+            echo
+            echo "### Semantic versioning summary"
+            echo
+            echo "- Current version: \`${current_version:-unknown}\`"
+            echo "- Upstream version: \`${upstream_version:-unknown}\`"
+            echo "- Update type: \`${semver_level}\`"
+            echo "- Meaning: $semver_summary"
+            echo
+            echo "### Preserved by default"
+            echo
+            echo "- resumes"
+            echo "- story bank"
+            echo "- project instructions"
+            echo "- generated jobs"
+            echo "- config files, unless \`update_config\` was enabled"
+            echo "- LinkedIn workspace, unless \`update_linkedin\` was enabled"
+            if [ "$semver_level" = "major" ]; then
+              echo
+              echo "> Important: this is a major update. Read the changelog and review setup/config changes."
+            fi
+            if [ -n "$changelog_excerpt" ]; then
+              echo
+              echo "### Recent changelog"
+              echo
+              echo '```markdown'
+              echo "$changelog_excerpt"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "Pushed core update to ${GITHUB_REPOSITORY}@${GITHUB_REF_NAME}."

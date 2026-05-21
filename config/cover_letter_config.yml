@@ -1,0 +1,70 @@
+cover_letter:
+  candidate_background: |
+    Candidate Name, Product Manager based in Target City.
+    Background: Replace this with your current role, target positioning, verified achievements, and relevant education.
+    Keep this section factual because the cover letter generator treats it as source material.
+
+  structure:
+    paragraph_1:
+      name: "Background and role connection"
+      max_sentences: 3
+      purpose: "Open with the candidate's professional background and connect to the role."
+      example_opening: "I am a product manager with experience across platform, data, and cross-functional delivery."
+    paragraph_2:
+      name: "Current or recent role"
+      max_sentences: 4
+      purpose: "Describe ownership scope and one verified outcome."
+      example_opening: "In my recent role, I owned discovery and delivery across engineering, design, and business stakeholders."
+    paragraph_3:
+      name: "Earlier experience with verified outcomes"
+      max_sentences: 4
+      purpose: "Use another story with concrete scope or metric."
+      example_opening: "Earlier, I worked on product initiatives where clear prioritisation and stakeholder alignment mattered."
+    paragraph_4:
+      name: "Specific interest in this company"
+      max_sentences: 3
+      purpose: "Make one concrete observation from the job description."
+      example_opening: "The role stands out because it connects product judgment with measurable customer and business outcomes."
+
+  tone:
+    - "professional and formal"
+    - "confident and substantive"
+    - "direct"
+    - "active voice"
+
+  forbidden:
+    phrases:
+      - "I am passionate about"
+      - "I am excited to apply"
+      - "I am honored"
+      - "I am thrilled"
+      - "I thrive in"
+      - "Happy to discuss"
+      - "Feel free to reach out"
+      - "I would love to"
+      - "Kind regards"
+    style:
+      - "generic enthusiasm"
+      - "unsupported claims"
+      - "overly casual phrasing"
+
+  closing:
+    format: "Best regards,\nCandidate Name"
+
+  stories:
+    source_file: "story_bank.md"
+    section: "Final - refined STAR stories"
+    rules:
+      - "Use only metrics and facts stated explicitly in the story library"
+      - "Never invent, extrapolate, or embellish"
+      - "Do not cite story IDs"
+
+  header:
+    include_date: true
+    date_format: "%B %d, %Y"
+    salutation: "Dear Hiring Manager,"
+
+  content:
+    target_words: 220
+    max_words: 280
+    paragraphs: 4

@@ -1,0 +1,32 @@
+use_default_settings: true
+
+search:
+  formats:
+    - html
+    - json
+  default_lang: "en"
+
+server:
+  secret_key: "github-actions-local-only"
+  bind_address: "0.0.0.0"
+  port: 8080
+  limiter: false
+  public_instance: false
+
+# Engines tuned for GitHub Actions ephemeral runners.
+# Google is disabled: its IPs are flagged as bot traffic on cloud runners and
+# consistently return captcha/empty results, wasting a slot in every query.
+# Bing handles site: operator reliably on cloud IPs and is the primary engine.
+# DuckDuckGo and Brave provide fallback coverage with independent indexes.
+engines:
+  - name: google
+    disabled: true
+  - name: bing
+    disabled: false
+    weight: 3
+  - name: duckduckgo
+    disabled: false
+    weight: 2
+  - name: brave
+    disabled: false
+    weight: 2

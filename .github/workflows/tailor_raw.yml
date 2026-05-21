@@ -1,0 +1,151 @@
+﻿name: Tailor Raw JD
+
+# Manual-only â€” triggered from the GitHub Actions UI.
+# Paste a full job description into the JD field.
+# Title and Company are optional; if omitted the LLM extracts them from the text.
+# The pipeline scores the JD, tailors the resume, generates a cover letter,
+# compiles PDFs, and commits results.
+
+on:
+  workflow_dispatch:
+    inputs:
+      jd:
+        description: 'Job description (paste full text)'
+        required: true
+        type: string
+      title:
+        description: 'Job title override (optional â€” inferred by LLM if blank)'
+        required: false
+        default: ''
+        type: string
+      company:
+        description: 'Company name override (optional â€” inferred by LLM if blank)'
+        required: false
+        default: ''
+        type: string
+      skip_score:
+        description: 'Skip scoring threshold â€” tailor regardless of fit score'
+        required: false
+        default: false
+        type: boolean
+      skip_validate:
+        description: 'Skip URL reachability and freshness validation'
+        required: false
+        default: false
+        type: boolean
+      force:
+        description: 'Re-tailor if this JD was already processed'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  tailor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Resolve prebuilt runner image
+        id: runner_image
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+        run: |
+          image="${CORE_IMAGE}"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+          if echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin && docker pull "$image"; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Using job-hunter core image: $image"
+          else
+            echo "::error::Could not pull job-hunter core image: $image"
+            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            exit 1
+          fi
+
+      - name: Build flags
+        id: flags
+        run: |
+          FLAGS=""
+          if [ "${{ github.event.inputs.skip_score }}" = "true" ];    then FLAGS="$FLAGS --skip-score";    fi
+          if [ "${{ github.event.inputs.skip_validate }}" = "true" ]; then FLAGS="$FLAGS --skip-validate"; fi
+          if [ "${{ github.event.inputs.force }}" = "true" ];         then FLAGS="$FLAGS --force";         fi
+          echo "flags=$FLAGS" >> $GITHUB_OUTPUT
+
+      - name: Run tailor-raw pipeline in prebuilt runner image
+        if: steps.runner_image.outputs.available == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          SEARXNG_BASE_URL: http://127.0.0.1:8080
+          RAW_JD: ${{ github.event.inputs.jd }}
+          RAW_TITLE: ${{ github.event.inputs.title }}
+          RAW_COMPANY: ${{ github.event.inputs.company }}
+          FLAGS: ${{ steps.flags.outputs.flags }}
+          LOG_LEVEL: INFO
+          RUNNER_IMAGE: ${{ steps.runner_image.outputs.image }}
+        run: |
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e ANTHROPIC_API_KEY \
+            -e OPENAI_API_KEY \
+            -e GOOGLE_API_KEY \
+            -e BRAVE_API_KEY \
+            -e TAVILY_API_KEY \
+            -e EXA_API_KEY \
+            -e SEARXNG_BASE_URL \
+            -e RAW_JD \
+            -e RAW_TITLE \
+            -e RAW_COMPANY \
+            -e FLAGS \
+            -e LOG_LEVEL \
+            -e JOB_HUNTER_ROOT=/workspace \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$RUNNER_IMAGE" \
+            bash -lc '
+              args=(tailor-raw --jd -)
+              [ -n "$RAW_TITLE" ] && args+=(--title "$RAW_TITLE")
+              [ -n "$RAW_COMPANY" ] && args+=(--company "$RAW_COMPANY")
+              printf "%s" "$RAW_JD" | job-hunter "${args[@]}" $FLAGS
+            '
+
+      - name: Upload logs as artifact
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tailor-raw-logs-${{ github.run_id }}
+          path: job_hunt.log
+          retention-days: 30
+
+      - name: Commit results
+        run: |
+          git config user.name "job-hunt-bot"
+          git config user.email "bot@job-hunt"
+          git add README.md config/applied_jobs.yml config/search_config.yml
+          find jobs -maxdepth 2 -type f \( \
+            -name meta.json -o \
+            -name jd.md -o \
+            -name cover_letter.md -o \
+            -name resume_tailored.tex -o \
+            -name resume_tailored.pdf -o \
+            -name cover_letter.pdf \
+          \) -print0 | xargs -0 -r git add --
+          git diff --staged --quiet || git commit -m "tailor: $(date +%Y-%m-%d)"
+          git pull --rebase origin main
+          git push

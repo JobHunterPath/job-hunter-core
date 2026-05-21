@@ -1,0 +1,179 @@
+﻿name: Tailor Links
+
+# Manual-only â€” triggered from the GitHub Actions UI.
+# Enter up to 5 job URLs (URL 1 is required, URLs 2â€“5 are optional).
+# The pipeline fetches each JD, tailors the resume, generates a cover letter,
+# compiles PDFs, and registers each company in search_config.yml regions.
+
+on:
+  workflow_dispatch:
+    inputs:
+      url_1:
+        description: 'Job URL 1 (required)'
+        required: true
+        type: string
+      url_2:
+        description: 'Job URL 2'
+        required: false
+        default: ''
+        type: string
+      url_3:
+        description: 'Job URL 3'
+        required: false
+        default: ''
+        type: string
+      url_4:
+        description: 'Job URL 4'
+        required: false
+        default: ''
+        type: string
+      url_5:
+        description: 'Job URL 5'
+        required: false
+        default: ''
+        type: string
+      skip_score:
+        description: 'Skip scoring threshold â€” tailor all fetched jobs'
+        required: false
+        default: false
+        type: boolean
+      skip_validate:
+        description: 'Skip URL reachability and freshness validation'
+        required: false
+        default: false
+        type: boolean
+      force:
+        description: 'Re-tailor jobs already in applied_jobs.yml'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  tailor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Resolve prebuilt runner image
+        id: runner_image
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+        run: |
+          image="${CORE_IMAGE}"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+          if echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin && docker pull "$image"; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Using job-hunter core image: $image"
+          else
+            echo "::error::Could not pull job-hunter core image: $image"
+            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            exit 1
+          fi
+
+      - name: Start SearXNG
+        run: |
+          if ! docker run -d --name searxng \
+            -p 8080:8080 \
+            -v "${{ github.workspace }}/.github/searxng/settings.yml:/etc/searxng/settings.yml:ro" \
+            -e SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml \
+            ghcr.io/searxng/searxng:latest; then
+            echo "SearXNG container failed to start; continuing with other providers"
+            exit 0
+          fi
+
+          for i in {1..30}; do
+            if curl -fsS "http://127.0.0.1:8080/search?q=test&format=json" >/dev/null; then
+              echo "SearXNG is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "SearXNG did not become ready; continuing with other providers"
+          docker logs searxng || true
+
+      - name: Build flags and collect URLs
+        id: flags
+        run: |
+          # Collect non-empty URL inputs into a comma-separated list
+          LINKS="${{ github.event.inputs.url_1 }}"
+          [ -n "${{ github.event.inputs.url_2 }}" ] && LINKS="${LINKS},${{ github.event.inputs.url_2 }}"
+          [ -n "${{ github.event.inputs.url_3 }}" ] && LINKS="${LINKS},${{ github.event.inputs.url_3 }}"
+          [ -n "${{ github.event.inputs.url_4 }}" ] && LINKS="${LINKS},${{ github.event.inputs.url_4 }}"
+          [ -n "${{ github.event.inputs.url_5 }}" ] && LINKS="${LINKS},${{ github.event.inputs.url_5 }}"
+          echo "links=$LINKS" >> $GITHUB_OUTPUT
+
+          FLAGS=""
+          if [ "${{ github.event.inputs.skip_score }}" = "true" ];    then FLAGS="$FLAGS --skip-score";    fi
+          if [ "${{ github.event.inputs.skip_validate }}" = "true" ]; then FLAGS="$FLAGS --skip-validate"; fi
+          if [ "${{ github.event.inputs.force }}" = "true" ];         then FLAGS="$FLAGS --force";         fi
+          echo "flags=$FLAGS" >> $GITHUB_OUTPUT
+
+      - name: Run tailor-links pipeline in prebuilt runner image
+        if: steps.runner_image.outputs.available == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          SEARXNG_BASE_URL: http://127.0.0.1:8080
+          TAILOR_LINKS: ${{ steps.flags.outputs.links }}
+          LOG_LEVEL: INFO
+          RUNNER_IMAGE: ${{ steps.runner_image.outputs.image }}
+        run: |
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e ANTHROPIC_API_KEY \
+            -e OPENAI_API_KEY \
+            -e GOOGLE_API_KEY \
+            -e BRAVE_API_KEY \
+            -e TAVILY_API_KEY \
+            -e EXA_API_KEY \
+            -e SEARXNG_BASE_URL \
+            -e TAILOR_LINKS \
+            -e LOG_LEVEL \
+            -e JOB_HUNTER_ROOT=/workspace \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$RUNNER_IMAGE" \
+            job-hunter tailor-links ${{ steps.flags.outputs.flags }}
+
+      - name: Upload logs as artifact
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tailor-links-logs-${{ github.run_id }}
+          path: job_hunt.log
+          retention-days: 30
+
+      - name: Commit results
+        run: |
+          git config user.name "job-hunt-bot"
+          git config user.email "bot@job-hunt"
+          git add README.md config/applied_jobs.yml config/search_config.yml
+          find jobs -maxdepth 2 -type f \( \
+            -name meta.json -o \
+            -name jd.md -o \
+            -name cover_letter.md -o \
+            -name resume_tailored.tex -o \
+            -name resume_tailored.pdf -o \
+            -name cover_letter.pdf \
+          \) -print0 | xargs -0 -r git add --
+          git diff --staged --quiet || git commit -m "tailor: $(date +%Y-%m-%d)"
+          git pull --rebase origin main
+          git push

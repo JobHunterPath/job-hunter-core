@@ -1,0 +1,165 @@
+"""Command-line entry point for the installed job-hunter core package."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+
+def _run_pipeline(argv: list[str]) -> int:
+    from pipeline.orchestrator import _build_parser, run
+
+    return run(_build_parser().parse_args(argv))
+
+
+def _run_discovery(_argv: list[str]) -> int:
+    from discovery.discoverer import run
+
+    run()
+    return 0
+
+
+def _run_merge_tracker(_argv: list[str]) -> int:
+    from pipeline.merge_tracker import main
+
+    return main()
+
+
+def _run_resolve_hunt_region(_argv: list[str]) -> int:
+    from pipeline.resolve_hunt_region import main
+
+    return main()
+
+
+def _run_linkedin(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="job-hunter linkedin")
+    parser.add_argument(
+        "job",
+        choices=["generate-ideas", "draft-posts", "discover-engagement", "all"],
+        help="LinkedIn helper job to run.",
+    )
+    parser.add_argument("--config", help="Path to linkedin/config.yml")
+    args = parser.parse_args(argv)
+
+    if args.job in ("generate-ideas", "all"):
+        from linkedin.generate_ideas import generate
+
+        generate(Path(args.config) if args.config else None)
+    if args.job in ("draft-posts", "all"):
+        from linkedin.draft_posts import draft
+
+        draft(Path(args.config) if args.config else None)
+    if args.job in ("discover-engagement", "all"):
+        from linkedin.discover_engagement import discover
+
+        discover(Path(args.config) if args.config else None)
+    return 0
+
+
+def _run_config(argv: list[str]) -> int:
+    from core.config_schema import main as config_main
+
+    return config_main(argv)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="job-hunter",
+        description="Private job-hunt automation core.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    hunt = subparsers.add_parser("hunt", help="Run the hunt pipeline.")
+    hunt.add_argument("--region", help="Optional search_config.yml region key.")
+    hunt.add_argument("--skip-score", action="store_true")
+    hunt.add_argument("--skip-validate", action="store_true")
+    hunt.set_defaults(func=lambda ns: _run_pipeline(_namespace_to_args(ns)))
+
+    tailor_links = subparsers.add_parser("tailor-links", help="Tailor from job URLs.")
+    tailor_links.add_argument("--links", help="Comma-separated job URLs.")
+    tailor_links.add_argument("--skip-score", action="store_true")
+    tailor_links.add_argument("--skip-validate", action="store_true")
+    tailor_links.add_argument("--force", action="store_true")
+    tailor_links.set_defaults(
+        func=lambda ns: _run_pipeline(["--mode", "tailor-links", *_namespace_to_args(ns)])
+    )
+
+    tailor_raw = subparsers.add_parser("tailor-raw", help="Tailor from raw JD text.")
+    tailor_raw.add_argument("--jd", required=True)
+    tailor_raw.add_argument("--title")
+    tailor_raw.add_argument("--company")
+    tailor_raw.add_argument("--skip-score", action="store_true")
+    tailor_raw.add_argument("--skip-validate", action="store_true")
+    tailor_raw.add_argument("--force", action="store_true")
+    tailor_raw.set_defaults(
+        func=lambda ns: _run_pipeline(["--mode", "tailor-raw", *_namespace_to_args(ns)])
+    )
+
+    discover = subparsers.add_parser("discover", help="Run weekly company discovery.")
+    discover.set_defaults(func=lambda ns: _run_discovery([]))
+
+    merge_tracker = subparsers.add_parser(
+        "merge-tracker",
+        help="Union-merge tracker files after concurrent run conflicts.",
+    )
+    merge_tracker.set_defaults(func=lambda ns: _run_merge_tracker([]))
+
+    resolve_hunt_region = subparsers.add_parser(
+        "resolve-hunt-region",
+        help="Resolve the scheduled/manual hunt region and emit GitHub Actions outputs.",
+    )
+    resolve_hunt_region.set_defaults(func=lambda ns: _run_resolve_hunt_region([]))
+
+    linkedin = subparsers.add_parser("linkedin", help="Run LinkedIn helpers.")
+    linkedin.add_argument(
+        "job",
+        choices=["generate-ideas", "draft-posts", "discover-engagement", "all"],
+    )
+    linkedin.add_argument("--config")
+    linkedin.set_defaults(func=lambda ns: _run_linkedin(_linkedin_args(ns)))
+
+    config = subparsers.add_parser("config", help="Check or migrate config schema.")
+    config.add_argument("action", choices=["check", "migrate"])
+    config.add_argument("--target-version", type=int, default=1)
+    config.set_defaults(func=lambda ns: _run_config(_config_args(ns)))
+
+    return parser
+
+
+def _namespace_to_args(ns: argparse.Namespace) -> list[str]:
+    args: list[str] = []
+    values = vars(ns)
+    for key, value in values.items():
+        if key in {"command", "func"} or value in (None, False):
+            continue
+        flag = f"--{key.replace('_', '-')}"
+        if value is True:
+            args.append(flag)
+        else:
+            args.extend([flag, str(value)])
+    return args
+
+
+def _linkedin_args(ns: argparse.Namespace) -> list[str]:
+    args = [ns.job]
+    if ns.config:
+        args.extend(["--config", str(ns.config)])
+    return args
+
+
+def _config_args(ns: argparse.Namespace) -> list[str]:
+    args = [ns.action]
+    if ns.target_version != 1:
+        args.extend(["--target-version", str(ns.target_version)])
+    return args
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return int(args.func(args) or 0)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

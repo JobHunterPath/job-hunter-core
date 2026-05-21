@@ -1,0 +1,22 @@
+scoring:
+  min_fit_score: 70
+  max_years_experience_required: 5
+  strategic_overrides:
+    - company: "Example Strategic Company"
+      reason: "High-priority target company"
+      min_score_override: 65
+  prompt_context:
+    resume_mode: compact_text
+    resume_max_chars: 4500
+    job_description_max_chars: 5000
+
+benchmarking:
+  enabled: true
+  track_metrics:
+    - "average_score_per_company"
+    - "average_score_per_industry"
+    - "score_trends_over_time"
+
+logging:
+  log_all_scores: true
+  min_score_to_log_details: 70

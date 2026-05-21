@@ -1,0 +1,125 @@
+linkedin:
+  positioning: "Product professional focused on technical products, platform work, and practical product execution."
+
+  audience:
+    - hiring managers
+    - product leaders
+    - recruiters
+    - technical PMs
+
+  content_pillars:
+    - product management
+    - technical product work
+    - platform product management
+    - stakeholder management
+    - learning in public
+    - side projects
+
+  tone:
+    - concrete
+    - honest
+    - practical
+    - concise
+    - no influencer voice
+
+  forbidden_phrases:
+    - "I am passionate about"
+    - "thrilled to share"
+    - "game changer"
+    - "thought leader"
+    - "10x"
+    - "pick your brain"
+    - "please refer me"
+
+  automation_policy:
+    human_review_required: true
+    auto_post: false
+    auto_comment: false
+    auto_like: false
+    auto_follow: false
+    auto_connect: false
+    auto_message: false
+
+  confidentiality:
+    mode: strict
+    story_bank_is_confidential: true
+    public_safe_generation: true
+    forbidden_public_details:
+      - internal product names unless explicitly approved
+      - unreleased roadmap details
+      - vendor/provider names not publicly confirmed
+      - incident details
+      - internal team structures
+      - private stakeholder names
+      - exact internal process details
+      - confidential metrics
+    allowed_transformations:
+      - convert private work into general lessons
+      - use anonymized product patterns
+      - discuss public-safe concepts
+      - refer to broad domains instead of private details
+      - use verified public facts only when explicitly marked public
+
+  files:
+    ideas: "linkedin/ideas.md"
+    drafts_dir: "linkedin/drafts"
+    engagement: "linkedin/engagement.md"
+    networking: "linkedin/networking.md"
+
+  cadence:
+    idea_generation_per_week: 1
+    draft_posts_per_week: 2
+    engagement_discovery_per_week: 3
+
+  idea_generation:
+    ideas_per_run: 8
+    source: story_bank
+
+  draft_generation:
+    posts_per_run: 2
+    source_status: raw
+    mark_converted: true
+    max_words_per_post: 180
+
+  engagement_discovery:
+    results_per_query: 5
+    people_per_run: 8
+    posts_per_run: 8
+    region:
+      country: DE
+      search_lang: en
+      location: Berlin
+    linkedin_domains:
+      people: "linkedin.com/in"
+      posts: "linkedin.com/posts"
+    topics:
+      - product management
+      - platform product management
+      - AI product management
+      - technical product management
+      - product leadership
+
+  networking:
+    suggestions_per_run: 8
+    message_variants_per_person: 2
+    max_message_words: 70
+    no_job_ask: true
+    no_referral_ask: true
+    relationship_types:
+      - follow_only
+      - connect_light
+      - connect_with_message
+      - recruiter_intro
+      - hiring_manager_intro
+      - peer_conversation
+    ask_readiness:
+      cold: "no ask"
+      warm: "ask for perspective"
+      engaged: "ask about team or company"
+      trusted: "referral may be appropriate"
+    target_people:
+      - product managers
+      - platform product managers
+      - technical recruiters
+      - hiring managers for PM/PO roles
+      - product leaders in target companies

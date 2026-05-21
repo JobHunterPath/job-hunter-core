@@ -1,0 +1,181 @@
+# API and LLM configuration for the shareable template repo.
+# Store real secret values in environment variables, GitHub Actions secrets, or
+# your local keyring. Do not commit API keys.
+
+llm:
+  # The maintained core image includes the supported provider SDKs.
+  default_provider: anthropic
+  providers:
+    validation: anthropic
+    scoring: anthropic
+    tailoring: anthropic
+    cover_letter: anthropic
+    discovery: anthropic
+    linkedin: anthropic
+    jd_extraction: anthropic
+    ai_web_search: anthropic
+  models:
+    # Model names must match the provider configured for each role above.
+    # If you switch providers, replace these with model names from that provider.
+    validation: "claude-haiku-4-5-20251001"
+    scoring: "claude-haiku-4-5-20251001"
+    tailoring: "claude-sonnet-4-6"
+    cover_letter: "claude-sonnet-4-6"
+    discovery: "claude-sonnet-4-6"
+    linkedin: "claude-sonnet-4-6"
+    jd_extraction: "claude-haiku-4-5-20251001"
+    ai_web_search: "claude-haiku-4-5-20251001"  # may 529 at peak hours; switch to sonnet if reliability matters more than cost
+  max_tokens:
+    validation: 200
+    scoring: 1000
+    tailoring: 4000
+    cover_letter: 800
+    discovery: 400
+    linkedin: 3000
+    jd_extraction: 1500
+    ai_web_search: 1200
+
+  # Concurrent LLM workers for validation and scoring.
+  # Keep this conservative for provider rate limits. Retry-with-backoff handles
+  # transient 429s automatically.
+  max_workers: 5
+
+  # Optional provider-level RPM throttle. This spaces calls before they hit the
+  # provider, which is different from retrying after a 429. Set to 0 to disable.
+  rate_limits:
+    google:
+      requests_per_minute: 4
+
+ollama:
+  base_url: "http://localhost:11434"
+
+secrets:
+  # Set required: true only for providers used in llm.default_provider or
+  # llm.providers.*; set unused providers to false.
+  anthropic:
+    env_var: "ANTHROPIC_API_KEY"
+    required: true
+  openai:
+    env_var: "OPENAI_API_KEY"
+    required: false
+  google:
+    env_var: "GOOGLE_API_KEY"
+    required: false
+  brave:
+    env_var: "BRAVE_API_KEY"
+    required: false
+  tavily:
+    env_var: "TAVILY_API_KEY"
+    required: false
+  exa:
+    env_var: "EXA_API_KEY"
+    required: false
+  rapidapi:
+    env_var: "RAPIDAPI_KEY"
+    required: false
+
+http:
+  url_verification:
+    enabled: true
+    timeout_seconds: 5
+    max_workers: 5
+  search_providers:
+    timeout_seconds: 10
+    max_consecutive_failures: 3
+    order:
+      - searxng
+      - brave
+      - tavily
+      - exa
+    searxng_base_url: "http://127.0.0.1:8080"
+    ats_discovery:
+      enabled: true
+      results_per_query: 10
+      # 0 means unlimited. Use these caps to constrain region x title x source query growth.
+      max_queries_per_region: 0
+      max_total_queries: 0
+      sources:
+        - greenhouse
+        - lever
+        - ashby
+        - smartrecruiters
+        - workable
+        - personio
+        - recruitee
+        - hibob
+    ai_web_search:
+      enabled: false
+      # Queries are title + region only; company names are never included.
+      # 0 preserves old behavior. Set above 0 to skip AI search when earlier sources find enough jobs.
+      run_if_fewer_than_jobs: 0
+      prompt_delay_seconds: 3         # pause between prompts to avoid overloading the web-search endpoint
+      max_prompts_per_run: 80
+      max_prompts_per_region: 8
+      max_results_per_prompt: 8
+      max_results_per_region: 30
+      max_total_results_per_run: 120
+      min_confidence: 0.5
+      sources:
+        greenhouse:
+          enabled: true
+          query_templates:
+            - 'site:greenhouse.io "{title}" "{location}"'
+        lever:
+          enabled: true
+          query_templates:
+            - 'site:jobs.lever.co "{title}" "{location}"'
+        ashby:
+          enabled: true
+          query_templates:
+            - 'site:jobs.ashbyhq.com "{title}" "{location}"'
+        smartrecruiters:
+          enabled: true
+          query_templates:
+            - 'site:jobs.smartrecruiters.com "{title}" "{location}"'
+        workable:
+          enabled: true
+          query_templates:
+            - 'site:apply.workable.com "{title}" "{location}"'
+        personio:
+          enabled: true
+          query_templates:
+            - '(site:jobs.personio.de OR site:jobs.personio.com) "{title}" "{location}"'
+        recruitee:
+          enabled: true
+          query_templates:
+            - 'site:recruitee.com "{title}" "{location}"'
+        hibob:
+          enabled: true
+          query_templates:
+            - 'site:careers.hibob.com/jobs "{title}" "{location}"'
+        generic_web:
+          enabled: true
+          query_templates:
+            # Exclude aggregators to force individual company career pages and ATS postings.
+            - '"{title}" "{location}" job apply -site:glassdoor.com -site:indeed.com -site:linkedin.com -site:monster.com -site:xing.com -site:stepstone.de'
+  ats_scraper:
+    timeout_seconds: 10
+
+  playwright:
+    timeout_seconds: 10
+
+  jd_enrichment:
+    # Full JD fetching is best-effort. Some hosts, especially LinkedIn, throttle
+    # direct scraping aggressively; keep their search snippets instead.
+    max_workers: 5
+    skip_url_patterns:
+      - 'linkedin\.com/jobs/'
+  job_boards:
+    timeout_seconds: 10
+    max_consecutive_failures: 3
+
+profile:
+  # Available resume templates:
+  # - resume_double_column.tex: AltaCV double-column layout
+  # - resume_single_column.tex: ATS-friendly single-column layout
+  resume_tex: "resume_double_column.tex"
+  story_bank: "story_bank.md"
+  project_instructions: "project_instructions.md"
+  profile_image: ""
+  latex_class: "altacv.cls"
+  output_dir: "jobs"

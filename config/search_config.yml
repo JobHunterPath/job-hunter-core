@@ -1,0 +1,107 @@
+regions:
+  primary:
+    enabled: true
+    primary: true
+    country: "DE"
+    search_lang: "en"
+    location: "Berlin"
+    description: "Primary search region"
+    job_titles:
+      - "Product Manager"
+      - "Product Owner"
+    companies:
+      - name: Example SaaS Company
+        career_url: boards.greenhouse.io/example
+      - name: Example Lever Company
+        career_url: jobs.lever.co/example
+      - name: Example Careers Site
+        career_url: careers.example.com
+
+scraping:
+  max_workers: 10              # companies processed in parallel
+  total_timeout_seconds: 1800  # 30 min ceiling for company scraping phase
+
+global_search:
+  results_per_query: 10
+  job_titles:
+    - "Product Manager"
+    - "Product Owner"
+
+job_boards:
+  arbeitnow:
+    enabled: true
+    max_pages: 3
+  jsearch:
+    enabled: false
+    num_pages: 1
+
+exclusion_rules:
+  excluded_url_patterns:
+    - "linkedin\\.com/jobs/search"
+    - "linkedin\\.com/jobs/[^/?#]+-jobs"
+    - "linkedin\\.com/jobs/collections"
+  excluded_title_terms:
+  - engineer
+  - engineering
+  - developer
+  - software
+  - frontend
+  - backend
+  - full stack
+  - fullstack
+  - devops
+  - data scientist
+  - designer
+  - ux
+  - ui
+  - working student
+  - werkstudent
+  - student
+  - intern
+  - internship
+  - praktikum
+  - praktikant
+  - trainee
+  excluded_industries:
+    - "gambling"
+    - "casino"
+    - "weapons"
+    - "defence"
+  senior_flags:
+    - "director"
+    - "vp "
+    - "vice president"
+    - "head of product"
+    - "chief product"
+  stale_indicators:
+    - "no longer available"
+    - "this job has expired"
+    - "position has been filled"
+    - "not accepting applications"
+  german_indicators:
+    # German sentence fragments — only appear in German-language postings
+    - wir suchen
+    - wir freuen uns
+    - jetzt bewerben
+    - ihre aufgaben
+    - ihr profil
+    - deine aufgaben
+    - dein profil
+    - was wir bieten
+    - was du mitbringst
+    - das bieten wir
+    # Unmistakable German compound words unique to job descriptions
+    - stellenangebot
+    - berufserfahrung
+    - deutschkenntnisse
+
+jobspy:
+  enabled: true
+  hours_old: 72             # only return jobs posted within this window
+  results_per_query: 20     # per title × region × source
+  # Maps region name to Indeed country code. Regions not listed use Google Jobs only.
+  country_indeed_by_region:
+    primary: germany        # replace with the correct country for your primary region
+
+excluded_companies:
+  - "Example Excluded Company"

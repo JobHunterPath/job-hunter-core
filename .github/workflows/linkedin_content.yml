@@ -1,0 +1,244 @@
+﻿name: LinkedIn Content
+
+on:
+  schedule:
+    - cron: '30 18 * * 1'  # weekly idea generation
+    - cron: '0 19 * * 1'   # weekly draft posts
+    - cron: '0 18 * * 2,4,6' # engagement discovery, three times per week
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which LinkedIn job to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - generate-ideas
+          - draft-posts
+          - discover-engagement
+
+permissions:
+  contents: write
+  packages: read
+
+concurrency:
+  group: linkedin-content-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate_ideas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '30 18 * * 1') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'generate-ideas' || github.event.inputs.job == 'all'))
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Sync latest branch
+        run: git pull --rebase origin main
+
+      - name: Resolve job-hunter core image
+        id: core_image
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+        run: |
+          echo "image=$CORE_IMAGE" >> "$GITHUB_OUTPUT"
+          if ! echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || ! docker pull "$CORE_IMAGE"; then
+            echo "::error::Could not pull job-hunter core image: $CORE_IMAGE"
+            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            exit 1
+          fi
+
+      - name: Generate public-safe raw ideas
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          LOG_LEVEL: INFO
+          RUNNER_IMAGE: ${{ steps.core_image.outputs.image }}
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e JOB_HUNTER_ROOT=/workspace \
+            -e ANTHROPIC_API_KEY \
+            -e OPENAI_API_KEY \
+            -e GOOGLE_API_KEY \
+            -e LOG_LEVEL \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$RUNNER_IMAGE" \
+            job-hunter linkedin generate-ideas
+
+      - name: Commit LinkedIn ideas
+        run: |
+          git config user.name "linkedin-content-bot"
+          git config user.email "bot@job-hunt"
+          git add linkedin/ideas.md
+          git diff --staged --quiet || git commit -m "linkedin: generate raw ideas"
+          git pull --rebase origin main
+          git push
+
+  draft_posts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: generate_ideas
+    if: |
+      always() &&
+      ((github.event_name == 'schedule' && github.event.schedule == '0 19 * * 1') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'draft-posts' || github.event.inputs.job == 'all'))
+      )
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Sync latest branch
+        run: git pull --rebase origin main
+
+      - name: Resolve job-hunter core image
+        id: core_image
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+        run: |
+          echo "image=$CORE_IMAGE" >> "$GITHUB_OUTPUT"
+          if ! echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || ! docker pull "$CORE_IMAGE"; then
+            echo "::error::Could not pull job-hunter core image: $CORE_IMAGE"
+            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            exit 1
+          fi
+
+      - name: Create draft posts
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          LOG_LEVEL: INFO
+          RUNNER_IMAGE: ${{ steps.core_image.outputs.image }}
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e JOB_HUNTER_ROOT=/workspace \
+            -e ANTHROPIC_API_KEY \
+            -e OPENAI_API_KEY \
+            -e GOOGLE_API_KEY \
+            -e LOG_LEVEL \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$RUNNER_IMAGE" \
+            job-hunter linkedin draft-posts
+
+      - name: Commit LinkedIn drafts
+        run: |
+          git config user.name "linkedin-content-bot"
+          git config user.email "bot@job-hunt"
+          git add linkedin/ideas.md linkedin/drafts/
+          git diff --staged --quiet || git commit -m "linkedin: draft weekly posts"
+          git pull --rebase origin main
+          git push
+
+  discover_engagement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: draft_posts
+    if: |
+      always() &&
+      ((github.event_name == 'schedule' && github.event.schedule == '0 18 * * 2,4,6') ||
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.job == 'discover-engagement' || github.event.inputs.job == 'all'))
+      )
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Sync latest branch
+        run: git pull --rebase origin main
+
+      - name: Resolve job-hunter core image
+        id: core_image
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+        run: |
+          echo "image=$CORE_IMAGE" >> "$GITHUB_OUTPUT"
+          if ! echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || ! docker pull "$CORE_IMAGE"; then
+            echo "::error::Could not pull job-hunter core image: $CORE_IMAGE"
+            echo "::error::Grant this repository package access or set CORE_IMAGE_PAT with read:packages."
+            exit 1
+          fi
+
+      - name: Start SearXNG
+        run: |
+          if ! docker run -d --name searxng \
+            -p 8080:8080 \
+            -v "${{ github.workspace }}/.github/searxng/settings.yml:/etc/searxng/settings.yml:ro" \
+            -e SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml \
+            ghcr.io/searxng/searxng:latest; then
+            echo "SearXNG container failed to start; continuing with other providers"
+            exit 0
+          fi
+
+          for i in {1..30}; do
+            if curl -fsS "http://127.0.0.1:8080/search?q=test&format=json" >/dev/null; then
+              echo "SearXNG is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "SearXNG did not become ready; continuing with other providers"
+          docker logs searxng || true
+
+      - name: Discover engagement and networking suggestions
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          SEARXNG_BASE_URL: http://127.0.0.1:8080
+          LOG_LEVEL: INFO
+          RUNNER_IMAGE: ${{ steps.core_image.outputs.image }}
+        run: |
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e JOB_HUNTER_ROOT=/workspace \
+            -e ANTHROPIC_API_KEY \
+            -e OPENAI_API_KEY \
+            -e GOOGLE_API_KEY \
+            -e BRAVE_API_KEY \
+            -e TAVILY_API_KEY \
+            -e EXA_API_KEY \
+            -e SEARXNG_BASE_URL \
+            -e LOG_LEVEL \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$RUNNER_IMAGE" \
+            job-hunter linkedin discover-engagement
+
+      - name: Commit LinkedIn discovery
+        run: |
+          git config user.name "linkedin-content-bot"
+          git config user.email "bot@job-hunt"
+          git add linkedin/engagement.md linkedin/networking.md
+          git diff --staged --quiet || git commit -m "linkedin: discover engagement"
+          git pull --rebase origin main
+          git push
