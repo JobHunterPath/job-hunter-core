@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.12.7 - 2026-05-21
+
+- Synced updates from the private source repository.
+
+Source commits:
+- `fc44a0e` fix(sync): force-push sync branch to handle workflow re-runs
+
+
 ## 2.12.6 - 2026-05-20
 
 - Synced reusable template updates from the private source repository.

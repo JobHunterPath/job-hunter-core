@@ -1,7 +1,7 @@
-﻿name: Tailor Links
+name: Tailor Links
 
-# Manual-only â€” triggered from the GitHub Actions UI.
-# Enter up to 5 job URLs (URL 1 is required, URLs 2â€“5 are optional).
+# Manual-only — triggered from the GitHub Actions UI.
+# Enter up to 5 job URLs (URL 1 is required, URLs 2–5 are optional).
 # The pipeline fetches each JD, tailors the resume, generates a cover letter,
 # compiles PDFs, and registers each company in search_config.yml regions.
 
@@ -33,7 +33,7 @@ on:
         default: ''
         type: string
       skip_score:
-        description: 'Skip scoring threshold â€” tailor all fetched jobs'
+        description: 'Skip scoring threshold — tailor all fetched jobs'
         required: false
         default: false
         type: boolean
@@ -68,7 +68,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
-          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           image="${CORE_IMAGE}"
           echo "image=$image" >> "$GITHUB_OUTPUT"

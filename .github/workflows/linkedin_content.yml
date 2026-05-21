@@ -1,4 +1,4 @@
-﻿name: LinkedIn Content
+name: LinkedIn Content
 
 on:
   schedule:
@@ -48,7 +48,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
-          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           echo "image=$CORE_IMAGE" >> "$GITHUB_OUTPUT"
           if ! echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || ! docker pull "$CORE_IMAGE"; then
@@ -111,7 +111,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
-          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           echo "image=$CORE_IMAGE" >> "$GITHUB_OUTPUT"
           if ! echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || ! docker pull "$CORE_IMAGE"; then
@@ -174,7 +174,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
-          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           echo "image=$CORE_IMAGE" >> "$GITHUB_OUTPUT"
           if ! echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || ! docker pull "$CORE_IMAGE"; then

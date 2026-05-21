@@ -1,6 +1,6 @@
-﻿name: Tailor Raw JD
+name: Tailor Raw JD
 
-# Manual-only â€” triggered from the GitHub Actions UI.
+# Manual-only — triggered from the GitHub Actions UI.
 # Paste a full job description into the JD field.
 # Title and Company are optional; if omitted the LLM extracts them from the text.
 # The pipeline scores the JD, tailors the resume, generates a cover letter,
@@ -14,17 +14,17 @@ on:
         required: true
         type: string
       title:
-        description: 'Job title override (optional â€” inferred by LLM if blank)'
+        description: 'Job title override (optional — inferred by LLM if blank)'
         required: false
         default: ''
         type: string
       company:
-        description: 'Company name override (optional â€” inferred by LLM if blank)'
+        description: 'Company name override (optional — inferred by LLM if blank)'
         required: false
         default: ''
         type: string
       skip_score:
-        description: 'Skip scoring threshold â€” tailor regardless of fit score'
+        description: 'Skip scoring threshold — tailor regardless of fit score'
         required: false
         default: false
         type: boolean
@@ -59,7 +59,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.CORE_IMAGE_PAT || github.token }}
-          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/job-network-projects/job-hunter-core:latest' }}
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/abdulrbasit/abdul.basit_resume/job-hunter-core:latest' }}
         run: |
           image="${CORE_IMAGE}"
           echo "image=$image" >> "$GITHUB_OUTPUT"

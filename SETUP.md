@@ -90,6 +90,12 @@ Value: <token from maintainer>
 If the secret is missing or invalid, the workflow fails early with an image-pull
 error.
 
+You can override the image with a repository variable:
+
+```text
+JOB_HUNTER_CORE_IMAGE=ghcr.io/OWNER/REPO/job-hunter-core:tag
+```
+
 ## 6. Configure Repository Update Tokens
 
 Most daily workflows can commit with GitHub's built-in `GITHUB_TOKEN` when your
@@ -184,8 +190,8 @@ generated jobs, and config values unless a migration explicitly says otherwise.
 
 ## Troubleshooting
 
-If a workflow cannot pull the core image, confirm the `CORE_IMAGE_PAT` secret
-is set correctly.
+If a workflow cannot pull the core image, confirm package access or add
+`CORE_IMAGE_PAT`.
 
 If a workflow says an LLM provider key is missing, confirm both the GitHub secret
 and the matching `config/api_config.yml` provider setting.
