@@ -14,7 +14,6 @@ FILE_MAP = {
     "SETUP.template.md": "SETUP.md",
     ".gitignore.template": ".gitignore",
     "profile/template-files/altacv.cls": "altacv.cls",
-    "profile/template-files/project_instructions.md": "project_instructions.md",
     "profile/template-files/resume_double_column.tex": "resume_double_column.tex",
     "profile/template-files/resume_single_column.tex": "resume_single_column.tex",
     "profile/template-files/story_bank.md": "story_bank.md",

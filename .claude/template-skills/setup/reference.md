@@ -8,13 +8,12 @@
 | `OPENAI_API_KEY` | If using OpenAI | OpenAI | GPT-4o models |
 | `GOOGLE_API_KEY` | If using Google | Google | Gemini models |
 | `GH_PAT` | Yes | GitHub | Update-from-template workflow, push commits |
-| `JOB_HUNTER_ACCESS_TOKEN` | Yes | Maintainer | Pull private Docker image, fetch template updates |
-| `BRAVE_API_KEY` | Optional | Brave | AI web search (job discovery) |
-| `TAVILY_API_KEY` | Optional | Tavily | AI web search |
-| `EXA_API_KEY` | Optional | Exa | AI web search |
-| `ADZUNA_APP_ID` + `ADZUNA_API_KEY` | Optional | Adzuna | Adzuna job board |
-| `REED_API_KEY` | Optional | Reed | Reed.co.uk job board |
-| `RAPIDAPI_KEY` | Optional | RapidAPI | JSearch board |
+| `BRAVE_API_KEY` | — | Brave | AI web search (job discovery) |
+| `TAVILY_API_KEY` | — | Tavily | AI web search |
+| `EXA_API_KEY` | — | Exa | AI web search |
+| `ADZUNA_APP_ID` + `ADZUNA_API_KEY` | — | Adzuna | Adzuna job board |
+| `REED_API_KEY` | — | Reed | Reed.co.uk job board |
+| `RAPIDAPI_KEY` | — | RapidAPI | JSearch board |
 
 ## Prompt-based Setup (for users without Claude Code / Codex CLI / Gemini CLI)
 

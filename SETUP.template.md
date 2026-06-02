@@ -23,8 +23,7 @@ Follow the steps below.
 # Setup Guide
 
 This repository is your personal job-hunt workspace. It stores your resume,
-story bank, project instructions, config files, workflow files, and generated
-outputs. The automation code runs from a maintained public core image, so this
+story bank, config files, workflow files, and generated outputs. The automation code runs from a maintained public core image, so this
 template does not need to carry Python scripts, tests, package files, or a
 Dockerfile.
 
@@ -118,7 +117,6 @@ Files to edit:
 
 Do not edit:
 - resume .tex files
-- project_instructions.md
 - config files
 - src/
 - tests/
@@ -167,43 +165,7 @@ My notes:
 Review every final story before pushing. If a claim is not interview-safe,
 move it back to draft.
 
-## 5. Complete Your Project Instructions
-
-`project_instructions.md` tells the AI your target roles, excluded companies,
-seniority preferences, tone requirements, and how to use story IDs. Fill it in
-before running any workflows.
-
-**AI prompt — VS Code:**
-
-```text
-Help me update project_instructions.md.
-
-Files to edit:
-- project_instructions.md
-
-Do not edit:
-- story_bank.md
-- resume .tex files
-- config files
-- src/
-- tests/
-- .github/workflows/
-
-Task:
-- Update the profile, target roles, target locations, proof points, gaps, and
-  writing rules.
-- Preserve the existing markdown structure.
-- Keep rules strict enough to prevent invented experience.
-
-Hard rules:
-- Do not invent metrics, employers, titles, skills, dates, or outcomes.
-- Do not suggest changes to scripts, tests, workflows, or code.
-
-My background and preferences:
-[PASTE YOUR CURRENT ROLE, TARGET ROLES, LOCATIONS, INDUSTRIES, EXCLUSIONS]
-```
-
-## 6. Update Your Resume
+## 5. Update Your Resume
 
 The repo includes two LaTeX resume layouts: `resume_double_column.tex` and
 `resume_single_column.tex`. Choose one and fill it in. The pipeline creates a
@@ -219,7 +181,6 @@ Files to read:
 - story_bank.md (for context on metrics and achievements)
 
 Do not edit:
-- project_instructions.md
 - config files
 - src/
 - tests/
@@ -262,7 +223,35 @@ profile:
   story_bank: "story_bank.md"
 ```
 
-## 7. Configure Your Search
+**Editing LaTeX in VS Code with live preview**
+
+Install the **LaTeX Workshop** extension (publisher: James Yu, ID: `james-yu.latex-workshop`) from the VS Code Extensions panel. Then create `.vscode/settings.json` in your repo root with:
+
+```json
+{
+  "latex-workshop.latex.recipe.default": "pdflatex",
+  "latex-workshop.latex.tools": [
+    {
+      "name": "pdflatex",
+      "command": "pdflatex",
+      "args": ["-synctex=1", "-interaction=nonstopmode", "-file-line-error", "%DOC%"]
+    }
+  ],
+  "latex-workshop.latex.recipes": [
+    { "name": "pdflatex", "tools": ["pdflatex"] }
+  ],
+  "latex-workshop.view.pdf.viewer": "tab",
+  "latex-workshop.latex.autoBuild.run": "onSave"
+}
+```
+
+You also need a local LaTeX distribution for VS Code to build PDFs: **MiKTeX** on Windows (`https://miktex.org/download`), **MacTeX** on macOS (`https://tug.org/mactex/`), or `sudo apt install texlive-full` on Linux. The pipeline itself compiles PDFs inside Docker, so a local distribution is only needed for the live-preview workflow.
+
+Press `Ctrl+Alt+V` (`Cmd+Alt+V` on Mac) to open the PDF preview panel. The file rebuilds automatically on every save.
+
+> **Single-column photo:** place your image file (e.g. `photo.jpg`) in the same folder as the `.tex` file, then follow the commented-out instructions in the `%----------HEADING----------` block.
+
+## 6. Configure Your Search
 
 Open the config files and fill in the details for your situation.
 
@@ -318,7 +307,7 @@ Update `candidate_background` with a short paragraph about your current role
 and what you bring to a new position. Keep it current — this is what the AI
 opens every cover letter with.
 
-## 8. Configure API Keys
+## 7. Configure API Keys
 
 The pipeline needs at least one LLM provider key to score jobs and write cover
 letters.
@@ -331,7 +320,7 @@ letters.
 | OpenAI | `https://platform.openai.com/api-keys` | `OPENAI_API_KEY` |
 | Google | `https://aistudio.google.com/apikey` | `GOOGLE_API_KEY` |
 
-Optional job-search providers (add only the ones you want to use):
+Job-search providers — add the ones relevant to your region and search strategy:
 
 | Provider | GitHub Secret name |
 |---|---|
@@ -342,7 +331,7 @@ Optional job-search providers (add only the ones you want to use):
 | Adzuna (Canada, UK, DE, NL, SG, AU…) | `ADZUNA_APP_ID` + `ADZUNA_API_KEY` |
 | Reed.co.uk (UK / Ireland) | `REED_API_KEY` |
 
-All of the above are optional — the pipeline skips each source silently if its key is absent.
+The pipeline skips each source silently if its key is absent.
 
 - **Adzuna**: Register free at https://developer.adzuna.com/ — both `ADZUNA_APP_ID` and `ADZUNA_API_KEY` appear on your application dashboard.
 - **Reed**: Register free at https://www.reed.co.uk/developers/jobseeker — the key is shown on your profile page.
@@ -369,7 +358,7 @@ secrets:
     required: false
 ```
 
-## 9. Configure Your Personal Access Token
+## 8. Configure Your Personal Access Token
 
 The workflows need a token you create yourself so they can commit results back
 to your repository, open template update pull requests, and update maintained
@@ -385,7 +374,7 @@ workflow files when the template changes.
 5. Click **Generate token** and copy it immediately — GitHub only shows it once.
 6. Add it as a repository secret named `GH_PAT`.
 
-## 10. Optional: Test Locally
+## 9. Optional: Test Locally
 
 This step is entirely optional — GitHub Actions handles everything without a
 local run. Skip to **Step 11** if you prefer.
@@ -453,7 +442,7 @@ docker run --rm \
 Replace `ANTHROPIC_API_KEY` with your provider's environment variable name if
 you are using OpenAI or Google.
 
-## 11. Commit And Push Your Setup
+## 10. Commit And Push Your Setup
 
 GitHub Actions only sees files that have been pushed.
 
@@ -466,7 +455,7 @@ git push origin main
 
 If Git says `nothing to commit`, continue.
 
-## 12. Run The Automation In GitHub
+## 11. Run The Automation In GitHub
 
 Open the **Actions** tab in your repository. If you see a yellow banner asking
 you to enable workflows, click **I understand my workflows, go ahead and enable
@@ -496,7 +485,7 @@ jobs/YYYY-MM-DD_company_role/
 Always review the tailored resume and cover letter before submitting an
 application.
 
-## 13. Pull Future Template Updates
+## 12. Pull Future Template Updates
 
 When the maintainer announces an update:
 
@@ -513,7 +502,7 @@ Template updates preserve your personal files — resume, story bank, project
 instructions, generated jobs, and existing config values — unless a migration
 note says otherwise.
 
-## 14. Advanced Features
+## 13. Advanced Features
 
 These are all disabled by default. Enable them once the basic pipeline is
 running and you are satisfied with the results.

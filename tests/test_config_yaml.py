@@ -73,7 +73,6 @@ def test_template_profile_files_are_present_or_optional():
     profile_root = Path("profile/template-files")
     for key in ("resume_tex", "story_bank"):
         assert (profile_root / profile[key]).exists(), key
-    assert (profile_root / "project_instructions.md").exists()
     assert (profile_root / profile["latex_class"]).exists()
 
     profile_image = profile.get("profile_image", "")

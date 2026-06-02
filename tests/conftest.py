@@ -96,7 +96,6 @@ if not (Path.cwd() / "config" / "api_config.yml").exists():
             profile:
               resume_tex: resume.tex
               story_bank: story_bank.md
-              project_instructions: project_instructions.md
               latex_class: altacv.cls
             """
         ).lstrip(),
@@ -112,7 +111,7 @@ if not (Path.cwd() / "config" / "api_config.yml").exists():
     (config_dir / "applied_jobs.yml").write_text("jobs: []\n", encoding="utf-8")
     (config_dir / "discovery_cache.yml").write_text("{}\n", encoding="utf-8")
 
-    for filename in ("resume.tex", "story_bank.md", "project_instructions.md", "altacv.cls"):
+    for filename in ("resume.tex", "story_bank.md", "altacv.cls"):
         (runtime_root / filename).write_text("", encoding="utf-8")
 
     os.environ.setdefault("JOB_HUNTER_ROOT", str(runtime_root))

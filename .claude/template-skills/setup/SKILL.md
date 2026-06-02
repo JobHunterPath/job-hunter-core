@@ -104,11 +104,10 @@ Confirm: "Resume updated with [N] experience entries."
 Print the checklist below based on the provider chosen in Step 1.
 
 Always required:
-- [ ] `GH_PAT` — personal access token with Contents and Workflows read/write on this repo (see SETUP.md § 10)
-- [ ] `JOB_HUNTER_ACCESS_TOKEN` — shared token from the maintainer (see SETUP.md § 9)
+- [ ] `GH_PAT` — personal access token with Contents and Workflows read/write on this repo (see SETUP.md § 8)
 - [ ] `[LLM_SECRET]` — e.g. `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY`
 
-Optional (add only the ones you want to use):
+Job search providers (add the ones relevant to your region):
 - [ ] `BRAVE_API_KEY` — AI web search
 - [ ] `TAVILY_API_KEY` — AI web search
 - [ ] `EXA_API_KEY` — AI web search

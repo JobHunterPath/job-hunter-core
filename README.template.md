@@ -14,12 +14,12 @@ likes automatically.
 ## Start Here
 
 Read [SETUP.md](SETUP.md) first. It walks through initial setup step by step, including how
-to fill in your project instructions, build your story bank, choose a resume layout, configure
+to build your story bank, choose a resume layout, configure
 job search, and run the automation from GitHub. It also includes AI prompts you can use to
 prepare each personal file.
 
 When using AI helpers in VS Code, use them only for personal setup files such as the story
-bank, resume, project instructions, and configs. Do not ask them to change workflows or
+bank, resume, and configs. Do not ask them to change workflows or
 automation-owned files in your local repo — those are maintained centrally and your changes
 would be overwritten on the next update.
 
@@ -58,14 +58,14 @@ The pipeline finds jobs through several layers, tried in order from cheapest to 
   No account needed.
 - **ArbeitNow** — a free EU job board, enabled by default.
 
-**Optional — requires an API key:**
+**Requires an API key:**
 
-- **Brave, Tavily, or Exa** — paid search APIs. Add one if you want broader discovery beyond
+- **Brave, Tavily, or Exa** — paid search APIs. Add one for broader discovery beyond
   SearXNG results. Add the key as a GitHub secret and it will be used automatically.
 - **RapidAPI / JobSpy** — searches Google Jobs and Indeed. Set `jobspy.enabled: true` in
   `config/search_config.yml` and add `RAPIDAPI_KEY`.
 
-**Optional — uses LLM credits:**
+**Uses LLM credits:**
 
 - **AI web search** — when enabled, uses your LLM provider to run site-specific searches
   by job title and region across Greenhouse, Lever, Ashby, and similar ATS boards. Disable
