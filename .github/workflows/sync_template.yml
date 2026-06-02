@@ -1,0 +1,52 @@
+name: Sync Template Repo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "README.template.md"
+      - "SETUP.template.md"
+      - ".gitignore.template"
+      - ".claude/template-skills/**"
+      - ".github/scripts/**"
+      - ".github/searxng/**"
+      - ".github/template-workflows/**"
+      - "config/schemas/**"
+      - "config/templates/**"
+      - "profile/template-files/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: ${{ github.repository == 'JobHunterPath/job-hunter-core' }}
+    steps:
+      - name: Checkout job-hunter-core
+        uses: actions/checkout@v5
+
+      - name: Checkout job-hunter-template
+        uses: actions/checkout@v5
+        with:
+          repository: JobHunterPath/job-hunter-template
+          token: ${{ secrets.TEMPLATE_REPO_PAT }}
+          path: job-hunter-template
+
+      - name: Sync maintained template files
+        run: python .github/scripts/build_template_repo.py job-hunter-template
+
+      - name: Open PR in job-hunter-template
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.TEMPLATE_REPO_PAT }}
+          path: job-hunter-template
+          commit-message: "chore: sync template files from job-hunter-core"
+          branch: sync/from-core-${{ github.run_id }}
+          title: "chore: sync template updates from job-hunter-core"
+          body: |
+            Automated sync of maintained template files from job-hunter-core.
+
+            Source commit: ${{ github.sha }}
+          delete-branch: true

@@ -1,0 +1,227 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  discussions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Only runs in the upstream job-hunter-core repo; forks will skip it because
+    # their repository name differs.
+    # Also skips release-maintenance commits and the version-bump commit itself
+    # to prevent re-triggering.
+    if: |
+      github.repository == 'JobHunterPath/job-hunter-core' &&
+      !startsWith(github.event.head_commit.message, 'chore(release):') &&
+      !startsWith(github.event.head_commit.message, 'chore: bump version')
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Determine bump type from conventional commits
+        id: bump
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --format="%s" HEAD)
+          else
+            COMMITS=$(git log --format="%s" "${LAST_TAG}..HEAD")
+          fi
+          echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+          BUMP="patch"
+          while IFS= read -r msg; do
+            if echo "$msg" | grep -qE '^(feat|fix|refactor)(\(.+\))?!:|^BREAKING CHANGE'; then
+              BUMP="major"
+              break
+            elif echo "$msg" | grep -qE '^feat(\(.+\))?:'; then
+              [ "$BUMP" != "major" ] && BUMP="minor"
+            fi
+          done <<< "$COMMITS"
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+
+      - name: Compute new version
+        id: version
+        run: |
+          CURRENT=$(grep '^version' pyproject.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/')
+          if [ -z "${{ steps.bump.outputs.last_tag }}" ]; then
+            echo "new=$CURRENT" >> "$GITHUB_OUTPUT"
+            echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+            echo "should_bump=false" >> "$GITHUB_OUTPUT"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          case "${{ steps.bump.outputs.bump }}" in
+            major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH+1)) ;;
+          esac
+          echo "new=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "should_bump=true" >> "$GITHUB_OUTPUT"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+
+      - name: Bump pyproject.toml and push
+        if: steps.version.outputs.should_bump == 'true'
+        run: |
+          sed -i 's/^version = ".*"/version = "${{ steps.version.outputs.new }}"/' pyproject.toml
+          git config user.name "Job Hunter"
+          git config user.email "noreply@github.com"
+          git add pyproject.toml
+          git commit -m "chore: bump version to v${{ steps.version.outputs.new }}"
+          git push
+
+      - name: Create release
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.version.outputs.new }}" \
+            --generate-notes \
+            --title "v${{ steps.version.outputs.new }}" \
+            --target main
+
+      - name: Post Discussion announcement
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: "v${{ steps.version.outputs.new }}"
+        run: |
+          BODY=$(cat <<EOF
+          ## $TAG is available
+
+          Run the **Update From Template** workflow in your fork to pull the latest changes:
+
+          > Actions -> \`Update From Template\` -> Run workflow
+
+          See the [release notes](https://github.com/${{ github.repository }}/releases/tag/$TAG) for what changed.
+          EOF
+          )
+
+          gh api graphql -f query='
+            query($owner:String!, $name:String!) {
+              repository(owner:$owner, name:$name) {
+                id
+                discussionCategories(first: 25) {
+                  nodes { id name }
+                }
+              }
+            }' \
+            -f owner="${{ github.repository_owner }}" \
+            -f name="${{ github.event.repository.name }}" \
+            > /tmp/discussions.json
+
+          REPO_ID=$(jq -r '.data.repository.id' /tmp/discussions.json)
+          CATEGORY_ID=$(jq -r '
+            .data.repository.discussionCategories.nodes
+            | (map(select(.name == "Announcements"))[0] // .[0] // {})
+            | .id // empty
+          ' /tmp/discussions.json)
+
+          if [ -z "$CATEGORY_ID" ]; then
+            {
+              echo "Discussion announcement skipped."
+              echo "Repository discussion categories are not available for ${{ github.repository }}."
+              echo
+              echo "Post manually at: https://github.com/orgs/JobHunterPath/discussions"
+              echo
+              echo "Title: $TAG released"
+              echo
+              echo "$BODY"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          gh api graphql -f query='
+            mutation($repoId:ID!, $categoryId:ID!, $title:String!, $body:String!) {
+              createDiscussion(input:{repositoryId:$repoId, categoryId:$categoryId, title:$title, body:$body}) {
+                discussion { url }
+              }
+            }' \
+            -f repoId="$REPO_ID" \
+            -f categoryId="$CATEGORY_ID" \
+            -f title="$TAG released" \
+            -f body="$BODY" \
+            --jq '.data.createDiscussion.discussion.url' \
+            | tee /tmp/discussion_url.txt
+
+          {
+            echo "Discussion announcement created."
+            echo
+            echo "Org discussions: https://github.com/orgs/JobHunterPath/discussions"
+            echo "Discussion: $(cat /tmp/discussion_url.txt)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post cross-repo announcement to job-hunter-template
+        if: steps.version.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.TEMPLATE_REPO_PAT }}
+          TAG: "v${{ steps.version.outputs.new }}"
+        run: |
+          gh api graphql -f query='
+            query($owner:String!, $name:String!) {
+              repository(owner:$owner, name:$name) {
+                id
+                discussionCategories(first: 25) {
+                  nodes { id name }
+                }
+              }
+            }' \
+            -f owner="JobHunterPath" \
+            -f name="job-hunter-template" \
+            > /tmp/template_discussions.json
+
+          TEMPLATE_REPO_ID=$(jq -r '.data.repository.id' /tmp/template_discussions.json)
+          TEMPLATE_CATEGORY_ID=$(jq -r '
+            .data.repository.discussionCategories.nodes
+            | (map(select(.name == "Announcements"))[0] // .[0] // {})
+            | .id // empty
+          ' /tmp/template_discussions.json)
+
+          if [ -z "$TEMPLATE_CATEGORY_ID" ]; then
+            {
+              echo "job-hunter-template Discussion announcement skipped."
+              echo "Repository discussion categories are not available for JobHunterPath/job-hunter-template."
+              echo
+              echo "Post manually at: https://github.com/JobHunterPath/job-hunter-template/discussions"
+              echo
+              echo "Title: $TAG released"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          TEMPLATE_BODY=$(cat <<EOF
+          ## $TAG is available
+
+          Run the **Update From Template** workflow in your fork to pull the latest changes:
+
+          > Actions -> \`Update From Template\` -> Run workflow
+
+          See the [release notes](https://github.com/JobHunterPath/job-hunter-core/releases/tag/$TAG) for what changed.
+          EOF
+          )
+
+          gh api graphql -f query='
+            mutation($repoId:ID!, $categoryId:ID!, $title:String!, $body:String!) {
+              createDiscussion(input:{repositoryId:$repoId, categoryId:$categoryId, title:$title, body:$body}) {
+                discussion { url }
+              }
+            }' \
+            -f repoId="$TEMPLATE_REPO_ID" \
+            -f categoryId="$TEMPLATE_CATEGORY_ID" \
+            -f title="$TAG released" \
+            -f body="$TEMPLATE_BODY" \
+            --jq '.data.createDiscussion.discussion.url' \
+            | tee /tmp/template_discussion_url.txt
+
+          {
+            echo "job-hunter-template Discussion announcement created."
+            echo
+            echo "Discussion: $(cat /tmp/template_discussion_url.txt)"
+          } >> "$GITHUB_STEP_SUMMARY"

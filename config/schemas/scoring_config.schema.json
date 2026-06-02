@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "scoring_config",
+  "type": "object",
+  "required": ["scoring"],
+  "additionalProperties": false,
+  "properties": {
+    "scoring": {
+      "type": "object",
+      "required": ["min_fit_score", "max_tailor_per_run", "max_years_experience_required"],
+      "properties": {
+        "min_fit_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "max_tailor_per_run": { "type": "integer", "minimum": 1 },
+        "max_years_experience_required": { "type": "integer", "minimum": 0 },
+        "strategic_overrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["company", "reason"],
+            "properties": {
+              "company": { "type": "string" },
+              "reason": { "type": "string" },
+              "min_score_override": { "type": "integer", "minimum": 0, "maximum": 100 },
+              "bypass_max_years_experience": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

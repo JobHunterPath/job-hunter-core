@@ -1,0 +1,140 @@
+regions:
+  berlin:
+    enabled: true
+    primary: true
+    country: "DE"
+    search_lang: "en"
+    location: "Berlin"
+    description: "Primary search region"
+    job_titles:
+      - "Product Manager"
+      - "Product Owner"
+    companies:
+      - name: Example SaaS Company
+        career_url: boards.greenhouse.io/example
+      - name: Example Lever Company
+        career_url: jobs.lever.co/example
+      - name: Example Careers Site
+        career_url: careers.example.com
+
+scraping:
+  max_workers: 10              # companies processed in parallel
+  total_timeout_seconds: 1800  # 30 min ceiling for company scraping phase
+
+global_search:
+  results_per_query: 10
+  job_titles:
+    - "Product Manager"
+    - "Product Owner"
+
+job_boards:
+  arbeitnow:
+    enabled: true
+    max_pages: 3
+  jsearch:
+    enabled: true
+    num_pages: 1
+  adzuna:
+    enabled: true
+    results_per_page: 50
+  reed:
+    enabled: true
+    results_wanted: 50
+
+exclusion_rules:
+  exclude_german_language: true
+  excluded_url_patterns:
+    - "linkedin\\.com/jobs/search"
+    - "linkedin\\.com/jobs/[^/?#]+-jobs"
+    - "linkedin\\.com/jobs/collections"
+    - "linkedin\\.com/jobs/remote-"
+    - "linkedin\\.com/jobs/[a-z]+-stellen"
+    - "linkedin\\.com/jobs/[a-z]+-stellenangebote"
+  excluded_title_terms:
+    - engineer
+    - engineering
+    - developer
+    - software
+    - frontend
+    - backend
+    - full stack
+    - fullstack
+    - devops
+    - data scientist
+    - designer
+    - ux
+    - ui
+    - working student
+    - werkstudent
+    - student
+    - intern
+    - internship
+    - praktikum
+    - praktikant
+    - trainee
+  excluded_industries:
+    - "gambling"
+    - "casino"
+    - "weapons"
+    - "defence"
+    - "military"
+    - "banking"
+    - "credit institution"
+    - "fintech lending"
+  senior_flags:
+    - "director"
+    - "vp "
+    - "vice president"
+    - "head of product"
+    - "chief product"
+  stale_indicators:
+    - "no longer available"
+    - "this job has expired"
+    - "position has been filled"
+    - "not accepting applications"
+  german_indicators:
+    - wir suchen
+    - wir freuen uns
+    - jetzt bewerben
+    - ihre aufgaben
+    - ihr profil
+    - deine aufgaben
+    - dein profil
+    - was wir bieten
+    - was du mitbringst
+    - das bieten wir
+    - stellenangebot
+    - berufserfahrung
+    - deutschkenntnisse
+
+jobspy:
+  enabled: true
+  hours_old: 72
+  results_per_query: 20
+  glassdoor_enabled: true
+  linkedin_enabled: false
+
+discovery:
+  max_workers: 10
+  total_timeout_seconds: 1800
+  reserve_seconds: 600
+  overlap_scope: new_only
+  # LLM discovery uses these simple sector names. ATS/search discovery also
+  # runs from your configured regions and job titles.
+  sectors:
+    - "automotive & mobility"
+    - "commercial aviation & travel tech"
+    - "industrial automation & enterprise SaaS"
+    - "health tech & life sciences"
+    - "climate tech & energy"
+    - "logistics & supply chain tech"
+    - "developer tools & cloud infrastructure"
+    - "marketplace & e-commerce tech"
+    - "insurtech & regtech"
+    - "education tech & HR tech"
+    - "proptech & smart building"
+    - "cybersecurity & privacy tech"
+    - "{location} tech startups & scale-ups"
+
+excluded_companies:
+  - "Example Excluded Company"

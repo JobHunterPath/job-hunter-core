@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "api_config",
+  "type": "object",
+  "required": ["agent_ai", "http", "profile"],
+  "properties": {
+    "agent_ai": {
+      "type": "object",
+      "required": ["execution"],
+      "properties": {
+        "execution": { "type": "string", "enum": ["agent_only"] }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "env_var": { "type": "string" },
+          "app_id_env_var": { "type": "string" },
+          "api_key_env_var": { "type": "string" },
+          "required": { "type": "boolean" }
+        }
+      }
+    },
+    "http": {
+      "type": "object",
+      "required": ["search_providers", "ats_scraper", "playwright", "jd_fetcher", "pdf", "job_boards"],
+      "properties": {
+        "api_budgets": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "state_path": { "type": "string" },
+            "monthly_limits": {
+              "type": "object",
+              "additionalProperties": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "url_verification": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "timeout_seconds": { "type": "integer", "minimum": 1 },
+            "max_workers": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "search_providers": {
+          "type": "object",
+          "required": ["timeout_seconds", "order"],
+          "properties": {
+            "timeout_seconds": { "type": "integer", "minimum": 1 },
+            "max_consecutive_failures": { "type": "integer", "minimum": 1 },
+            "order": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+            "searxng_base_url": { "type": "string" },
+            "ats_discovery": { "type": "object" }
+          }
+        },
+        "ats_scraper": {
+          "type": "object",
+          "required": ["timeout_seconds", "detail_timeout_seconds", "snippet_chars"],
+          "properties": {
+            "timeout_seconds": { "type": "integer", "minimum": 1 },
+            "detail_timeout_seconds": { "type": "integer", "minimum": 1 },
+            "hibob_playwright_timeout_seconds": { "type": "integer", "minimum": 1 },
+            "snippet_chars": { "type": "integer", "minimum": 100 }
+          }
+        },
+        "playwright": {
+          "type": "object",
+          "required": ["timeout_seconds"],
+          "properties": {
+            "timeout_seconds": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "jd_fetcher": {
+          "type": "object",
+          "required": ["timeout_seconds", "max_description_chars"],
+          "properties": {
+            "timeout_seconds": { "type": "integer", "minimum": 1 },
+            "min_text_length": { "type": "integer", "minimum": 0 },
+            "max_description_chars": { "type": "integer", "minimum": 100 },
+            "title_min_chars": { "type": "integer", "minimum": 1 },
+            "title_max_chars": { "type": "integer", "minimum": 1 },
+            "hash_chars": { "type": "integer", "minimum": 4 }
+          }
+        },
+        "jd_enrichment": {
+          "type": "object",
+          "properties": {
+            "max_workers": { "type": "integer", "minimum": 1 },
+            "skip_url_patterns": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "pdf": {
+          "type": "object",
+          "required": ["texlive_image", "log_tail_chars"],
+          "properties": {
+            "texlive_image": { "type": "string" },
+            "docker_pull_timeout_seconds": { "type": "integer", "minimum": 30 },
+            "pdflatex_timeout_seconds": { "type": "integer", "minimum": 10 },
+            "docker_timeout_seconds": { "type": "integer", "minimum": 10 },
+            "log_tail_chars": { "type": "integer", "minimum": 100 }
+          }
+        },
+        "job_boards": {
+          "type": "object",
+          "required": ["timeout_seconds", "snippet_chars"],
+          "properties": {
+            "timeout_seconds": { "type": "integer", "minimum": 1 },
+            "max_consecutive_failures": { "type": "integer", "minimum": 1 },
+            "snippet_chars": { "type": "integer", "minimum": 100 },
+            "arbeitnow": { "type": "object" },
+            "arbeitsagentur": { "type": "object" },
+            "himalayas": { "type": "object" },
+            "jsearch": { "type": "object" },
+            "adzuna": { "type": "object" },
+            "reed": { "type": "object" },
+            "jobspy": { "type": "object" }
+          }
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "required": ["resume_tex", "story_bank", "latex_class"],
+      "properties": {
+        "resume_tex": { "type": "string" },
+        "story_bank": { "type": "string" },
+        "cover_letter_config": { "type": "string" },
+        "scoring_config": { "type": "string" },
+        "tailoring_config": { "type": "string" },
+        "profile_image": { "type": "string" },
+        "latex_class": { "type": "string" }
+      }
+    }
+  }
+}
