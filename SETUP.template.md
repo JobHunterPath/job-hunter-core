@@ -587,6 +587,12 @@ Find Gemini model names at `https://ai.google.dev/gemini-api/docs/models`.
 Confirm the public core image is available: `ghcr.io/jobhunterpath/job-hunter-core:latest`.
 If you override `JOB_HUNTER_CORE_IMAGE`, confirm that image name and tag exist.
 
+**Workflow fails with "GitHub Actions is not permitted to create or approve pull requests"**
+
+Go to your repository → **Settings** → **Actions** → **General** → scroll to
+**Workflow permissions** → enable **"Allow GitHub Actions to create and approve
+pull requests"** → Save.
+
 **Update From Template cannot push workflow files**
 
 Confirm `GH_PAT` is added as a GitHub secret and has **Contents: Read and write**

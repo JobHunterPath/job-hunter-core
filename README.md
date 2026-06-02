@@ -1,4 +1,4 @@
-# job-hunter-core
+# Job Hunter Core
 
 Open source job hunting automation engine.
 
