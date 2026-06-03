@@ -29,8 +29,7 @@ def fetch_remotive_jobs(
     excluded_title_terms = config.get("exclusion_rules", {}).get("excluded_title_terms", []) or []
     jobs: list[dict] = []
 
-    for region_name, region_config in enabled_regions.items():
-        location = str(region_config.get("location") or "")
+    for region_name, _region_config in enabled_regions.items():
         for title in title_filters:
             for page in range(1, max_pages + 1):
                 try:

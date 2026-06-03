@@ -34,12 +34,11 @@ from job_hunter_core.sources.ai_web_search import fetch_ai_web_search_jobs
 from job_hunter_core.sources.arbeitsagentur_source import fetch_arbeitsagentur_jobs
 from job_hunter_core.sources.ats import fetch_ats_jobs
 from job_hunter_core.sources.himalayas_source import fetch_himalayas_jobs
-from job_hunter_core.sources.remotive_source import fetch_remotive_jobs
-from job_hunter_core.sources.the_muse_source import fetch_the_muse_jobs
 from job_hunter_core.sources.job_boards import fetch_arbeitnow_jobs, fetch_jsearch_jobs
 from job_hunter_core.sources.job_policy import JobPolicy, make_job_filter
 from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
 from job_hunter_core.sources.reed_source import fetch_reed_jobs
+from job_hunter_core.sources.remotive_source import fetch_remotive_jobs
 from job_hunter_core.sources.search_providers import (
     BraveProvider,
     all_providers_exhausted,
@@ -49,6 +48,7 @@ from job_hunter_core.sources.search_providers import (
     fetch_static_career_jobs,
     search_web,
 )
+from job_hunter_core.sources.the_muse_source import fetch_the_muse_jobs
 from job_hunter_core.tracking.discovery_cache import (
     load_cached_candidate_urls,
     load_cached_candidate_urls_with_metadata,
@@ -437,9 +437,7 @@ def scrape(region: str | None = None) -> list[dict]:
             return
 
         if all_providers_exhausted():
-            logger.debug(
-                "[scraper] %s: search skipped (ATS-only mode)", company["name"]
-            )
+            logger.debug("[scraper] %s: search skipped (ATS-only mode)", company["name"])
             return
 
         for query, company_name, _ in build_queries([company], config):

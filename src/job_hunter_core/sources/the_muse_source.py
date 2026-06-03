@@ -71,7 +71,7 @@ def fetch_the_muse_jobs(
                 if location and job_location != "Remote":
                     if not location_matches(job_location, location):
                         continue
-                description = strip_html((item.get("contents") or ""))
+                description = strip_html(item.get("contents") or "")
                 company_name = str((item.get("company") or {}).get("name") or "")
                 job_url = str(item.get("refs", {}).get("landing_page") or "")
                 posted = str(item.get("publication_date") or "")[:10]

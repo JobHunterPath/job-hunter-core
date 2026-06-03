@@ -159,9 +159,7 @@ def all_providers_exhausted(api_cfg: dict | None = None) -> bool:
     if result:
         with _SEARXNG_ZERO_LOCK:
             if not _ats_only_logged:
-                logger.info(
-                    "[search] all providers exhausted — switching to ATS-only mode"
-                )
+                logger.info("[search] all providers exhausted — switching to ATS-only mode")
                 _ats_only_logged = True
 
     return result
