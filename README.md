@@ -27,8 +27,6 @@ job-hunter-core scrapes jobs from 15+ sources (ATS APIs, job boards, AI-assisted
 4. Edit `context/resume_*.tex` with your resume and `context/story_bank.md` with your STAR stories
 5. Run the `job_hunt` workflow from the Actions tab
 
-See [SETUP.md](SETUP.md) for full setup instructions.
-
 ## Supported sources
 
 | Source | Type | Notes |
@@ -56,7 +54,7 @@ See [SETUP.md](SETUP.md) for full setup instructions.
 
 ## Configuration
 
-All configuration lives in `config/`. See `config/templates/` for commented examples and [SETUP.md](SETUP.md) for full setup instructions.
+All configuration lives in `config/`. See `config/templates/` for commented examples and [SETUP.template.md](SETUP.template.md) for full setup instructions.
 
 ## Terms of Service notice
 

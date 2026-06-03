@@ -36,7 +36,7 @@ Contributions are welcome. Please read this document before opening a PR.
 
 ## Config changes
 
-- **Adding a key**: update `config/templates/`, `config/schemas/`, `README.md`, and `SETUP.md` in the same commit.
+- **Adding a key**: update `config/templates/`, `config/schemas/`, `README.md`, and `SETUP.template.md` in the same commit.
 - **Removing or renaming a key**: this is a breaking change. Note it explicitly in the PR description.
 
 ## Code style
@@ -48,6 +48,6 @@ Contributions are welcome. Please read this document before opening a PR.
   ```
   feat(sources): add arbeitsagentur source
   fix(scoring): handle empty JD response from LLM
-  docs: update SETUP.md prerequisites
+  docs: update SETUP.template.md prerequisites
   ```
   Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `chore`

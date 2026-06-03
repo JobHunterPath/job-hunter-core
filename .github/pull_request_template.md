@@ -8,4 +8,4 @@
 - [ ] Lint passes: `ruff check src/ tests/`
 - [ ] New sources include tests with mocked HTTP calls
 - [ ] Config key changes update `config/schemas/` and `config/templates/`
-- [ ] README.md and SETUP.md updated if config or sources changed
+- [ ] README.md and SETUP.template.md updated if config or sources changed

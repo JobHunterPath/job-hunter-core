@@ -16,7 +16,7 @@ Apply these when touching any file under `config/templates/` or `config/schemas/
 
 1. Add the key to the relevant `config/templates/<name>.yml` with a sensible default value.
 2. Add the key to the matching `config/schemas/<name>.schema.json`: declare its type, add it to `properties`, and add it to `required` only if there is no safe default.
-3. Update the config reference section in both `README.md` and `SETUP.md` to document the new key, its type, its default, and what it controls.
+3. Update the config reference section in both `README.md` and `SETUP.template.md` to document the new key, its type, its default, and what it controls.
 4. Run `job-hunter config check` against the updated template to confirm it passes validation before committing.
 
 ## Renaming a Key (breaking)
@@ -35,7 +35,7 @@ Do not silently rename a key and ship it without documentation. Users with exist
 1. Remove the key from the YAML template.
 2. Remove the key from the JSON schema: delete it from `properties` and from `required` if it was listed there.
 3. Grep for the key name in `src/` to find every place the code reads it. Remove or replace all those reads.
-4. Update `README.md` and `SETUP.md` to remove all references to the deleted key.
+4. Update `README.md` and `SETUP.template.md` to remove all references to the deleted key.
 5. Announce the removal in the release notes with a migration note for users who have the key in their config.
 
 Grep command to find source references before removing:
@@ -73,6 +73,6 @@ against the updated template file. It must pass before the change is committed. 
 
 ## Docs Rule
 
-Always update `README.md` and `SETUP.md` config sections in the same commit as the schema change. Never ship a schema change without updating docs. Reviewers should be able to confirm doc and schema are in sync by reading the diff.
+Always update `README.md` and `SETUP.template.md` config sections in the same commit as the schema change. Never ship a schema change without updating docs. Reviewers should be able to confirm doc and schema are in sync by reading the diff.
 
 Note: job-hunter-core does not use a `system_config.yml` or schema versioning system. Do not introduce one.

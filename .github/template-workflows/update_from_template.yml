@@ -56,6 +56,7 @@ jobs:
             .github/workflows/build_runner_image.yml
 
           cp template-source/.gitignore .gitignore
+          cp template-source/LICENSE LICENSE
           python3 template-source/.github/scripts/merge_upstream.py \
             template-source/README.md \
             README.md \
@@ -177,7 +178,7 @@ jobs:
           commit_msg="chore(template): update from JobHunterPath/job-hunter-template${tag:+ $tag}"
 
           git add -- \
-            .gitignore README.md SETUP.md altacv.cls \
+            .gitignore LICENSE README.md SETUP.md altacv.cls \
             .github/workflows .github/searxng .github/scripts \
             config
           git add -- linkedin/config.yml 2>/dev/null || true

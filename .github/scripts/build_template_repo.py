@@ -13,6 +13,7 @@ FILE_MAP = {
     "README.template.md": "README.md",
     "SETUP.template.md": "SETUP.md",
     ".gitignore.template": ".gitignore",
+    "LICENSE": "LICENSE",
     "profile/template-files/altacv.cls": "altacv.cls",
     "profile/template-files/resume_double_column.tex": "resume_double_column.tex",
     "profile/template-files/resume_single_column.tex": "resume_single_column.tex",
