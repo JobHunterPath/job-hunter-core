@@ -199,6 +199,14 @@ http:
   job_boards:
     timeout_seconds: 10
     max_consecutive_failures: 3
+    # remotive:
+    #   enabled: false
+    #   max_pages_per_query: 1
+    #   timeout_seconds: 15
+    # the_muse:
+    #   enabled: false
+    #   max_pages_per_query: 2
+    #   timeout_seconds: 15
 
 profile:
   # Available resume templates:

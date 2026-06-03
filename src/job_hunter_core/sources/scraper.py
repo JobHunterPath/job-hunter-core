@@ -34,6 +34,8 @@ from job_hunter_core.sources.ai_web_search import fetch_ai_web_search_jobs
 from job_hunter_core.sources.arbeitsagentur_source import fetch_arbeitsagentur_jobs
 from job_hunter_core.sources.ats import fetch_ats_jobs
 from job_hunter_core.sources.himalayas_source import fetch_himalayas_jobs
+from job_hunter_core.sources.remotive_source import fetch_remotive_jobs
+from job_hunter_core.sources.the_muse_source import fetch_the_muse_jobs
 from job_hunter_core.sources.job_boards import fetch_arbeitnow_jobs, fetch_jsearch_jobs
 from job_hunter_core.sources.job_policy import JobPolicy, make_job_filter
 from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
@@ -565,6 +567,18 @@ def scrape(region: str | None = None) -> list[dict]:
     except Exception as e:
         stats.record("himalayas", failed=1)
         logger.warning("[scraper] Himalayas failed: %s", e)
+
+    try:
+        for job in fetch_remotive_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] Remotive failed: %s", e)
+
+    try:
+        for job in fetch_the_muse_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] The Muse failed: %s", e)
 
     stats.record("arbeitsagentur", attempted=1)
     try:
