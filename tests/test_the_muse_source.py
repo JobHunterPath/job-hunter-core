@@ -125,6 +125,38 @@ def test_fetch_the_muse_jobs_title_filter():
     assert jobs[0]["title"] == "Software Engineer"
 
 
+def test_fetch_the_muse_jobs_fetches_once_for_multiple_titles():
+    response_data = {
+        "results": [
+            {
+                "name": "Software Engineer",
+                "company": {"name": "Tech Co"},
+                "refs": {"landing_page": "https://www.themuse.com/jobs/techco/software-engineer"},
+                "publication_date": "2026-06-01T00:00:00Z",
+                "locations": [{"name": "Remote"}],
+                "contents": "Engineering role.",
+            }
+        ]
+    }
+    with (
+        patch(
+            "job_hunter_core.sources.the_muse_source.load_api_config",
+            return_value=_ENABLED_CFG,
+        ),
+        patch(
+            "job_hunter_core.sources.the_muse_source.requests.get",
+            return_value=_mock_get(response_data),
+        ) as mock_get,
+    ):
+        jobs = fetch_the_muse_jobs(
+            ["Software Engineer", "Product Manager"],
+            {"EU": {"location": "Europe", "country": "DE"}},
+            {"exclusion_rules": {"excluded_title_terms": []}},
+        )
+    assert len(jobs) == 1
+    assert mock_get.call_count == 1
+
+
 def test_fetch_the_muse_jobs_disabled():
     disabled_cfg = {"http": {"job_boards": {"the_muse": {"enabled": False}}}}
     with (
@@ -137,3 +169,31 @@ def test_fetch_the_muse_jobs_disabled():
         jobs = fetch_the_muse_jobs(["Software Engineer"], {"EU": {}}, {})
     assert jobs == []
     mock_get.assert_not_called()
+
+
+def test_fetch_the_muse_jobs_defaults_enabled():
+    response_data = {
+        "results": [
+            {
+                "name": "Software Engineer",
+                "company": {"name": "ACME"},
+                "refs": {"landing_page": "https://www.themuse.com/jobs/acme/software-engineer"},
+                "publication_date": "2026-06-01T00:00:00Z",
+                "locations": [{"name": "Remote"}],
+                "contents": "Engineering role.",
+            }
+        ]
+    }
+    with (
+        patch(
+            "job_hunter_core.sources.the_muse_source.load_api_config",
+            return_value={"http": {"job_boards": {}}},
+        ),
+        patch(
+            "job_hunter_core.sources.the_muse_source.requests.get",
+            return_value=_mock_get(response_data),
+        ) as mock_get,
+    ):
+        jobs = fetch_the_muse_jobs(["Software Engineer"], _REGIONS, _CONFIG)
+    assert len(jobs) == 1
+    mock_get.assert_called_once()

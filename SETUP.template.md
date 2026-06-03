@@ -353,6 +353,11 @@ Job-search providers — add the ones relevant to your region and search strateg
 
 The pipeline skips each source silently if its key is absent.
 
+Remotive and The Muse are free job sources and do not need API keys. They are
+enabled by default in `config/api_config.yml`; set
+`http.job_boards.remotive.enabled: false` or
+`http.job_boards.the_muse.enabled: false` only if you want to opt out.
+
 - **Adzuna**: Register free at https://developer.adzuna.com/ — both `ADZUNA_APP_ID` and `ADZUNA_API_KEY` appear on your application dashboard.
 - **Reed**: Register free at https://www.reed.co.uk/developers/jobseeker — the key is shown on your profile page.
 

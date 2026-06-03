@@ -21,7 +21,7 @@ def fetch_remotive_jobs(
 ) -> list[dict]:
     """Fetch remote jobs from Remotive's free public API."""
     source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("remotive", {}) or {}
-    if not source_cfg.get("enabled", False):
+    if not source_cfg.get("enabled", True):
         return []
 
     timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))

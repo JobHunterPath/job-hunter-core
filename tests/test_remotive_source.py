@@ -138,3 +138,31 @@ def test_fetch_remotive_jobs_disabled():
         jobs = fetch_remotive_jobs(["Software Engineer"], {"EU": {}}, {})
     assert jobs == []
     mock_get.assert_not_called()
+
+
+def test_fetch_remotive_jobs_defaults_enabled():
+    response_data = {
+        "jobs": [
+            {
+                "title": "Software Engineer",
+                "company_name": "ACME",
+                "url": "https://example.com/job/1",
+                "publication_date": "2026-06-01",
+                "candidate_required_location": "Remote",
+                "description": "Engineering role.",
+            }
+        ]
+    }
+    with (
+        patch(
+            "job_hunter_core.sources.remotive_source.load_api_config",
+            return_value={"http": {"job_boards": {}}},
+        ),
+        patch(
+            "job_hunter_core.sources.remotive_source.requests.get",
+            return_value=_mock_get(response_data),
+        ) as mock_get,
+    ):
+        jobs = fetch_remotive_jobs(["Software Engineer"], _REGIONS, _CONFIG)
+    assert len(jobs) == 1
+    mock_get.assert_called_once()

@@ -48,6 +48,8 @@ job-hunter-core scrapes jobs from 15+ sources (ATS APIs, job boards, AI-assisted
 | Adzuna | Job board API | Requires API key |
 | Reed | Job board API | Requires API key |
 | Himalayas | Job board | Remote-focused |
+| Remotive | Job board API | Free, no API key required |
+| The Muse | Job board API | Free, no API key required |
 | Bundesagentur für Arbeit | Job board | German market |
 | Arbeitnow | Job board | |
 | AI web search | Search | Brave / Tavily / Exa |

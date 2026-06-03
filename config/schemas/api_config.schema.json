@@ -139,17 +139,20 @@
               "properties": {
                 "enabled": {
                   "type": "boolean",
-                  "description": "Enable or disable the Remotive source."
+                  "description": "Enable or disable the Remotive source.",
+                  "default": true
                 },
                 "max_pages_per_query": {
                   "type": "integer",
                   "description": "Maximum pages to fetch per title query.",
-                  "minimum": 1
+                  "minimum": 1,
+                  "default": 1
                 },
                 "timeout_seconds": {
                   "type": "integer",
                   "description": "HTTP request timeout in seconds.",
-                  "minimum": 1
+                  "minimum": 1,
+                  "default": 15
                 }
               }
             },
@@ -159,17 +162,20 @@
               "properties": {
                 "enabled": {
                   "type": "boolean",
-                  "description": "Enable or disable the The Muse source."
+                  "description": "Enable or disable the The Muse source.",
+                  "default": true
                 },
                 "max_pages_per_query": {
                   "type": "integer",
                   "description": "Maximum pages to fetch per title query.",
-                  "minimum": 1
+                  "minimum": 1,
+                  "default": 2
                 },
                 "timeout_seconds": {
                   "type": "integer",
                   "description": "HTTP request timeout in seconds.",
-                  "minimum": 1
+                  "minimum": 1,
+                  "default": 15
                 }
               }
             },
