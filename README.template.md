@@ -125,22 +125,6 @@ With `sectors` empty, the pipeline skips LLM company-name suggestions entirely a
 companies only from real job postings found on ATS platforms. This costs no LLM tokens for
 the discovery step and produces companies with verified live postings.
 
-## Importing Browser-Captured Jobs
-
-If you find a job manually in your browser that the pipeline missed, you can import it
-without re-running a full hunt:
-
-```bash
-docker run --rm -it -v "$PWD:/workspace" -w /workspace \
-  ghcr.io/jobhunterpath/job-hunter-core:latest \
-  job-hunter import-captures --captures-dir captures/
-```
-
-Place one JSON file per job in a `captures/` folder at the root of your repo. Each file
-needs at minimum a `url` field. The import command deduplicates against
-`config/applied_jobs.yml`, runs scoring, and writes tailored output if the job passes.
-This workflow requires no search API keys.
-
 ## Source-Yield Diagnostics
 
 After every hunt run, the log includes a per-source yield summary. A line such as:
