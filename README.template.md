@@ -2,8 +2,8 @@
 
 This repository automates job discovery across multiple locations, fit scoring, resume tailoring,
 cover letter generation, and PDF output for a configurable job search. The pipeline uses direct
-ATS APIs, HTTP/BeautifulSoup, Playwright, an ephemeral SearXNG container, and optional paid
-search APIs.
+ATS APIs, HTTP/BeautifulSoup, Playwright, an ephemeral SearXNG container, and optional
+search APIs with free tiers.
 
 It also includes an optional LinkedIn content and networking system. The LinkedIn workflow
 is disabled by default; when enabled, it generates public-safe post ideas from your private
@@ -47,21 +47,37 @@ Once setup is complete, the pipeline runs on a schedule automatically:
 ## Job Sources
 
 The pipeline finds jobs through several layers, tried in order from cheapest to most expensive.
+**No paid search API key is required for the default run.** Keyed providers are optional
+extensions that add breadth when free sources return thin results.
 
 **Free — no API key required:**
 
 - **Direct company career pages** — the pipeline visits each URL in your
-  `config/search_config.yml` company list.
-- **Direct ATS APIs** — Greenhouse, Lever, Ashby, and SmartRecruiters career pages are read
-  through their public job APIs.
+  `config/search_config.yml` company list. For each URL it attempts:
+  1. Known ATS public endpoints (Greenhouse, Lever, Ashby, SmartRecruiters, Workable,
+     Personio, Recruitee, Hibob, Teamtailor, Breezy, Workday) via their job APIs.
+  2. `JobPosting` structured data embedded in the page HTML.
+  3. Common career-path and sitemap patterns (e.g. `/sitemap.xml`, `/careers`, `/jobs`).
+  4. Static HTML extraction and, as a last resort, Playwright rendering for JavaScript-heavy pages.
+  The method that succeeded is recorded per-job in the run log.
+- **ATS discovery** — the pipeline queries all 11 ATS platforms listed in
+  `config/api_config.yml` under `http.search_providers.ats_discovery.sources` directly by
+  job title and region. These are public no-key endpoints. Results are deduplicated against
+  `config/discovery_cache.yml`.
 - **SearXNG** — a free search engine GitHub Actions starts temporarily during each run.
   No account needed.
 - **ArbeitNow** — a free EU job board, enabled by default.
+- **Cache revalidation** — when enabled in `config/search_config.yml`, the pipeline
+  re-checks URLs already stored in `config/discovery_cache.yml` if the live run returns
+  fewer than `cache_revalidation.threshold` results. Disabled by default; costs no API
+  credits.
 
 **Requires an API key:**
 
-- **Brave, Tavily, or Exa** — paid search APIs. Add one for broader discovery beyond
-  SearXNG results. Add the key as a GitHub secret and it will be used automatically.
+- **Brave, Tavily, or Exa** — optional search APIs, each with a free tier. Add one for broader discovery
+  beyond SearXNG results. Add the key as a GitHub secret and it will be used automatically.
+  When a provider's monthly budget is reached (`http.api_budgets.monthly_limits`), it is
+  skipped silently and the next provider in the fallback order takes over.
 - **RapidAPI / JobSpy** — searches Google Jobs and Indeed. Set `jobspy.enabled: true` in
   `config/search_config.yml` and add `RAPIDAPI_KEY`.
 
@@ -69,7 +85,8 @@ The pipeline finds jobs through several layers, tried in order from cheapest to 
 
 - **AI web search** — when enabled, uses your LLM provider to run site-specific searches
   by job title and region across Greenhouse, Lever, Ashby, and similar ATS boards. Disable
-  when you want to conserve credits.
+  when you want to conserve credits. Controlled by
+  `http.search_providers.ai_web_search.enabled` in `config/api_config.yml`.
 
 The provider fallback order is set in `config/api_config.yml`:
 
@@ -83,13 +100,68 @@ http:
       - exa
 ```
 
-If a provider fails, the pipeline continues with the next one.
+If a provider fails or its monthly budget is exhausted, the pipeline continues with the
+next one. Exhausted providers are suppressed for the rest of the month without affecting
+the failure counter.
 
 Every result — regardless of source — passes through URL verification, full job description
 fetching, freshness validation, and fit scoring before tailoring or cover letter generation.
 
 `config/discovery_cache.yml` stores URLs already seen in broad discovery so future runs skip
 them without repeating search calls.
+
+## Running Company Discovery Without LLM Sectors
+
+Company Discovery (triggered manually from Actions) uses two paths by default: ATS-posting
+discovery and LLM sector suggestions. You can run it in a fully deterministic, no-LLM-sector
+mode by setting `discovery.sectors` to an empty list in `config/search_config.yml`:
+
+```yaml
+discovery:
+  sectors: []
+```
+
+With `sectors` empty, the pipeline skips LLM company-name suggestions entirely and discovers
+companies only from real job postings found on ATS platforms. This costs no LLM tokens for
+the discovery step and produces companies with verified live postings.
+
+## Importing Browser-Captured Jobs
+
+If you find a job manually in your browser that the pipeline missed, you can import it
+without re-running a full hunt:
+
+```bash
+docker run --rm -it -v "$PWD:/workspace" -w /workspace \
+  ghcr.io/jobhunterpath/job-hunter-core:latest \
+  job-hunter import-captures --captures-dir captures/
+```
+
+Place one JSON file per job in a `captures/` folder at the root of your repo. Each file
+needs at minimum a `url` field. The import command deduplicates against
+`config/applied_jobs.yml`, runs scoring, and writes tailored output if the job passes.
+This workflow requires no search API keys.
+
+## Source-Yield Diagnostics
+
+After every hunt run, the log includes a per-source yield summary. A line such as:
+
+```
+[scrape] sources: direct_ats=12 career_page=3 searxng=5 ats_discovery=8 jobspy=2 cache_revalidation=0
+```
+
+shows how many jobs each source contributed. Use this to identify which sources are
+thin before deciding what to change.
+
+What to look for:
+
+- `direct_ats=0` and `career_page=0` — the companies in your `config/search_config.yml`
+  list may have no current openings for your titles, or the URLs may be wrong.
+- `searxng=0` — SearXNG may not have started cleanly (check the Actions log for container
+  startup errors) or may have returned zero results for the configured titles and region.
+- `ats_discovery=0` — no live postings found on the 11 ATS platforms for your titles and
+  region. This can happen in smaller markets or for niche titles.
+- `jobspy=0` — JobSpy (RapidAPI) returned no results, or its key is absent/exhausted.
+- All sources low — see the troubleshooting section below.
 
 **LLM providers:**
 

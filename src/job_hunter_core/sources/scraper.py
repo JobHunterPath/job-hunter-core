@@ -9,6 +9,7 @@ The fallback order is intentionally conservative:
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import os
@@ -47,11 +48,98 @@ from job_hunter_core.sources.search_providers import (
 )
 from job_hunter_core.tracking.discovery_cache import (
     load_cached_candidate_urls,
+    load_cached_candidate_urls_with_metadata,
     save_cached_candidate_urls,
 )
 
 ROOT = str(REPO_ROOT)
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Per-source yield diagnostics
+# ---------------------------------------------------------------------------
+
+
+@dataclasses.dataclass
+class SourceStats:
+    """Counts for a single named source during one scrape run."""
+
+    attempted: int = 0
+    returned: int = 0
+    accepted: int = 0
+    skipped: int = 0
+    failed: int = 0
+    exhausted: int = 0
+    cached: int = 0
+
+
+class ScrapeStats:
+    """Accumulates per-source statistics during a scrape run.
+
+    Thread-safe: individual source stat objects are created before the
+    parallel phase and are only written by their owning thread (company
+    processing is per-company) or under the main thread for global sources.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._sources: dict[str, SourceStats] = {}
+
+    def source(self, name: str) -> SourceStats:
+        with self._lock:
+            if name not in self._sources:
+                self._sources[name] = SourceStats()
+            return self._sources[name]
+
+    def record(
+        self,
+        name: str,
+        *,
+        attempted: int = 0,
+        returned: int = 0,
+        accepted: int = 0,
+        skipped: int = 0,
+        failed: int = 0,
+        exhausted: int = 0,
+        cached: int = 0,
+    ) -> None:
+        s = self.source(name)
+        with self._lock:
+            s.attempted += attempted
+            s.returned += returned
+            s.accepted += accepted
+            s.skipped += skipped
+            s.failed += failed
+            s.exhausted += exhausted
+            s.cached += cached
+
+    def log_summary(self) -> None:
+        """Log a compact per-source summary at INFO level."""
+        with self._lock:
+            sources = dict(self._sources)
+        if not sources:
+            logger.info("[scraper][diag] no sources recorded")
+            return
+        lines = ["[scraper][diag] source yield summary:"]
+        for name, s in sorted(sources.items()):
+            parts = [f"attempted={s.attempted}", f"returned={s.returned}", f"accepted={s.accepted}"]
+            if s.skipped:
+                parts.append(f"skipped={s.skipped}")
+            if s.failed:
+                parts.append(f"failed={s.failed}")
+            if s.exhausted:
+                parts.append(f"exhausted={s.exhausted}")
+            if s.cached:
+                parts.append(f"cached={s.cached}")
+            lines.append(f"  {name}: {', '.join(parts)}")
+        logger.info("\n".join(lines))
+
+    def to_dict(self) -> dict[str, dict]:
+        with self._lock:
+            return {
+                name: dataclasses.asdict(s) for name, s in self._sources.items()
+            }
 
 
 def load_search_config() -> dict:
@@ -242,6 +330,7 @@ def scrape(region: str | None = None) -> list[dict]:
     """Scrape jobs for configured companies and global boards."""
     config = load_search_config()
     companies = load_companies(region)
+    stats = ScrapeStats()
 
     global_cfg = config.get("global_search", {})
     title_filters = global_cfg.get("job_titles", [])
@@ -279,34 +368,61 @@ def scrape(region: str | None = None) -> list[dict]:
     max_workers = int(scraping_cfg.get("max_workers", 10))
 
     def _process_company(company: dict) -> None:
-        region = company.get("region", "")
+        company_region = company.get("region", "")
         company_region_config = company.get("_region_config") or {
             "location": company.get("location", ""),
             "country": company.get("country", ""),
             "search_lang": company.get("search_lang", ""),
         }
+        stats.record("ats_api", attempted=1)
         ats_jobs = fetch_ats_jobs(
             company, company.get("location", ""), title_filters, excluded_title_terms
         )
         if ats_jobs is not None:
+            stats.record("ats_api", returned=len(ats_jobs))
+            accepted = 0
             for job in ats_jobs:
-                add_job({**job, "region": region})
+                if add_job({**job, "region": company_region}):
+                    accepted += 1
+            stats.record("ats_api", accepted=accepted, skipped=len(ats_jobs) - accepted)
             return
 
         direct_found = 0
+        stats.record("static_career_page", attempted=1)
         try:
-            for job in fetch_static_career_jobs(company, title_filters, excluded_title_terms):
-                direct_found += int(add_job({**job, "region": region}))
+            static_jobs = list(fetch_static_career_jobs(company, title_filters, excluded_title_terms))
+            stats.record("static_career_page", returned=len(static_jobs))
+            for job in static_jobs:
+                if add_job({**job, "region": company_region}):
+                    direct_found += 1
+            stats.record(
+                "static_career_page",
+                accepted=direct_found,
+                skipped=len(static_jobs) - direct_found,
+            )
         except Exception as e:
+            stats.record("static_career_page", failed=1)
             logger.debug("[scraper] HTTP career scrape failed for %s: %s", company["name"], e)
 
         if direct_found == 0:
+            stats.record("playwright_career_page", attempted=1)
             try:
-                for job in fetch_playwright_career_jobs(
-                    company, title_filters, excluded_title_terms
-                ):
-                    direct_found += int(add_job({**job, "region": region}))
+                pw_jobs = list(
+                    fetch_playwright_career_jobs(company, title_filters, excluded_title_terms)
+                )
+                stats.record("playwright_career_page", returned=len(pw_jobs))
+                pw_accepted = 0
+                for job in pw_jobs:
+                    if add_job({**job, "region": company_region}):
+                        direct_found += 1
+                        pw_accepted += 1
+                stats.record(
+                    "playwright_career_page",
+                    accepted=pw_accepted,
+                    skipped=len(pw_jobs) - pw_accepted,
+                )
             except Exception as e:
+                stats.record("playwright_career_page", failed=1)
                 logger.debug(
                     "[scraper] Playwright career scrape failed for %s: %s", company["name"], e
                 )
@@ -315,13 +431,17 @@ def scrape(region: str | None = None) -> list[dict]:
             return
 
         for query, company_name, _ in build_queries([company], config):
+            stats.record("search_fallback", attempted=1)
             try:
                 raw = search_web(query, company_region_config, count=10)
+                stats.record("search_fallback", returned=len(raw))
             except Exception as e:
+                stats.record("search_fallback", failed=1)
                 logger.warning("[scraper] Search error for %s: %s", company_name, e)
                 continue
 
             filtered_count = 0
+            accepted_count = 0
             for item in raw:
                 url = item.get("url", "")
                 title = item.get("title", "")
@@ -341,7 +461,7 @@ def scrape(region: str | None = None) -> list[dict]:
                     filtered_count += 1
                     continue
 
-                add_job(
+                if add_job(
                     {
                         "title": title,
                         "company": company_name,
@@ -350,10 +470,16 @@ def scrape(region: str | None = None) -> list[dict]:
                         "snippet": snippet,
                         "source": item.get("source", "Search fallback"),
                         "query": query,
-                        "region": region,
+                        "region": company_region,
                     }
-                )
+                ):
+                    accepted_count += 1
 
+            stats.record(
+                "search_fallback",
+                accepted=accepted_count,
+                skipped=filtered_count,
+            )
             if filtered_count > 0:
                 logger.debug(
                     "[scraper] Filtered %s ineligible results from %s", filtered_count, company_name
@@ -382,6 +508,7 @@ def scrape(region: str | None = None) -> list[dict]:
                 try:
                     future.result()
                 except Exception as e:
+                    stats.record("ats_api", failed=1)
                     logger.warning("[scraper] Error processing %s: %s", company.get("name", "?"), e)
         except TimeoutError:
             logger.warning(
@@ -389,33 +516,69 @@ def scrape(region: str | None = None) -> list[dict]:
                 total_scrape_timeout,
             )
 
+    stats.record("ats_search_discovery", attempted=1)
     try:
-        for job in discover_ats_jobs_by_search(
-            title_filters,
-            enabled_regions,
-            excluded_title_terms,
-            ats_discovery_cfg=config.get("ats_discovery", {}),
-        ):
-            add_job(job, cache_candidate=True)
+        discovery_jobs = list(
+            discover_ats_jobs_by_search(
+                title_filters,
+                enabled_regions,
+                excluded_title_terms,
+                ats_discovery_cfg=config.get("ats_discovery", {}),
+            )
+        )
+        stats.record("ats_search_discovery", returned=len(discovery_jobs))
+        disc_accepted = 0
+        for job in discovery_jobs:
+            if add_job(job, cache_candidate=True):
+                disc_accepted += 1
+        stats.record(
+            "ats_search_discovery",
+            accepted=disc_accepted,
+            skipped=len(discovery_jobs) - disc_accepted,
+        )
     except Exception as e:
+        stats.record("ats_search_discovery", failed=1)
         logger.warning("[scraper] ATS search discovery failed: %s", e)
 
+    stats.record("jobspy", attempted=1)
     try:
-        for job in fetch_jobspy_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        jobspy_jobs = list(fetch_jobspy_jobs(title_filters, enabled_regions, config))
+        stats.record("jobspy", returned=len(jobspy_jobs))
+        jobspy_accepted = 0
+        for job in jobspy_jobs:
+            if add_job(job, cache_candidate=True):
+                jobspy_accepted += 1
+        stats.record("jobspy", accepted=jobspy_accepted, skipped=len(jobspy_jobs) - jobspy_accepted)
     except Exception as e:
+        stats.record("jobspy", failed=1)
         logger.warning("[scraper] JobSpy failed: %s", e)
 
+    stats.record("himalayas", attempted=1)
     try:
-        for job in fetch_himalayas_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        him_jobs = list(fetch_himalayas_jobs(title_filters, enabled_regions, config))
+        stats.record("himalayas", returned=len(him_jobs))
+        him_accepted = 0
+        for job in him_jobs:
+            if add_job(job, cache_candidate=True):
+                him_accepted += 1
+        stats.record("himalayas", accepted=him_accepted, skipped=len(him_jobs) - him_accepted)
     except Exception as e:
+        stats.record("himalayas", failed=1)
         logger.warning("[scraper] Himalayas failed: %s", e)
 
+    stats.record("arbeitsagentur", attempted=1)
     try:
-        for job in fetch_arbeitsagentur_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        aa_jobs = list(fetch_arbeitsagentur_jobs(title_filters, enabled_regions, config))
+        stats.record("arbeitsagentur", returned=len(aa_jobs))
+        aa_accepted = 0
+        for job in aa_jobs:
+            if add_job(job, cache_candidate=True):
+                aa_accepted += 1
+        stats.record(
+            "arbeitsagentur", accepted=aa_accepted, skipped=len(aa_jobs) - aa_accepted
+        )
     except Exception as e:
+        stats.record("arbeitsagentur", failed=1)
         logger.warning("[scraper] Arbeitsagentur failed: %s", e)
 
     boards_cfg = load_api_config().get("http", {}).get("job_boards", {})
@@ -430,13 +593,18 @@ def scrape(region: str | None = None) -> list[dict]:
                 board_location,
                 max_pages,
             )
-            for job in fetch_arbeitnow_jobs(
-                title_filters,
-                board_location,
-                max_pages,
-                excluded_title_terms,
-            ):
-                add_job(job)
+            stats.record("arbeitnow", attempted=1)
+            arbeitnow_jobs = list(
+                fetch_arbeitnow_jobs(title_filters, board_location, max_pages, excluded_title_terms)
+            )
+            stats.record("arbeitnow", returned=len(arbeitnow_jobs))
+            an_accepted = 0
+            for job in arbeitnow_jobs:
+                if add_job(job):
+                    an_accepted += 1
+            stats.record(
+                "arbeitnow", accepted=an_accepted, skipped=len(arbeitnow_jobs) - an_accepted
+            )
 
         if boards_cfg.get("jsearch", {}).get("enabled", False):
             num_pages = boards_cfg["jsearch"].get("num_pages", 1)
@@ -446,33 +614,56 @@ def scrape(region: str | None = None) -> list[dict]:
                 board_location,
                 title_filters,
             )
-            for job in fetch_jsearch_jobs(
-                title_filters,
-                board_location,
-                RAPIDAPI_KEY,
-                num_pages,
-                excluded_title_terms,
-                region_config.get("country", ""),
-                region_config.get("search_lang", ""),
-            ):
-                add_job(job)
+            stats.record("jsearch", attempted=1)
+            jsearch_jobs = list(
+                fetch_jsearch_jobs(
+                    title_filters,
+                    board_location,
+                    RAPIDAPI_KEY,
+                    num_pages,
+                    excluded_title_terms,
+                    region_config.get("country", ""),
+                    region_config.get("search_lang", ""),
+                )
+            )
+            stats.record("jsearch", returned=len(jsearch_jobs))
+            js_accepted = 0
+            for job in jsearch_jobs:
+                if add_job(job):
+                    js_accepted += 1
+            stats.record("jsearch", accepted=js_accepted, skipped=len(jsearch_jobs) - js_accepted)
 
+    stats.record("adzuna", attempted=1)
     try:
-        for job in fetch_adzuna_jobs(
-            title_filters, enabled_regions, config, ADZUNA_APP_ID, ADZUNA_API_KEY
-        ):
-            add_job(job)
+        az_jobs = list(
+            fetch_adzuna_jobs(title_filters, enabled_regions, config, ADZUNA_APP_ID, ADZUNA_API_KEY)
+        )
+        stats.record("adzuna", returned=len(az_jobs))
+        az_accepted = 0
+        for job in az_jobs:
+            if add_job(job):
+                az_accepted += 1
+        stats.record("adzuna", accepted=az_accepted, skipped=len(az_jobs) - az_accepted)
     except Exception as e:
+        stats.record("adzuna", failed=1)
         logger.warning("[scraper] Adzuna failed: %s", e)
 
+    stats.record("reed", attempted=1)
     try:
-        for job in fetch_reed_jobs(title_filters, enabled_regions, config, REED_API_KEY):
-            add_job(job)
+        reed_jobs = list(fetch_reed_jobs(title_filters, enabled_regions, config, REED_API_KEY))
+        stats.record("reed", returned=len(reed_jobs))
+        reed_accepted = 0
+        for job in reed_jobs:
+            if add_job(job):
+                reed_accepted += 1
+        stats.record("reed", accepted=reed_accepted, skipped=len(reed_jobs) - reed_accepted)
     except Exception as e:
+        stats.record("reed", failed=1)
         logger.warning("[scraper] Reed failed: %s", e)
 
+    api_cfg_loaded = load_api_config()
     ai_web_cfg = (
-        load_api_config().get("http", {}).get("search_providers", {}).get("ai_web_search", {}) or {}
+        api_cfg_loaded.get("http", {}).get("search_providers", {}).get("ai_web_search", {}) or {}
     )
     ai_min_jobs = int(ai_web_cfg.get("run_if_fewer_than_jobs", 0) or 0)
     if ai_min_jobs > 0 and len(results) >= ai_min_jobs:
@@ -481,13 +672,29 @@ def scrape(region: str | None = None) -> list[dict]:
             len(results),
             ai_min_jobs,
         )
+        stats.record("ai_web_search", skipped=1)
     else:
+        stats.record("ai_web_search", attempted=1)
         try:
-            for job in fetch_ai_web_search_jobs(title_filters, enabled_regions):
-                add_job(job, allow_excluded_urls=True, cache_candidate=True)
+            ai_jobs = list(fetch_ai_web_search_jobs(title_filters, enabled_regions))
+            stats.record("ai_web_search", returned=len(ai_jobs))
+            ai_accepted = 0
+            for job in ai_jobs:
+                if add_job(job, allow_excluded_urls=True, cache_candidate=True):
+                    ai_accepted += 1
+            stats.record(
+                "ai_web_search", accepted=ai_accepted, skipped=len(ai_jobs) - ai_accepted
+            )
         except Exception as e:
+            stats.record("ai_web_search", failed=1)
             logger.warning("[scraper] AI web search failed: %s", e)
 
+    # --- revalidation fallback (Task 5) ---
+    _maybe_revalidate_cache(
+        config, api_cfg_loaded, results, cached_candidate_urls, add_job, stats
+    )
+
+    stats.log_summary()
     logger.info("[scraper] Complete: %s jobs found", len(results))
     if candidate_cache_updates:
         save_cached_candidate_urls(cached_candidate_urls | candidate_cache_updates)
@@ -495,6 +702,87 @@ def scrape(region: str | None = None) -> list[dict]:
             "[scraper] Cached %s new discovery candidate URL(s)", len(candidate_cache_updates)
         )
     return results
+
+
+# ---------------------------------------------------------------------------
+# Task 5: Cache revalidation as a bounded fallback
+# ---------------------------------------------------------------------------
+
+
+def _maybe_revalidate_cache(
+    config: dict,
+    _api_cfg: dict,
+    results: list[dict],
+    cached_candidate_urls: set[str],
+    add_job: Any,
+    stats: ScrapeStats,
+) -> None:
+    """Re-check cached broad-discovery URLs when live yield is below a threshold.
+
+    Controlled by ``scraping.cache_revalidation`` in search_config.yml:
+      enabled: false          # disabled by default
+      threshold: 5            # only run when fewer than this many live results
+      max_urls: 20            # upper bound on how many cached URLs to check
+    """
+    rev_cfg = config.get("scraping", {}).get("cache_revalidation", {}) or {}
+    if not rev_cfg.get("enabled", False):
+        return
+
+    threshold = int(rev_cfg.get("threshold", 5))
+    max_urls = int(rev_cfg.get("max_urls", 20))
+
+    if len(results) >= threshold:
+        logger.debug(
+            "[scraper][revalidation] skipped: %d live results >= threshold %d",
+            len(results),
+            threshold,
+        )
+        return
+
+    if not cached_candidate_urls:
+        logger.debug("[scraper][revalidation] no cached URLs to revalidate")
+        return
+
+    # Load with metadata so we can pick the most-recently-seen URLs first.
+    try:
+        all_cached = load_cached_candidate_urls_with_metadata()
+    except Exception:
+        # Fallback: use the flat set already loaded
+        all_cached = {url: {} for url in cached_candidate_urls}
+
+    # Skip URLs already found in this run.
+    result_urls = {canonicalize_url(j.get("url", "")) for j in results}
+    candidates = [url for url in all_cached if url not in result_urls]
+    candidates = candidates[:max_urls]
+
+    if not candidates:
+        logger.debug("[scraper][revalidation] all cached URLs already in results")
+        return
+
+    logger.info(
+        "[scraper][revalidation] live yield %d < threshold %d; revalidating up to %d cached URL(s)",
+        len(results),
+        threshold,
+        len(candidates),
+    )
+    stats.record("cache_revalidation", attempted=len(candidates))
+
+    accepted = 0
+    for url in candidates:
+        meta = all_cached.get(url) or {}
+        job = {
+            "title": meta.get("title", ""),
+            "company": meta.get("company", ""),
+            "url": url,
+            "posted": meta.get("posted", ""),
+            "snippet": meta.get("snippet", ""),
+            "source": "cache_revalidation",
+        }
+        if add_job(job, cache_candidate=False):
+            accepted += 1
+
+    stats.record("cache_revalidation", accepted=accepted, skipped=len(candidates) - accepted)
+    logger.info("[scraper][revalidation] accepted %d / %d revalidated URL(s)", accepted, len(candidates))
 
 
 if __name__ == "__main__":

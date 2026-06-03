@@ -338,7 +338,14 @@ class ExaProvider(SearchProvider):
 
 
 class SearchRouter:
-    """Tries enabled search providers in configured order."""
+    """Tries enabled search providers in configured order.
+
+    Exhausted providers (monthly quota hit) are distinguished from transient
+    failures: they are skipped immediately and reset the consecutive-failure
+    counter so that a quota exhaustion does not suppress the next provider.
+    Providers with no credentials are skipped silently at DEBUG level so that
+    no-key deployments do not produce noisy warnings.
+    """
 
     def __init__(self, providers: list[SearchProvider] | None = None) -> None:
         self.providers = (
@@ -353,20 +360,47 @@ class SearchRouter:
         if failures < self.max_consecutive_failures:
             return False
         logger.warning(
-            "[search] %s skipped after %s consecutive failure(s)",
+            "[search] %s suppressed after %s consecutive transient failure(s); "
+            "will resume after a successful call from another provider",
             provider.name,
             failures,
         )
         return True
 
+    @staticmethod
+    def _is_exhausted(provider: SearchProvider) -> bool:
+        """Return True when the provider's monthly quota is already marked exhausted."""
+        from job_hunter_core.core.api_budget import _budget_cfg, _read_state, _state_path
+
+        cfg = _budget_cfg()
+        if not cfg.get("enabled", True):
+            return False
+        state = _read_state(_state_path(cfg))
+        exhausted = state.get("exhausted", {})
+        return provider.name.lower() in exhausted
+
     def search(self, query: str, region_config: dict, count: int = 10) -> list[SearchResult]:
         all_results: list[SearchResult] = []
+        any_keyed_provider_tried = False
+
         for provider in self.providers:
             if not provider.enabled():
                 logger.debug("[search] %s disabled or missing credentials", provider.name)
                 continue
+
+            # Check exhaustion before calling; reserve_api_call inside each
+            # provider also guards this, but an upfront check gives a cleaner log.
+            if self._is_exhausted(provider):
+                logger.info(
+                    "[search] %s skipped: monthly quota already exhausted for this month",
+                    provider.name,
+                )
+                continue
+
             if self._is_suppressed(provider):
                 continue
+
+            any_keyed_provider_tried = True
             try:
                 logger.info("[search] %s: %s", provider.name, query[:80])
                 results = provider.search(query, region_config, count=count)
@@ -377,16 +411,28 @@ class SearchRouter:
             except Exception as exc:
                 if is_api_quota_exhausted(exc):
                     mark_api_exhausted(provider.name, exc=exc)
+                    # Quota exhaustion is not a transient failure; reset consecutive counter
+                    # so the next provider is not penalised by this provider's exhaustion.
                     _reset_provider_failure(provider.name)
+                    logger.warning(
+                        "[search] %s quota exhausted; continuing to next provider",
+                        provider.name,
+                    )
                     continue
                 failures = _record_provider_failure(provider.name)
                 logger.warning(
-                    "[search] %s failed (%s/%s): %s",
+                    "[search] %s transient failure (%s/%s): %s",
                     provider.name,
                     failures,
                     self.max_consecutive_failures,
                     exc,
                 )
+
+        if not any_keyed_provider_tried and not all_results:
+            logger.debug(
+                "[search] no enabled providers with credentials; returning empty result set"
+            )
+
         return all_results[:count]
 
 

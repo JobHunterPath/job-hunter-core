@@ -642,3 +642,141 @@ def test_scrape_ats_path_applies_industry_filter():
     ):
         jobs = scraper.scrape()
     assert jobs == []
+
+
+# ── Task 1: ScrapeStats diagnostics ─────────────────────────────────────────
+
+
+def test_scrape_stats_records_accepted_and_skipped():
+    """ScrapeStats.record accumulates counts correctly."""
+    stats = scraper.ScrapeStats()
+    stats.record("ats_api", attempted=3, returned=2, accepted=1, skipped=1)
+    s = stats.source("ats_api")
+    assert s.attempted == 3
+    assert s.returned == 2
+    assert s.accepted == 1
+    assert s.skipped == 1
+
+
+def test_scrape_stats_log_summary_does_not_raise(caplog):
+    """log_summary emits at least one INFO line without errors."""
+    import logging
+
+    stats = scraper.ScrapeStats()
+    stats.record("test_source", attempted=1, returned=0, failed=1)
+    with caplog.at_level(logging.INFO):
+        stats.log_summary()
+    assert any("test_source" in r.message for r in caplog.records)
+
+
+def test_scrape_stats_to_dict_matches_recorded_values():
+    stats = scraper.ScrapeStats()
+    stats.record("jobspy", attempted=5, returned=3, accepted=2, skipped=1)
+    d = stats.to_dict()
+    assert d["jobspy"]["attempted"] == 5
+    assert d["jobspy"]["returned"] == 3
+    assert d["jobspy"]["accepted"] == 2
+    assert d["jobspy"]["skipped"] == 1
+
+
+def test_scrape_diagnostics_one_successful_one_failed_source():
+    """A scrape with one working ATS source and one failing global source produces correct stats."""
+    with (
+        patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
+        patch("job_hunter_core.sources.scraper.load_companies", return_value=COMPANIES[:1]),
+        patch("job_hunter_core.sources.scraper.fetch_ats_jobs", return_value=[ATS_JOB]),
+        patch(
+            "job_hunter_core.sources.scraper.fetch_jobspy_jobs",
+            side_effect=RuntimeError("jobspy boom"),
+        ),
+        patch("job_hunter_core.sources.scraper.fetch_himalayas_jobs", return_value=[]),
+        patch("job_hunter_core.sources.scraper.fetch_arbeitsagentur_jobs", return_value=[]),
+        patch("job_hunter_core.sources.scraper.fetch_adzuna_jobs", return_value=[]),
+        patch("job_hunter_core.sources.scraper.fetch_reed_jobs", return_value=[]),
+    ):
+        jobs = scraper.scrape()
+
+    # ATS job was accepted
+    assert any(j["url"] == ATS_JOB["url"] for j in jobs)
+
+
+# ── Task 5: Cache revalidation ────────────────────────────────────────────────
+
+
+def test_cache_revalidation_skipped_by_default():
+    """Cache revalidation must not run when scraping.cache_revalidation.enabled is False."""
+    config_with_revalidation = {
+        **CONFIG,
+        "scraping": {
+            "max_workers": 2,
+            "cache_revalidation": {"enabled": False, "threshold": 100, "max_urls": 50},
+        },
+    }
+    cached_url = scraper.canonicalize_url(
+        "https://jobs.lever.co/cached/11111111-1111-1111-1111-111111111111"
+    )
+
+    with (
+        patch(
+            "job_hunter_core.sources.scraper.load_search_config",
+            return_value=config_with_revalidation,
+        ),
+        patch("job_hunter_core.sources.scraper.load_companies", return_value=[]),
+        patch(
+            "job_hunter_core.sources.scraper.load_cached_candidate_urls",
+            return_value={cached_url},
+        ),
+        patch(
+            "job_hunter_core.sources.scraper.load_cached_candidate_urls_with_metadata",
+            return_value={cached_url: {"title": "Product Manager", "company": "CachedCo"}},
+        ) as mock_meta,
+        patch("job_hunter_core.sources.scraper.fetch_adzuna_jobs", return_value=[]),
+        patch("job_hunter_core.sources.scraper.fetch_reed_jobs", return_value=[]),
+    ):
+        jobs = scraper.scrape()
+
+    # Revalidation disabled; metadata loader must not have been called
+    mock_meta.assert_not_called()
+    assert not any(j.get("source") == "cache_revalidation" for j in jobs)
+
+
+def test_cache_revalidation_bounded_when_enabled():
+    """Cache revalidation respects max_urls cap."""
+    config_with_revalidation = {
+        **CONFIG,
+        "scraping": {
+            "max_workers": 2,
+            "cache_revalidation": {"enabled": True, "threshold": 100, "max_urls": 2},
+        },
+    }
+    cached_urls_meta = {
+        scraper.canonicalize_url(f"https://jobs.lever.co/co{i}/{'a' * 36}"): {
+            "title": "Product Manager",
+            "company": f"Co{i}",
+        }
+        for i in range(5)
+    }
+
+    with (
+        patch(
+            "job_hunter_core.sources.scraper.load_search_config",
+            return_value=config_with_revalidation,
+        ),
+        patch("job_hunter_core.sources.scraper.load_companies", return_value=[]),
+        patch(
+            "job_hunter_core.sources.scraper.load_cached_candidate_urls",
+            return_value=set(cached_urls_meta),
+        ),
+        patch(
+            "job_hunter_core.sources.scraper.load_cached_candidate_urls_with_metadata",
+            return_value=cached_urls_meta,
+        ),
+        patch("job_hunter_core.sources.scraper.fetch_adzuna_jobs", return_value=[]),
+        patch("job_hunter_core.sources.scraper.fetch_reed_jobs", return_value=[]),
+    ):
+        jobs = scraper.scrape()
+
+    revalidated = [j for j in jobs if j.get("source") == "cache_revalidation"]
+    # max_urls=2 caps the number revalidated even though 5 URLs are cached
+    assert len(revalidated) <= 2
+

@@ -207,3 +207,84 @@ def test_ats_discovery_runs_without_llm_sectors(monkeypatch, tmp_path):
 
     companies = _read_search_config(cfg)["regions"]["berlin"]["companies"]
     assert companies == [{"name": "SearchCo", "career_url": "jobs.ashbyhq.com/searchco"}]
+
+
+# ── Task 4: Deterministic company discovery mode ─────────────────────────────
+
+
+def test_ats_only_discovery_adds_companies_without_llm(monkeypatch, tmp_path):
+    """With sectors=[], companies come only from real ATS postings (no LLM names)."""
+    cfg = tmp_path / "search_config.yml"
+    _write_search_config(
+        cfg,
+        {
+            "berlin": {
+                "enabled": True,
+                "location": "Berlin",
+                "companies": [],
+            }
+        },
+        discovery={"sectors": []},
+    )
+    monkeypatch.setattr(discoverer, "SEARCH_CONFIG_FILE", str(cfg))
+
+    llm_call_count = []
+
+    def fake_discover_names(*args):
+        llm_call_count.append(1)
+        return []
+
+    monkeypatch.setattr(discoverer, "discover_company_names", fake_discover_names)
+    monkeypatch.setattr(
+        discoverer,
+        "discover_company_candidates",
+        lambda *args: [
+            {"name": "AtsOnlyCo", "career_url": "jobs.lever.co/atsonlyco"},
+            {"name": "AtsOnlyCo2", "career_url": "jobs.ashbyhq.com/atsonlyco2"},
+        ],
+    )
+    monkeypatch.setattr(discoverer, "has_jobs_in_location", lambda *args: False)
+
+    discoverer.run()
+
+    companies = _read_search_config(cfg)["regions"]["berlin"]["companies"]
+    names = [c["name"] for c in companies]
+    assert "AtsOnlyCo" in names
+    assert "AtsOnlyCo2" in names
+    # LLM was never called because sectors is empty
+    assert llm_call_count == []
+
+
+def test_discovery_origin_summary_logged(monkeypatch, tmp_path, capsys):
+    """run() prints a summary showing how many companies came from LLM vs ATS postings."""
+    cfg = tmp_path / "search_config.yml"
+    _write_search_config(
+        cfg,
+        {
+            "berlin": {
+                "enabled": True,
+                "location": "Berlin",
+                "companies": [],
+            }
+        },
+        discovery={"sectors": ["saas"]},
+    )
+    monkeypatch.setattr(discoverer, "SEARCH_CONFIG_FILE", str(cfg))
+    monkeypatch.setattr(discoverer, "discover_company_names", lambda *args: ["LlmCo"])
+    monkeypatch.setattr(
+        discoverer,
+        "find_career_url",
+        lambda name, urls, rc: {"name": name, "career_url": f"jobs.lever.co/{name.lower()}"},
+    )
+    monkeypatch.setattr(
+        discoverer,
+        "discover_company_candidates",
+        lambda *args: [{"name": "AtsCo", "career_url": "jobs.ashbyhq.com/atsco"}],
+    )
+    monkeypatch.setattr(discoverer, "has_jobs_in_location", lambda *args: False)
+
+    discoverer.run()
+
+    captured = capsys.readouterr().out
+    assert "llm=" in captured
+    assert "ats_postings=" in captured

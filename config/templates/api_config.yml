@@ -77,6 +77,12 @@ secrets:
 
 http:
   api_budgets:
+    # Monthly call budgets for keyed search providers. When a provider exceeds
+    # its limit the pipeline skips it silently for the rest of the month and
+    # falls through to the next provider in `search_providers.order`. Exhaustion
+    # is distinguished from transient failures: a quota-exhausted provider does
+    # not count toward `max_consecutive_failures` and does not suppress the run.
+    # Budget state is written to `state_path` after every run.
     enabled: true
     state_path: "config/api_usage.json"
     monthly_limits:
@@ -92,7 +98,13 @@ http:
     max_workers: 5
   search_providers:
     timeout_seconds: 10
+    # A provider is suppressed for the rest of the run after this many consecutive
+    # transient failures. Quota-exhausted providers are skipped silently and do
+    # not increment this counter.
     max_consecutive_failures: 3
+    # Fallback order: the pipeline tries each provider in turn and moves to the
+    # next one on failure or exhaustion. SearXNG is always free (no key needed).
+    # Brave/Tavily/Exa are optional; the pipeline runs without them.
     order:
       - searxng
       - brave
@@ -100,11 +112,16 @@ http:
       - exa
     searxng_base_url: "http://127.0.0.1:8080"
     ats_discovery:
+      # ATS discovery queries public ATS job APIs directly without any search
+      # provider key. It runs regardless of whether SearXNG or Brave/Tavily/Exa
+      # are available, so it is the primary no-key discovery path.
       enabled: true
       results_per_query: 10
       # 0 means unlimited. Use these caps to constrain region x title x source query growth.
       max_queries_per_region: 0
       max_total_queries: 0
+      # All ATS platforms supported in code are listed here.
+      # Remove entries you do not want queried; all are no-key/public-endpoint sources.
       sources:
         - greenhouse
         - lever
@@ -114,6 +131,9 @@ http:
         - personio
         - recruitee
         - hibob
+        - teamtailor
+        - breezy
+        - workday
     ai_web_search:
       enabled: false
       # Queries are title + region only; company names are never included.

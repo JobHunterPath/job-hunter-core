@@ -35,7 +35,15 @@
       "type": "object",
       "properties": {
         "max_workers": { "type": "integer", "minimum": 1 },
-        "total_timeout_seconds": { "type": "integer", "minimum": 60 }
+        "total_timeout_seconds": { "type": "integer", "minimum": 60 },
+        "cache_revalidation": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "threshold": { "type": "integer", "minimum": 0 },
+            "max_urls": { "type": "integer", "minimum": 0 }
+          }
+        }
       }
     },
     "ats_discovery": {

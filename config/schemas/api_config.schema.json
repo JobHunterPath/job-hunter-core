@@ -54,7 +54,26 @@
             "max_consecutive_failures": { "type": "integer", "minimum": 1 },
             "order": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
             "searxng_base_url": { "type": "string" },
-            "ats_discovery": { "type": "object" }
+            "ats_discovery": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "results_per_query": { "type": "integer", "minimum": 1 },
+                "max_queries_per_region": { "type": "integer", "minimum": 0 },
+                "max_total_queries": { "type": "integer", "minimum": 0 },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "greenhouse", "lever", "ashby", "smartrecruiters",
+                      "workable", "personio", "recruitee", "hibob",
+                      "teamtailor", "breezy", "workday"
+                    ]
+                  }
+                }
+              }
+            }
           }
         },
         "ats_scraper": {

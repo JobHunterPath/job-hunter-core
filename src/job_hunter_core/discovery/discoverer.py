@@ -431,7 +431,7 @@ def run() -> None:
             )
             print(f"[discover] LLM suggested {len(suggested)} companies: {suggested}\n")
         else:
-            print("[discover] No LLM sectors configured; using ATS discovery only.")
+            print("[discover] No LLM sectors configured; running in deterministic ATS-only mode.")
 
         new_names = [
             name
@@ -443,7 +443,7 @@ def run() -> None:
         if skipped_excluded:
             print(f"[discover] Excluded by exclusion list: {skipped_excluded}")
 
-        print(f"[discover] {len(new_names)} not yet tracked: {new_names}\n")
+        print(f"[discover] {len(new_names)} LLM suggestions not yet tracked: {new_names}\n")
 
         new_entries = []
         existing_urls_snapshot = set(existing_urls)
@@ -462,9 +462,11 @@ def run() -> None:
         if lookup_timed_out:
             deadline_hit = True
 
+        llm_entries = [entry for entry in lookup_results if entry]
+
         ats_entries = []
         if not deadline_hit and not _deadline_reached(deadline):
-            print(f"[discover] Searching ATS postings for {region_name}...")
+            print(f"[discover] Searching ATS postings for {region_name} (deterministic mode)...")
             try:
                 ats_entries = discover_company_candidates(
                     search_config,
@@ -472,12 +474,21 @@ def run() -> None:
                     region_config,
                     job_titles,
                 )
-                print(f"[discover] ATS discovery found {len(ats_entries)} candidates.")
+                print(
+                    f"[discover] ATS posting discovery found {len(ats_entries)} candidate(s) "
+                    f"(source: real postings, no LLM names used)."
+                )
             except Exception as e:
                 print(f"[discover] ATS discovery failed for {region_name}: {e}")
 
-        combined_entries = [entry for entry in lookup_results if entry]
+        # Surface origin so users can see where companies came from.
+        combined_entries = list(llm_entries)
         combined_entries.extend(ats_entries)
+        print(
+            f"[discover] Company origin summary for {region_name}: "
+            f"llm={len(llm_entries)}, ats_postings={len(ats_entries)}, "
+            f"combined={len(combined_entries)}"
+        )
 
         for entry in sorted(combined_entries, key=lambda e: e["name"].lower()):
             entry_name = entry["name"].lower()

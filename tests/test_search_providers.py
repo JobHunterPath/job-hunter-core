@@ -174,3 +174,134 @@ def test_brave_provider_uses_shared_search_provider_timeout(monkeypatch):
 
     assert search_providers.BraveProvider().search("query", {}, count=1) == []
     assert sections == ["search_providers"]
+
+
+# ── Task 2: Exhausted provider fallback ──────────────────────────────────────
+
+
+class ExhaustedProvider(search_providers.SearchProvider):
+    """Simulates a provider whose quota is exhausted (reserve_api_call returns False)."""
+
+    name = "exhausted_provider"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def search(self, query: str, region_config: dict, count: int = 10):
+        self.calls += 1
+        return []
+
+
+class GoodProvider(search_providers.SearchProvider):
+    """Provider that always returns one result."""
+
+    name = "good_provider"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def search(self, query: str, region_config: dict, count: int = 10):
+        self.calls += 1
+        return [
+            search_providers.SearchResult(
+                url="https://example.com/job/1",
+                title="Product Manager",
+                description="Great role",
+                source="good_provider",
+            )
+        ]
+
+
+def test_router_skips_exhausted_provider_and_continues_to_next(monkeypatch):
+    """When a provider is pre-marked exhausted, the router skips it and tries the next one."""
+    search_providers._PROVIDER_FAILURES.clear()
+
+    exhausted = ExhaustedProvider()
+    good = GoodProvider()
+
+    # Mark exhausted_provider as quota-exhausted without a real state file
+    monkeypatch.setattr(
+        search_providers.SearchRouter,
+        "_is_exhausted",
+        lambda self, provider: provider.name == "exhausted_provider",
+    )
+
+    router = search_providers.SearchRouter(providers=[exhausted, good])
+    results = router.search("query", {}, count=5)
+
+    assert exhausted.calls == 0, "exhausted provider must not be called"
+    assert good.calls == 1
+    assert len(results) == 1
+
+
+def test_router_quota_exhaustion_exception_does_not_suppress_next_provider(monkeypatch):
+    """A quota-exhaustion exception resets the failure counter and continues to the next provider."""
+    search_providers._PROVIDER_FAILURES.clear()
+
+    class QuotaProvider(search_providers.SearchProvider):
+        name = "quota_provider"
+        calls = 0
+
+        def search(self, query, region_config, count=10):
+            self.calls += 1
+
+            class FakeResp:
+                status_code = 402
+                reason = "Payment Required"
+                text = "quota exceeded"
+
+            exc = Exception("quota exceeded")
+            exc.response = FakeResp()
+            raise exc
+
+    quota = QuotaProvider()
+    good = GoodProvider()
+
+    # Treat any exception from quota_provider as quota-exhausted
+
+    monkeypatch.setattr(
+        search_providers,
+        "is_api_quota_exhausted",
+        lambda exc: getattr(getattr(exc, "response", None), "status_code", None) == 402,
+    )
+    monkeypatch.setattr(search_providers, "mark_api_exhausted", lambda *a, **kw: None)
+    monkeypatch.setattr(
+        search_providers.SearchRouter,
+        "_is_exhausted",
+        lambda self, provider: False,  # not pre-exhausted; let the exception path trigger
+    )
+
+    router = search_providers.SearchRouter(providers=[quota, good])
+    results = router.search("query", {}, count=5)
+
+    assert quota.calls == 1
+    assert good.calls == 1
+    assert len(results) == 1
+    # Failure counter for quota_provider must be 0 (reset after quota exc, not incremented)
+    assert search_providers._PROVIDER_FAILURES.get("quota_provider", 0) == 0
+
+
+def test_router_no_key_provider_skipped_silently():
+    """A provider with no credentials is skipped at DEBUG level without noisy warnings."""
+    search_providers._PROVIDER_FAILURES.clear()
+
+    class NoKeyProvider(search_providers.SearchProvider):
+        name = "no_key"
+        calls = 0
+
+        def enabled(self) -> bool:
+            return False
+
+        def search(self, query, region_config, count=10):
+            self.calls += 1
+            return []
+
+    no_key = NoKeyProvider()
+    good = GoodProvider()
+
+    router = search_providers.SearchRouter(providers=[no_key, good])
+    results = router.search("query", {}, count=5)
+
+    assert no_key.calls == 0
+    assert good.calls == 1
+    assert len(results) == 1
