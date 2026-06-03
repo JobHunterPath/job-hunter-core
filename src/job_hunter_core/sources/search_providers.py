@@ -20,6 +20,10 @@ import requests
 from bs4 import BeautifulSoup
 
 from job_hunter_core.core.api_budget import (
+    _budget_cfg,
+    _is_exhausted,
+    _read_state,
+    _state_path,
     is_api_quota_exhausted,
     mark_api_exhausted,
     reserve_api_call,
@@ -112,6 +116,11 @@ TRACKING_QUERY_PREFIXES = ("utm_",)
 _PROVIDER_FAILURES: dict[str, int] = {}
 _PROVIDER_FAILURES_LOCK = threading.Lock()
 
+_SEARXNG_ZERO_THRESHOLD: int = 5
+_searxng_consecutive_zeros: int = 0
+_SEARXNG_ZERO_LOCK = threading.Lock()
+_ats_only_logged: bool = False
+
 
 @dataclass
 class SearchResult:
@@ -119,6 +128,43 @@ class SearchResult:
     title: str
     description: str
     source: str
+
+
+def all_providers_exhausted(api_cfg: dict | None = None) -> bool:
+    """Return True when all search providers are effectively unavailable.
+
+    Paid providers (brave, tavily, exa) are exhausted when their monthly quota
+    has been marked in the budget state file.  SearXNG is considered unavailable
+    when it is not configured OR when it has returned 0 results for
+    _SEARXNG_ZERO_THRESHOLD consecutive queries in the current run.
+    """
+    global _ats_only_logged
+
+    cfg = _budget_cfg(api_cfg)
+    state = _read_state(_state_path(cfg))
+    brave_out = _is_exhausted("brave", state)
+    tavily_out = _is_exhausted("tavily", state)
+    exa_out = _is_exhausted("exa", state)
+    paid_exhausted = brave_out and tavily_out and exa_out
+
+    with _SEARXNG_ZERO_LOCK:
+        consecutive_zeros = _searxng_consecutive_zeros
+
+    searxng_unavailable = (not SearxngProvider().enabled()) or (
+        consecutive_zeros >= _SEARXNG_ZERO_THRESHOLD
+    )
+
+    result = paid_exhausted and searxng_unavailable
+
+    if result:
+        with _SEARXNG_ZERO_LOCK:
+            if not _ats_only_logged:
+                logger.info(
+                    "[search] all providers exhausted — switching to ATS-only mode"
+                )
+                _ats_only_logged = True
+
+    return result
 
 
 class SearchProvider:
@@ -256,7 +302,14 @@ class SearxngProvider(SearchProvider):
         )
         resp.raise_for_status()
         raw = resp.json().get("results", [])[:count]
-        return normalize_web_results(raw, "SearXNG")
+        results = normalize_web_results(raw, "SearXNG")
+        with _SEARXNG_ZERO_LOCK:
+            global _searxng_consecutive_zeros
+            if len(results) == 0:
+                _searxng_consecutive_zeros += 1
+            else:
+                _searxng_consecutive_zeros = 0
+        return results
 
 
 class BraveProvider(SearchProvider):
@@ -703,6 +756,11 @@ def discover_ats_jobs_by_search(
     cfg = dict(_search_cfg().get("ats_discovery", {}) or {})
     cfg.update(ats_discovery_cfg or {})
     if not cfg.get("enabled", True):
+        return []
+
+    api_cfg = load_api_config()
+    if all_providers_exhausted(api_cfg):
+        logger.info("[search-discovery] skipped: all providers exhausted")
         return []
 
     max_results_per_query = int(cfg.get("results_per_query", 10))

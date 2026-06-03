@@ -305,3 +305,105 @@ def test_router_no_key_provider_skipped_silently():
     assert no_key.calls == 0
     assert good.calls == 1
     assert len(results) == 1
+
+
+# ── T-7: Search exhaustion detection ─────────────────────────────────────────
+
+
+def _reset_exhaustion_state():
+    """Reset module-level exhaustion counters to their defaults."""
+    import job_hunter_core.sources.search_providers as sp
+
+    with sp._SEARXNG_ZERO_LOCK:
+        sp._searxng_consecutive_zeros = 0
+        sp._ats_only_logged = False
+
+
+def test_all_providers_exhausted_returns_false_with_budget(monkeypatch):
+    """Returns False when no paid providers are exhausted."""
+    _reset_exhaustion_state()
+
+    # Patch _is_exhausted to always return False (none exhausted)
+    monkeypatch.setattr(search_providers, "_is_exhausted", lambda provider, state: False)
+    monkeypatch.setattr(search_providers, "_read_state", lambda path: {})
+    monkeypatch.setattr(search_providers, "_budget_cfg", lambda api_cfg=None: {})
+    monkeypatch.setattr(search_providers, "_state_path", lambda cfg: "dummy_path")
+
+    result = search_providers.all_providers_exhausted()
+    assert result is False
+
+    _reset_exhaustion_state()
+
+
+def test_all_providers_exhausted_returns_true_when_all_exhausted(monkeypatch):
+    """Returns True when all paid providers exhausted and SearXNG unavailable."""
+    _reset_exhaustion_state()
+
+    monkeypatch.setattr(search_providers, "_is_exhausted", lambda provider, state: True)
+    monkeypatch.setattr(search_providers, "_read_state", lambda path: {})
+    monkeypatch.setattr(search_providers, "_budget_cfg", lambda api_cfg=None: {})
+    monkeypatch.setattr(search_providers, "_state_path", lambda cfg: "dummy_path")
+    # SearXNG not configured
+    monkeypatch.setattr(search_providers.SearxngProvider, "enabled", lambda self: False)
+
+    result = search_providers.all_providers_exhausted()
+    assert result is True
+
+    _reset_exhaustion_state()
+
+
+def test_discover_ats_jobs_by_search_returns_empty_when_exhausted(monkeypatch, caplog):
+    """discover_ats_jobs_by_search() returns [] and logs when all providers exhausted."""
+    import logging
+
+    _reset_exhaustion_state()
+
+    monkeypatch.setattr(search_providers, "all_providers_exhausted", lambda api_cfg=None: True)
+    monkeypatch.setattr(
+        search_providers,
+        "_search_cfg",
+        lambda: {"ats_discovery": {"enabled": True}},
+    )
+    monkeypatch.setattr(search_providers, "load_api_config", lambda: {})
+
+    with caplog.at_level(logging.INFO, logger=search_providers.logger.name):
+        result = search_providers.discover_ats_jobs_by_search(
+            ["Software Engineer"],
+            {"EU": {"location": "Europe"}},
+        )
+
+    assert result == []
+    assert any(
+        "[search-discovery] skipped: all providers exhausted" in record.message
+        for record in caplog.records
+    )
+
+    _reset_exhaustion_state()
+
+
+def test_searxng_consecutive_zeros_increments(monkeypatch):
+    """SearxngProvider.search() increments _searxng_consecutive_zeros on zero results."""
+    import job_hunter_core.sources.search_providers as sp
+
+    _reset_exhaustion_state()
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"results": []}
+
+    monkeypatch.setattr(search_providers.requests, "get", lambda *a, **kw: FakeResponse())
+
+    provider = sp.SearxngProvider.__new__(sp.SearxngProvider)
+    provider.base_url = "http://localhost:8888"
+
+    for _ in range(3):
+        provider.search("test query", {})
+
+    with sp._SEARXNG_ZERO_LOCK:
+        count = sp._searxng_consecutive_zeros
+    assert count == 3
+
+    _reset_exhaustion_state()

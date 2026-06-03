@@ -42,6 +42,7 @@ from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
 from job_hunter_core.sources.reed_source import fetch_reed_jobs
 from job_hunter_core.sources.search_providers import (
     BraveProvider,
+    all_providers_exhausted,
     canonicalize_url,  # noqa: F401
     discover_ats_jobs_by_search,
     fetch_playwright_career_jobs,
@@ -116,14 +117,17 @@ class ScrapeStats:
             s.exhausted += exhausted
             s.cached += cached
 
-    def log_summary(self) -> None:
+    def log_summary(self, *, ats_only: bool = False) -> None:
         """Log a compact per-source summary at INFO level."""
         with self._lock:
             sources = dict(self._sources)
         if not sources:
             logger.info("[scraper][diag] no sources recorded")
             return
-        lines = ["[scraper][diag] source yield summary:"]
+        header = "[scraper][diag] source yield summary:"
+        if ats_only:
+            header += " mode=ats-only"
+        lines = [header]
         for name, s in sorted(sources.items()):
             parts = [f"attempted={s.attempted}", f"returned={s.returned}", f"accepted={s.accepted}"]
             if s.skipped:
@@ -432,6 +436,12 @@ def scrape(region: str | None = None) -> list[dict]:
         if direct_found:
             return
 
+        if all_providers_exhausted():
+            logger.debug(
+                "[scraper] %s: search skipped (ATS-only mode)", company["name"]
+            )
+            return
+
         for query, company_name, _ in build_queries([company], config):
             stats.record("search_fallback", attempted=1)
             try:
@@ -702,7 +712,7 @@ def scrape(region: str | None = None) -> list[dict]:
     # --- revalidation fallback (Task 5) ---
     _maybe_revalidate_cache(config, api_cfg_loaded, results, cached_candidate_urls, add_job, stats)
 
-    stats.log_summary()
+    stats.log_summary(ats_only=all_providers_exhausted())
     logger.info("[scraper] Complete: %s jobs found", len(results))
     if candidate_cache_updates:
         save_cached_candidate_urls(cached_candidate_urls | candidate_cache_updates)
