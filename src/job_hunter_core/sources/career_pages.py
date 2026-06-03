@@ -96,7 +96,14 @@ _ATS_URL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
 ]
 
 # Common career-page paths to probe when the base URL is not an ATS subdomain.
-_CAREER_PATHS = ["/careers", "/jobs", "/job-openings", "/open-positions", "/work-with-us", "/join-us"]
+_CAREER_PATHS = [
+    "/careers",
+    "/jobs",
+    "/job-openings",
+    "/open-positions",
+    "/work-with-us",
+    "/join-us",
+]
 
 
 def detect_ats(url: str) -> tuple[str, str, str]:
@@ -116,12 +123,7 @@ def detect_ats(url: str) -> tuple[str, str, str]:
 
 def _normalise_ats_job(raw: dict, ats_name: str, slug: str, base_url: str) -> dict | None:
     """Convert a raw ATS API job object into a minimal job dict."""
-    title = (
-        raw.get("title")
-        or raw.get("text")
-        or raw.get("name")
-        or ""
-    )
+    title = raw.get("title") or raw.get("text") or raw.get("name") or ""
     if not title:
         return None
 
@@ -555,17 +557,13 @@ def extract_career_page_jobs(
     if html_content:
         jsonld_jobs = extract_jsonld_jobs(html_content, html_base_url, name)
         if jsonld_jobs:
-            logger.debug(
-                "[career_pages] rung=jsonld company=%s jobs=%d", name, len(jsonld_jobs)
-            )
+            logger.debug("[career_pages] rung=jsonld company=%s jobs=%d", name, len(jsonld_jobs))
             return jsonld_jobs
 
     # Rung 3: Sitemap / common career-path discovery
     sitemap_jobs = discover_via_sitemap(career_url, name, title_filters, excluded_title_terms)
     if sitemap_jobs:
-        logger.debug(
-            "[career_pages] rung=sitemap company=%s jobs=%d", name, len(sitemap_jobs)
-        )
+        logger.debug("[career_pages] rung=sitemap company=%s jobs=%d", name, len(sitemap_jobs))
         return sitemap_jobs
 
     # Rung 4: Static HTML extraction (reuses already-fetched HTML when available)
@@ -582,9 +580,7 @@ def extract_career_page_jobs(
         for job in raw_jobs:
             job["extraction_method"] = "static_html"
         if raw_jobs:
-            logger.debug(
-                "[career_pages] rung=static_html company=%s jobs=%d", name, len(raw_jobs)
-            )
+            logger.debug("[career_pages] rung=static_html company=%s jobs=%d", name, len(raw_jobs))
             return raw_jobs
 
     # Rung 5: Playwright rendering (only when all static rungs yield nothing)
@@ -592,7 +588,5 @@ def extract_career_page_jobs(
         career_url, name, title_filters, location, excluded_title_terms
     )
     if pw_jobs:
-        logger.debug(
-            "[career_pages] rung=playwright company=%s jobs=%d", name, len(pw_jobs)
-        )
+        logger.debug("[career_pages] rung=playwright company=%s jobs=%d", name, len(pw_jobs))
     return pw_jobs

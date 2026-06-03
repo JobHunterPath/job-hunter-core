@@ -779,4 +779,3 @@ def test_cache_revalidation_bounded_when_enabled():
     revalidated = [j for j in jobs if j.get("source") == "cache_revalidation"]
     # max_urls=2 caps the number revalidated even though 5 URLs are cached
     assert len(revalidated) <= 2
-

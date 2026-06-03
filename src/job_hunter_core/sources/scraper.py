@@ -137,9 +137,7 @@ class ScrapeStats:
 
     def to_dict(self) -> dict[str, dict]:
         with self._lock:
-            return {
-                name: dataclasses.asdict(s) for name, s in self._sources.items()
-            }
+            return {name: dataclasses.asdict(s) for name, s in self._sources.items()}
 
 
 def load_search_config() -> dict:
@@ -390,7 +388,9 @@ def scrape(region: str | None = None) -> list[dict]:
         direct_found = 0
         stats.record("static_career_page", attempted=1)
         try:
-            static_jobs = list(fetch_static_career_jobs(company, title_filters, excluded_title_terms))
+            static_jobs = list(
+                fetch_static_career_jobs(company, title_filters, excluded_title_terms)
+            )
             stats.record("static_career_page", returned=len(static_jobs))
             for job in static_jobs:
                 if add_job({**job, "region": company_region}):
@@ -574,9 +574,7 @@ def scrape(region: str | None = None) -> list[dict]:
         for job in aa_jobs:
             if add_job(job, cache_candidate=True):
                 aa_accepted += 1
-        stats.record(
-            "arbeitsagentur", accepted=aa_accepted, skipped=len(aa_jobs) - aa_accepted
-        )
+        stats.record("arbeitsagentur", accepted=aa_accepted, skipped=len(aa_jobs) - aa_accepted)
     except Exception as e:
         stats.record("arbeitsagentur", failed=1)
         logger.warning("[scraper] Arbeitsagentur failed: %s", e)
@@ -682,17 +680,13 @@ def scrape(region: str | None = None) -> list[dict]:
             for job in ai_jobs:
                 if add_job(job, allow_excluded_urls=True, cache_candidate=True):
                     ai_accepted += 1
-            stats.record(
-                "ai_web_search", accepted=ai_accepted, skipped=len(ai_jobs) - ai_accepted
-            )
+            stats.record("ai_web_search", accepted=ai_accepted, skipped=len(ai_jobs) - ai_accepted)
         except Exception as e:
             stats.record("ai_web_search", failed=1)
             logger.warning("[scraper] AI web search failed: %s", e)
 
     # --- revalidation fallback (Task 5) ---
-    _maybe_revalidate_cache(
-        config, api_cfg_loaded, results, cached_candidate_urls, add_job, stats
-    )
+    _maybe_revalidate_cache(config, api_cfg_loaded, results, cached_candidate_urls, add_job, stats)
 
     stats.log_summary()
     logger.info("[scraper] Complete: %s jobs found", len(results))
@@ -782,7 +776,9 @@ def _maybe_revalidate_cache(
             accepted += 1
 
     stats.record("cache_revalidation", accepted=accepted, skipped=len(candidates) - accepted)
-    logger.info("[scraper][revalidation] accepted %d / %d revalidated URL(s)", accepted, len(candidates))
+    logger.info(
+        "[scraper][revalidation] accepted %d / %d revalidated URL(s)", accepted, len(candidates)
+    )
 
 
 if __name__ == "__main__":

@@ -8,9 +8,7 @@ from job_hunter_core.sources import career_pages
 
 
 def test_detect_ats_greenhouse():
-    ats, slug, template = career_pages.detect_ats(
-        "https://boards.greenhouse.io/deliveryhero"
-    )
+    ats, slug, template = career_pages.detect_ats("https://boards.greenhouse.io/deliveryhero")
     assert ats == "greenhouse"
     assert slug == "deliveryhero"
     assert "greenhouse" in template
@@ -44,9 +42,7 @@ def test_detect_ats_unknown_returns_empty():
 
 
 def test_detect_ats_workday():
-    ats, slug, template = career_pages.detect_ats(
-        "https://acme.myworkdayjobs.com/en-US/External"
-    )
+    ats, slug, template = career_pages.detect_ats("https://acme.myworkdayjobs.com/en-US/External")
     assert ats == "workday"
     assert slug == "acme"
 

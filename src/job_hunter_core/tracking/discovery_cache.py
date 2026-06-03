@@ -82,9 +82,7 @@ def load_cached_candidate_urls_with_metadata() -> dict[str, dict]:
             canonical = canonicalize_url(url)
             if canonical:
                 result[canonical] = {
-                    k: entry[k]
-                    for k in ("title", "company", "posted", "snippet")
-                    if k in entry
+                    k: entry[k] for k in ("title", "company", "posted", "snippet") if k in entry
                 }
     return result
 
