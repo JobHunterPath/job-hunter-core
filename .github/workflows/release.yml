@@ -27,6 +27,21 @@ jobs:
 
       - name: Determine bump type from conventional commits
         id: bump
+        # Version bump policy:
+        #   patch  — default for all commits, including routine feat: and fix:
+        #   minor  — explicit maintainer intent only; add "#minor" anywhere in the commit subject
+        #            (e.g. "feat(scope): description #minor")
+        #   major  — breaking-change marker: trailing "!" on the type/scope, or "BREAKING CHANGE" in the body
+        #
+        # Examples:
+        #   feat(foo): add bar              → patch
+        #   fix(foo): repair bar            → patch
+        #   feat(foo): release cycle #minor → minor
+        #   feat(foo)!: breaking bar        → major
+        #   BREAKING CHANGE: ...            → major
+        #
+        # Rationale: routine feat: commits should not auto-increment minor versions.
+        # Minor releases (e.g. 1.2.0) require deliberate maintainer action via #minor.
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -z "$LAST_TAG" ]; then
@@ -40,7 +55,7 @@ jobs:
             if echo "$msg" | grep -qE '^(feat|fix|refactor)(\(.+\))?!:|^BREAKING CHANGE'; then
               BUMP="major"
               break
-            elif echo "$msg" | grep -qE '^feat(\(.+\))?:'; then
+            elif echo "$msg" | grep -qE '#minor'; then
               [ "$BUMP" != "major" ] && BUMP="minor"
             fi
           done <<< "$COMMITS"
