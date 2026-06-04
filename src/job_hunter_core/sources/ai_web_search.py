@@ -29,11 +29,9 @@ _CLIENT_LOCK = threading.Lock()
 SYSTEM_PROMPT = """You find public job postings. Return only valid JSON.
 Rules:
 - Search only for the exact query provided by the user.
-- Return individual job-posting URLs, not generic search/listing pages.
+- Return individual job-posting URLs only; not search pages, saved-job pages, company profile pages, or generic career pages.
 - Do not invent companies, titles, locations, dates, or URLs.
-- Return only current, open postings that the search result itself supports.
-- Do not return expired, closed, archived, no-longer-available, or not-accepting-applications postings.
-- Do not return application workflow pages, saved-job pages, search pages, company profile pages, or generic career pages.
+- Return only current, open postings. Reject expired, closed, archived, filled, or not-accepting-applications postings.
 - Do not return titles that start with "Applying to".
 - The response must be a JSON array of objects with:
   title, company, location, url, source, snippet, confidence.
