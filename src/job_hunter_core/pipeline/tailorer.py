@@ -23,28 +23,14 @@ with open(profile_path("resume_tex", "resume.tex"), encoding="utf-8") as f:
 TAILORING_CONFIG_FILE = ROOT / "config" / "tailoring_config.yml"
 
 
-SYSTEM = """You are editing a LaTeX resume.
+_SYSTEM_BASE = """You are editing a LaTeX resume.
 Return ONLY the complete modified LaTeX file.
 No markdown fences, no explanation, no commentary."""
 
-PROMPT = """Tailor this LaTeX resume for the job description below.
-
-STRICT RULES:
-1. Do NOT invent metrics, titles, or skills not in the original.
-2. Only modify: (a) the Summary section text, (b) bullet ordering within each role, (c) synonyms to mirror JD keywords naturally, (d) the active Projects/Technical Projects section only under the project rules below.
-3. Summary must stay 4 lines or fewer. No em dashes.
-4. Mirror these JD keywords where naturally possible: {keywords}
-5. Keep all LaTeX commands and formatting intact.
-6. Return the complete .tex file.
-
-POSITIONING RULES:
-{positioning_rules}
-
-PROJECT SECTION RULES:
-{project_rules}
-
-STORY BANK SOURCE MATERIAL:
-{story_bank}
+# System prompt is built per-call from stable config-driven content so Anthropic can cache the prefix.
+# Variable fields (keywords, tex, jd, gaps) stay in the user message.
+PROMPT = """\
+Mirror these JD keywords: {keywords}
 
 BASE RESUME:
 {tex}
@@ -52,8 +38,41 @@ BASE RESUME:
 JOB DESCRIPTION:
 {jd}
 
-GAPS (do not fabricate these, simply do not emphasize them):
+GAPS (do not fabricate; simply do not emphasize):
 {gaps}"""
+
+
+def _build_tailoring_rules(tailoring_cfg: dict) -> str:
+    """Build the strict tailoring rules section from tailoring_config.yml."""
+    tailoring = tailoring_cfg.get("tailoring", {})
+    rules = tailoring.get("rules", {})
+
+    lines = []
+
+    forbidden = rules.get("forbidden_modifications", [])
+    if forbidden:
+        forbidden_text = ", ".join(m.replace("_", " ") for m in forbidden)
+        lines.append(f"Do NOT: {forbidden_text}.")
+
+    allowed = rules.get("allowed_modifications", [])
+    if allowed:
+        allowed_items = "; ".join(
+            f"({chr(97 + i)}) {m.replace('_', ' ')}" for i, m in enumerate(allowed)
+        )
+        lines.append(f"Only modify: {allowed_items}.")
+
+    keyword_cfg = tailoring.get("keyword_strategy", {})
+    aggressiveness = keyword_cfg.get("aggressiveness", "natural")
+    avoid_kw = keyword_cfg.get("avoid_keywords", [])
+    lines.append(f"Mirror JD keywords {aggressiveness}ly where context allows.")
+    if avoid_kw:
+        lines.append(f"Never introduce these terms: {', '.join(avoid_kw)}.")
+
+    if rules.get("preserve_latex", True):
+        lines.append("Keep all LaTeX commands and formatting intact.")
+    lines.append("Return the complete .tex file.")
+
+    return "\n".join(f"- {line}" for line in lines)
 
 
 def _load_tailoring_config() -> dict:
@@ -165,16 +184,22 @@ def tailor(match_result: dict) -> str:
     stories_cfg = tailoring_cfg.get("tailoring", {}).get("stories", {})
     story_bank = _load_story_bank(stories_cfg.get("story_bank", "story_bank.md"))
     story_bank_limit = int(stories_cfg.get("max_chars_for_tailoring", 16000))
+    tailoring_rules = _build_tailoring_rules(tailoring_cfg)
     positioning_rules = _build_positioning_rules(tailoring_cfg)
     project_rules = _build_project_rules(tailoring_cfg, BASE_TEX, story_bank)
 
     settings = get_llm_role_settings("tailoring")
 
+    system = "\n\n".join([
+        _SYSTEM_BASE,
+        f"TAILORING RULES:\n{tailoring_rules}",
+        f"POSITIONING RULES:\n{positioning_rules}",
+        f"PROJECT SECTION RULES:\n{project_rules}",
+        f"STORY BANK SOURCE MATERIAL:\n{story_bank[:story_bank_limit] if story_bank else '(story bank unavailable)'}",
+    ])
+
     prompt = PROMPT.format(
         keywords=keywords,
-        positioning_rules=positioning_rules,
-        project_rules=project_rules,
-        story_bank=story_bank[:story_bank_limit] if story_bank else "(story bank unavailable)",
         tex=BASE_TEX,
         jd=job["snippet"],
         gaps=gaps,
@@ -182,10 +207,12 @@ def tailor(match_result: dict) -> str:
 
     try:
         tailored_text = get_llm_client("tailoring").complete(
-            system=SYSTEM,
+            system=system,
             user=prompt,
             model=settings.model,
             max_tokens=settings.max_tokens,
+            cache_system=True,
+            cache_ttl="1h",
         )
         logger.info(f"[tailor] Tailored for {job.get('title', '?')} @ {job.get('company', '?')}")
 

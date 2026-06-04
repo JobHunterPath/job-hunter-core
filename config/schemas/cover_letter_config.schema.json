@@ -39,6 +39,7 @@
           "properties": {
             "source_file": { "type": "string" },
             "section": { "type": "string" },
+            "max_chars_for_cover": { "type": "integer", "minimum": 1000 },
             "rules": { "type": "array", "items": { "type": "string" } }
           }
         },

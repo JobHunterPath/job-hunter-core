@@ -62,6 +62,7 @@ cover_letter:
   stories:
     source_file: "story_bank.md"
     section: "Final - refined STAR stories"
+    max_chars_for_cover: 6000
     rules:
       - "Use only metrics and facts stated explicitly in the story library"
       - "Never invent, extrapolate, or embellish — every claim must be justifiable"

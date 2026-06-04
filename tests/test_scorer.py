@@ -196,10 +196,12 @@ def test_score_uses_configured_resume_and_jd_context_caps(monkeypatch):
         result = scorer.score({**JOB, "snippet": "ABCDEFGHIJKLMNO"}, config)
 
     assert result["score"] == 85
-    prompt = captured["user"]
-    assert "Roadmapping and agile leadership" in prompt
-    assert "ABCDEFGHIJKL" in prompt
-    assert "MNO" not in prompt
+    # Resume context is now in the system prompt (cached prefix); JD stays in user message.
+    system = captured["system"]
+    assert "Roadmapping and agile leadership" in system
+    user = captured["user"]
+    assert "ABCDEFGHIJKL" in user
+    assert "MNO" not in user
 
 
 def _score_result(score_val, years=3, company="TestCo"):

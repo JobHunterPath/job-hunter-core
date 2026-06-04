@@ -118,16 +118,22 @@ class LLMClient:
         max_tokens: int,
         max_retries: int = 3,
         response_format: str = "text",
+        cache_system: bool = False,
+        cache_ttl: str = "5m",
     ) -> str:
         """
         Send a prompt and return the response as a plain string.
 
         Args:
-            system:      System / instruction prompt. May be empty.
-            user:        User message content.
-            model:       Provider-specific model identifier.
-            max_tokens:  Maximum tokens to generate.
-            max_retries: Retry attempts on transient errors (rate limits, 5xx).
+            system:       System / instruction prompt. May be empty.
+            user:         User message content.
+            model:        Provider-specific model identifier.
+            max_tokens:   Maximum tokens to generate.
+            max_retries:  Retry attempts on transient errors (rate limits, 5xx).
+            cache_system: Anthropic only — add a cache breakpoint to the system prompt.
+                          Requires the system text to be ≥ 1,024 tokens to be effective.
+            cache_ttl:    Anthropic only — "5m" (default) or "1h" (extended, 2× write cost).
+                          Use "1h" for sequential workflows that run longer than 5 minutes.
 
         Returns:
             Stripped response text.
@@ -143,6 +149,8 @@ class LLMClient:
                     model=model,
                     max_tokens=max_tokens,
                     response_format=response_format,
+                    cache_system=cache_system,
+                    cache_ttl=cache_ttl,
                 )
             except Exception as exc:
                 if not _is_retryable(exc) or attempt == max_retries:
@@ -182,6 +190,8 @@ class LLMClient:
         model: str,
         max_tokens: int,
         response_format: str = "text",
+        cache_system: bool = False,
+        cache_ttl: str = "5m",
     ) -> str:
 
         if self._provider == "anthropic":
@@ -191,7 +201,13 @@ class LLMClient:
                 messages=[{"role": "user", "content": user}],
             )
             if system:
-                kwargs["system"] = system
+                if cache_system:
+                    cache_ctrl: dict = {"type": "ephemeral"}
+                    if cache_ttl == "1h":
+                        cache_ctrl["ttl"] = "1h"
+                    kwargs["system"] = [{"type": "text", "text": system, "cache_control": cache_ctrl}]
+                else:
+                    kwargs["system"] = system
             resp = self._raw.messages.create(**kwargs)
             return resp.content[0].text.strip()
 

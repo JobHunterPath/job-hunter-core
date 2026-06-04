@@ -53,68 +53,68 @@ def load_cover_letter_config() -> dict[str, object]:
     return config
 
 
-_SYSTEM = """You write professional cover letters for job applications.
+def _build_system(cover_cfg: dict, candidate_background: str, story_limit: int) -> str:
+    """Build the system prompt from cover_letter_config sections."""
+    tone_list = cover_cfg.get("tone", []) or []
+    tone_text = ", ".join(tone_list) if tone_list else "formal, confident, and substantive"
 
-Tone: formal, confident, and substantive. Not casual. Not sycophantic. Not salesy.
+    forbidden_cfg = cover_cfg.get("forbidden", {}) or {}
+    style_rules = forbidden_cfg.get("style", []) or []
+    forbidden_phrases = forbidden_cfg.get("phrases", []) or []
 
-Hard rules — no exceptions:
-- No em dashes (—). Rewrite the sentence instead.
-- No casual phrases: "Happy to discuss", "Feel free to reach out", "I would love to", "Looking forward to connecting"
-- No clichés: "I am passionate", "I am excited to apply", "I am honored", "I thrive in"
-- No sycophancy: no praise of the company, no "your impressive mission", no flattery of any kind
-- No mention of start dates, availability, or working hours
-- No claims about fixing the company's problems
-- No invented or extrapolated facts. Every metric and claim must appear explicitly in the story library. If it is not there, do not write it.
-- No story IDs or bracketed citations, such as [STORY-01] or similar tags
-- No sender details, address blocks, contact information, or Re: subject lines
-- Return plain text only. No markdown, no headers, no bullet points.
-- Start directly with the first sentence of the letter body."""
+    rules_lines = [f"- {rule}" for rule in style_rules]
+    if forbidden_phrases:
+        phrases_str = ", ".join(f'"{p}"' for p in forbidden_phrases)
+        rules_lines.append(f"- Forbidden phrases: {phrases_str}")
+    # Output format rules — always required, not config-driven
+    rules_lines += [
+        "- No story IDs or bracketed citations, such as [STORY-01] or similar tags",
+        "- No sender details, address blocks, contact information, or Re: subject lines",
+        "- Return plain text only. No markdown, no headers, no bullet points.",
+        "- Start directly with the first sentence of the letter body.",
+    ]
 
-_PROMPT = """Write a professional cover letter body for this job application.
+    content_cfg = cover_cfg.get("content", {}) or {}
+    max_words = int(content_cfg.get("max_words", 280))
+    target_words = int(content_cfg.get("target_words", 220))
+    paragraphs = int(content_cfg.get("paragraphs", 4))
 
-Structure (four paragraphs, plain text, no labels):
+    return "\n\n".join([
+        f"You write professional cover letters for job applications.\n\n"
+        f"Tone: {tone_text}.\n\n"
+        f"Hard rules — no exceptions:\n" + "\n".join(rules_lines),
+        f"LENGTH: target {target_words} words, hard maximum {max_words} words, {paragraphs} paragraphs.",
+        f"CANDIDATE BACKGROUND:\n{candidate_background}",
+        f"STORY LIBRARY — use these facts and metrics exactly as stated, do not embellish:\n{STORIES[:story_limit]}",
+    ])
 
-PARAGRAPH 1 — Background and role connection (2-3 sentences):
-Open with a complete sentence stating the candidate's professional background and what they bring.
-Connect it explicitly to what this specific role requires. Use full, grammatical sentences.
-Example opening: "I have worked as a Technical Product Owner on [X] products, with [Y] background, which is directly relevant to this role."
 
-PARAGRAPH 2 — Current/recent role (3-4 sentences):
-Describe the environment: what the candidate owns and the scale of responsibility.
-State 1-2 specific responsibilities using concrete language from the story library.
-Include one specific outcome or result that is explicitly stated in the story library.
-Begin with a complete sentence grounded in the candidate background and story library.
+def _build_user_prompt(cover_cfg: dict, jd: str, company: str, title: str) -> str:
+    """Build the user message from cover_letter_config structure section."""
+    structure = cover_cfg.get("structure", {}) or {}
+    content_cfg = cover_cfg.get("content", {}) or {}
+    paragraphs_count = int(content_cfg.get("paragraphs", 4))
 
-PARAGRAPH 3 — Earlier experience with verified outcomes (3-4 sentences):
-Begin with: "Previously, ..." or "Earlier in my role, ..."
-State the concrete scope: user count, team count, or stakeholder count as it appears in the story library.
-State at least one verified metric outcome. Draw an explicit and specific parallel to a challenge in this role.
+    para_lines = []
+    for i in range(1, paragraphs_count + 1):
+        para = structure.get(f"paragraph_{i}", {}) or {}
+        name = para.get("name", f"Paragraph {i}")
+        max_sentences = para.get("max_sentences", 3)
+        purpose = para.get("purpose", "")
+        para_lines.append(f"PARAGRAPH {i} — {name} (max {max_sentences} sentences): {purpose}")
 
-PARAGRAPH 4 — Specific interest in this company and role (2-3 sentences):
-Begin with: "What draws me to this role is ..." or "This role is of interest because ..."
-Make one concrete observation about what the company does or what the role involves, based on the job description.
-State what aspect of the work aligns with how the candidate currently operates. No generic interest. No culture references.
+    structure_text = "\n".join(para_lines)
 
-CRITICAL CONSTRAINTS:
-- Every factual claim must be directly traceable to the story library. Do not infer, extrapolate, or combine claims.
-- No em dashes (—) anywhere in the output.
-- No casual language. Professional register throughout.
-- No story IDs or bracketed citations.
-- Forbidden phrases: "I am passionate", "I am excited", "I am honored", "I am thrilled",
-  "thank you for your time", "at your earliest convenience", "Happy to discuss",
-  "I would love to", "Feel free to", any mention of start dates or availability.
-
-CANDIDATE BACKGROUND:
-{candidate_background}
-
-STORY LIBRARY — use these facts and metrics exactly as stated, do not embellish:
-{stories}
-
-JOB DESCRIPTION:
-{jd}
-
-COMPANY: {company}
-ROLE: {title}"""
+    return (
+        f"Write a professional cover letter body for this job application.\n\n"
+        f"Structure ({paragraphs_count} paragraphs, plain text, no paragraph labels):\n"
+        f"{structure_text}\n\n"
+        f"Every factual claim must be directly traceable to the story library. "
+        f"Do not infer, extrapolate, or combine claims.\n\n"
+        f"JOB DESCRIPTION:\n{jd}\n\n"
+        f"COMPANY: {company}\n"
+        f"ROLE: {title}"
+    )
 
 
 def write_cover(
@@ -141,22 +141,30 @@ def write_cover(
 
     logger.info(f"[cover] Generating for {job['title']} @ {job['company']}")
 
-    prompt = _PROMPT.format(
-        stories=STORIES[:6000],
-        jd=job["snippet"],
-        company=job["company"],
-        title=job["title"],
-        candidate_background=(config.get("candidate_background") or "").strip()
+    candidate_background = (
+        (config.get("candidate_background") or "").strip()
         or (config.get("cover_letter", {}).get("candidate_background") or "").strip()
-        or "Replace this with the candidate's current role, target positioning, and verified background.",
+        or "Replace this with the candidate's current role, target positioning, and verified background."
     )
+
+    cover_cfg = config.get("cover_letter", {}) or {}
+    stories_cfg = cover_cfg.get("stories", {}) or {}
+    story_limit = int(stories_cfg.get("max_chars_for_cover", 6000))
+
+    # System prompt is assembled from stable content (rules + background + story bank)
+    # so Anthropic can cache the prefix across sequential cover-letter calls in the same run.
+    # Variable content (JD, company, title) stays in the user message.
+    system = _build_system(cover_cfg, candidate_background, story_limit)
+    prompt = _build_user_prompt(cover_cfg, job["snippet"], job["company"], job["title"])
 
     try:
         body = get_llm_client("cover_letter").complete(
-            system=_SYSTEM,
+            system=system,
             user=prompt,
             model=settings.model,
             max_tokens=settings.max_tokens,
+            cache_system=True,
+            cache_ttl="1h",
         )
         body = _clean_body(body)
         logger.debug(f"[cover] Generated body ({len(body)} chars)")

@@ -32,25 +32,34 @@ def load_scoring_config() -> dict[str, object]:
     return config
 
 
-SYSTEM = """You are a recruiter scoring job fit.
-Return ONLY valid JSON with no markdown fences, no explanation.
-Schema: {"score": int, "matched_keywords": [str], "gaps": [str], "years_exp_required": int or null}"""
+_SYSTEM_BASE = (
+    "You are a recruiter scoring job fit. "
+    "Return ONLY valid JSON with no markdown fences, no explanation. "
+    'Schema: {"score": int, "matched_keywords": [str], "gaps": [str], "years_exp_required": int or null}'
+)
 
-PROMPT = """Score this candidate's resume against the job description.
 
-RESUME CONTEXT:
-{resume}
+def _build_system_with_resume(config: dict) -> str:
+    """Build the system prompt with the resume embedded so Anthropic can cache the prefix."""
+    resume_context = build_scoring_resume_context(BASE_RESUME, config)
+    return f"{_SYSTEM_BASE}\n\nCANDIDATE RESUME:\n{resume_context}"
 
-JOB DESCRIPTION:
-{jd}
 
-Rules:
-- score: 0-100 fit score
-- matched_keywords: up to 10 keywords from JD present in resume
-- gaps: up to 5 skills in JD missing from resume
-- years_exp_required: years of experience stated in JD, null if not mentioned
-
-Return JSON only."""
+def _build_scoring_prompt(jd_context: str, config: dict) -> str:
+    """Build the scoring user prompt from config values."""
+    prompt_cfg = _scoring_prompt_config(config)
+    max_kw = int(prompt_cfg.get("max_matched_keywords", 10))
+    max_gaps = int(prompt_cfg.get("max_gaps", 5))
+    return (
+        f"Score this candidate's resume against the job description.\n\n"
+        f"JOB DESCRIPTION:\n{jd_context}\n\n"
+        f"Rules:\n"
+        f"- score: 0-100 fit score\n"
+        f"- matched_keywords: up to {max_kw} keywords from JD present in resume\n"
+        f"- gaps: up to {max_gaps} skills in JD missing from resume\n"
+        f"- years_exp_required: years of experience stated in JD, null if not mentioned\n\n"
+        f"Return JSON only."
+    )
 
 REPAIR_PROMPT = """\
 Convert this model response into valid JSON matching exactly this schema:
@@ -117,17 +126,19 @@ def _parse_score_json(raw: str) -> dict:
 
 def score(job: dict, config: dict) -> dict:
     settings = get_llm_role_settings("scoring")
-    resume_context = build_scoring_resume_context(BASE_RESUME, config)
+    system = _build_system_with_resume(config)
     jd_context = build_scoring_job_context(job, config)
-    prompt = PROMPT.format(resume=resume_context, jd=jd_context)
+    prompt = _build_scoring_prompt(jd_context, config)
 
     try:
         raw = get_llm_client("scoring").complete(
-            system=SYSTEM,
+            system=system,
             user=prompt,
             model=settings.model,
             max_tokens=settings.max_tokens,
             response_format="json",
+            cache_system=True,
+            cache_ttl="5m",
         )
         try:
             result = _parse_score_json(raw)
@@ -136,11 +147,13 @@ def score(job: dict, config: dict) -> dict:
                 "[scorer] Repairing malformed score JSON for %s", job.get("title", "Unknown")
             )
             repaired = get_llm_client("scoring").complete(
-                system=SYSTEM,
+                system=system,
                 user=REPAIR_PROMPT.format(raw=raw[:2000]),
                 model=settings.model,
                 max_tokens=settings.max_tokens,
                 response_format="json",
+                cache_system=True,
+                cache_ttl="5m",
             )
             result = _parse_score_json(repaired)
         logger.debug(f"[scorer] {job.get('title', 'Unknown')} → score={result.get('score')}")

@@ -24,6 +24,16 @@
               "bypass_max_years_experience": { "type": "boolean" }
             }
           }
+        },
+        "prompt_context": {
+          "type": "object",
+          "properties": {
+            "resume_mode": { "type": "string", "enum": ["compact_text", "raw"] },
+            "resume_max_chars": { "type": "integer", "minimum": 100 },
+            "job_description_max_chars": { "type": "integer", "minimum": 100 },
+            "max_matched_keywords": { "type": "integer", "minimum": 1 },
+            "max_gaps": { "type": "integer", "minimum": 1 }
+          }
         }
       }
     }

@@ -10,6 +10,8 @@ scoring:
     resume_mode: compact_text
     resume_max_chars: 4500
     job_description_max_chars: 5000
+    max_matched_keywords: 10
+    max_gaps: 5
 
 logging:
   log_all_scores: true

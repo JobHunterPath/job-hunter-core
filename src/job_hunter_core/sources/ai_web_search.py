@@ -133,21 +133,34 @@ def build_rule_context(
 ) -> str:
     exclusion_rules = search_config.get("exclusion_rules", {}) or {}
     location = region_config.get("location") or region_config.get("name") or ""
-    return "\n".join(
-        [
-            "Filtering rules from search_config.yml:",
-            f"- Required title families: {_compact_list(title_filters)}",
-            f"- Target location/region: {location or 'any'}; allow remote only when the posting says remote.",
-            f"- Reject excluded companies: {_compact_list(search_config.get('excluded_companies', []))}",
-            f"- Reject excluded title terms: {_compact_list(exclusion_rules.get('excluded_title_terms', []))}",
-            f"- Reject seniority flags: {_compact_list(exclusion_rules.get('senior_flags', []))}",
-            f"- Reject stale/closed indicators: {_compact_list(exclusion_rules.get('stale_indicators', []))}",
-            f"- Reject German-language indicators: {_compact_list(exclusion_rules.get('german_indicators', []))}",
-            f"- Reject excluded industries: {_compact_list(exclusion_rules.get('excluded_industries', []))}",
-            f"- Reject URL patterns: {_compact_list(exclusion_rules.get('excluded_url_patterns', []))}",
-            "Return [] if the search result does not clearly satisfy these rules.",
-        ]
-    )
+    lines = [
+        "Filtering rules from search_config.yml:",
+        f"- Required title families: {_compact_list(title_filters)}",
+        f"- Target location/region: {location or 'any'}; allow remote only when the posting says remote.",
+    ]
+    excluded_companies = search_config.get("excluded_companies", [])
+    if excluded_companies:
+        lines.append(f"- Reject excluded companies: {_compact_list(excluded_companies)}")
+    excluded_title_terms = exclusion_rules.get("excluded_title_terms", [])
+    if excluded_title_terms:
+        lines.append(f"- Reject excluded title terms: {_compact_list(excluded_title_terms)}")
+    senior_flags = exclusion_rules.get("senior_flags", [])
+    if senior_flags:
+        lines.append(f"- Reject seniority flags: {_compact_list(senior_flags)}")
+    stale_indicators = exclusion_rules.get("stale_indicators", [])
+    if stale_indicators:
+        lines.append(f"- Reject stale/closed indicators: {_compact_list(stale_indicators)}")
+    german_indicators = exclusion_rules.get("german_indicators", [])
+    if german_indicators:
+        lines.append(f"- Reject German-language indicators: {_compact_list(german_indicators)}")
+    excluded_industries = exclusion_rules.get("excluded_industries", [])
+    if excluded_industries:
+        lines.append(f"- Reject excluded industries: {_compact_list(excluded_industries)}")
+    excluded_url_patterns = exclusion_rules.get("excluded_url_patterns", [])
+    if excluded_url_patterns:
+        lines.append(f"- Reject URL patterns: {_compact_list(excluded_url_patterns)}")
+    lines.append("Return [] if the search result does not clearly satisfy these rules.")
+    return "\n".join(lines)
 
 
 def build_queries(

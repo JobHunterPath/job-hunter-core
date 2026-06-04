@@ -14,6 +14,8 @@ Apply these when writing or reviewing Python in `src/job_hunter_core/`.
 
 Token rule: report only findings with file, line, category, and smallest safe fix. Do not paste full diffs or full files.
 
+For Docker deployment rules and testing guidelines, see `dev-code/reference.md`.
+
 ## SOLID Scope
 
 Only enforce S and O from SOLID:
@@ -28,13 +30,11 @@ Prefer the simplest readable code that fits the existing package shape.
 - Follow PEP 8 in spirit: clear names, readable control flow, small cohesive functions, and boring code over clever abstractions.
 - Keep reusable Python generic. Personal names, target titles, role preferences, locations, thresholds, and application targeting belong in `config/`, not in `src/job_hunter_core/`.
 - Put user-tunable values in config. Use named constants only for internal protocol details, formatting limits, or values users should not normally tune.
-- Keep deterministic work in Python. Python may scrape, import, normalize, compile PDFs, update tracking, and write deterministic summaries. There is no agent skill system in job-hunter-core — judgment work belongs to the consuming agent layer.
+- Keep deterministic work in Python. Judgment work belongs to the consuming agent layer.
 - Make external I/O explicit. Network, browser, subprocess, and filesystem-heavy operations should have clear boundaries, timeouts where applicable, and tests that can mock those boundaries.
 - Log useful context around external failures and intentionally swallowed exceptions. Avoid silent `except` blocks.
-- Keep CLI behavior honest. Do not add flags that do nothing, hide backend behavior, or imply unsupported automation. Use `argparse` defaults and exit behavior consistently.
 - Use structured parsers for YAML and JSON. Prefer `pathlib` for filesystem paths and explicit UTF-8 for text files.
-- Avoid compatibility shims, dead code, and comments that restate the code. Comments should explain non-obvious why, not ordinary what.
-- Preserve the canonical package layout: importable code lives under `src/job_hunter_core/`, and imports should use `job_hunter_core.*`.
+- Preserve the canonical package layout: importable code lives under `src/job_hunter_core/`, imports use `job_hunter_core.*`.
 - Require type hints on all public functions. Add `from __future__ import annotations` at the top of every module that uses them.
 
 ## Multi-Provider LLM Guidelines
@@ -42,25 +42,18 @@ Prefer the simplest readable code that fits the existing package shape.
 job-hunter-core supports Anthropic, OpenAI, Google, and Ollama. Apply these rules when touching LLM integration code:
 
 - Route provider selection through config, never through hard-coded conditionals scattered across modules.
-- Each provider adapter should implement the same interface; new providers are added by extending that interface, not by modifying existing adapters.
+- Each provider adapter should implement the same interface; new providers are added by extending that interface.
 - Never import a provider SDK at module level if it may not be installed. Use lazy imports or optional dependency guards.
 - Keep provider-specific retry logic, rate-limit handling, and auth inside the adapter, not in the calling code.
 
-## Docker-First Deployment Guidelines
+## Token Efficiency for Skills
 
-- The deployment target is Docker; do not add system-level dependencies that are not installable via `pip` or already present in the base image.
-- Do not read from `~/.config`, `~/.local`, or other user-home paths that will not exist inside a container. Read all config from paths relative to the project root or from environment variables.
-- Environment variables are the canonical way to pass secrets and runtime overrides into the container. Never hard-code credentials or paths that differ between environments.
-- If a new external tool or binary is required, note the Dockerfile change needed alongside the code change.
+When writing or editing a dev skill:
 
-## Testing Guidelines
-
-- Add or update tests for new public behavior and changed config keys.
-- Mock network, browser, subprocess, and external service calls at the point of use.
-- Keep fixtures small, deterministic, and local to the test unless reuse is valuable.
-- Prefer testing observable behavior over private implementation details.
-- Run `python -m pytest tests/ -q --tb=short` before committing code changes.
-- Run `ruff check src/ tests/` to catch lint issues before committing.
+- **Size target:** keep `SKILL.md` under 60 lines. If over, extract to `reference.md`.
+- Move YAML schemas, markdown templates, step sequences, and enumerated rule lists to `reference.md`. The skill instructs Claude to read it; don't embed the detail inline.
+- No repeated rules: if a rule already lives in `CLAUDE.md` or another skill, reference it — don't copy it.
+- For Python LLM callers: use `cache_system=True, cache_ttl="5m"` for parallel calls (scorer), `cache_ttl="1h"` for sequential calls that span >5 minutes (tailorer, cover_writer). Build system prompts from stable config-driven content; keep per-job variable fields in the user message.
 
 ## Review Output
 

@@ -86,6 +86,7 @@ def test_tailor_includes_project_rules_and_story_bank_for_active_projects():
 
     def capture_complete(**kwargs):
         captured["user"] = kwargs.get("user", "")
+        captured["system"] = kwargs.get("system", "")
         return SAMPLE_LATEX
 
     tex_with_projects = r"""\documentclass{altacv}
@@ -109,10 +110,11 @@ def test_tailor_includes_project_rules_and_story_bank_for_active_projects():
     ):
         tailorer.tailor(MATCH)
 
-    assert "Include at most 4 projects total" in captured["user"]
-    assert "Never exceed 5 bullets" in captured["user"]
-    assert "Do not create a third page" in captured["user"]
-    assert "MS-01" in captured["user"]
+    # Project rules and story bank are now in the system prompt (cached prefix).
+    assert "Include at most 4 projects total" in captured["system"]
+    assert "Never exceed 5 bullets" in captured["system"]
+    assert "Do not create a third page" in captured["system"]
+    assert "MS-01" in captured["system"]
 
 
 def test_tailor_disables_project_tailoring_when_section_is_commented():
@@ -120,6 +122,7 @@ def test_tailor_disables_project_tailoring_when_section_is_commented():
 
     def capture_complete(**kwargs):
         captured["user"] = kwargs.get("user", "")
+        captured["system"] = kwargs.get("system", "")
         return SAMPLE_LATEX
 
     tex_with_commented_projects = r"""\documentclass{altacv}
@@ -140,5 +143,6 @@ def test_tailor_disables_project_tailoring_when_section_is_commented():
     ):
         tailorer.tailor(MATCH)
 
-    assert "No active Projects/Technical Projects section exists" in captured["user"]
-    assert "Do not add, uncomment, or tailor project content" in captured["user"]
+    # Project rules are now in the system prompt (cached prefix).
+    assert "No active Projects/Technical Projects section exists" in captured["system"]
+    assert "Do not add, uncomment, or tailor project content" in captured["system"]
