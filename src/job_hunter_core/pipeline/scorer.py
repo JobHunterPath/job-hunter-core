@@ -61,6 +61,7 @@ def _build_scoring_prompt(jd_context: str, config: dict) -> str:
         f"Return JSON only."
     )
 
+
 REPAIR_PROMPT = """\
 Convert this model response into valid JSON matching exactly this schema:
 {{"score": int, "matched_keywords": [str], "gaps": [str], "years_exp_required": int|null}}

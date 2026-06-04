@@ -190,13 +190,15 @@ def tailor(match_result: dict) -> str:
 
     settings = get_llm_role_settings("tailoring")
 
-    system = "\n\n".join([
-        _SYSTEM_BASE,
-        f"TAILORING RULES:\n{tailoring_rules}",
-        f"POSITIONING RULES:\n{positioning_rules}",
-        f"PROJECT SECTION RULES:\n{project_rules}",
-        f"STORY BANK SOURCE MATERIAL:\n{story_bank[:story_bank_limit] if story_bank else '(story bank unavailable)'}",
-    ])
+    system = "\n\n".join(
+        [
+            _SYSTEM_BASE,
+            f"TAILORING RULES:\n{tailoring_rules}",
+            f"POSITIONING RULES:\n{positioning_rules}",
+            f"PROJECT SECTION RULES:\n{project_rules}",
+            f"STORY BANK SOURCE MATERIAL:\n{story_bank[:story_bank_limit] if story_bank else '(story bank unavailable)'}",
+        ]
+    )
 
     prompt = PROMPT.format(
         keywords=keywords,

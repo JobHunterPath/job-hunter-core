@@ -17,7 +17,8 @@ Token rule: show status, stats, and failing checks only. Do not paste full diffs
 1. **Sensitive files** — FAIL if any staged file matches `*.env`, `*.key`, `*.pem`, `*.p12`, `*secret*`, `*credential*`, `*password*`.
 2. **Context files** — WARN if `CLAUDE.md`, `AGENTS.md`, or `.claude/` files are staged. Prompt: "Context files staged — intentional?"
 3. **Tests** — run `python -m pytest tests/ -q --tb=short`. A failure is a WARN that must be noted, not a hard block.
-4. **Lint** — run `ruff check src/ tests/`. A failure is a WARN that must be noted.
+4. **Format** — run `python -m ruff format --check src/ tests/`. On any "Would reformat" output, run `python -m ruff format src/ tests/` to fix, then re-stage the affected files before committing.
+5. **Lint** — run `python -m ruff check src/ tests/`. A failure is a WARN that must be noted.
 
 ## Step 2 — Draft message
 

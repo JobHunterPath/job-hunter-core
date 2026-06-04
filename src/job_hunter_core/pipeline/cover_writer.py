@@ -79,14 +79,16 @@ def _build_system(cover_cfg: dict, candidate_background: str, story_limit: int) 
     target_words = int(content_cfg.get("target_words", 220))
     paragraphs = int(content_cfg.get("paragraphs", 4))
 
-    return "\n\n".join([
-        f"You write professional cover letters for job applications.\n\n"
-        f"Tone: {tone_text}.\n\n"
-        f"Hard rules — no exceptions:\n" + "\n".join(rules_lines),
-        f"LENGTH: target {target_words} words, hard maximum {max_words} words, {paragraphs} paragraphs.",
-        f"CANDIDATE BACKGROUND:\n{candidate_background}",
-        f"STORY LIBRARY — use these facts and metrics exactly as stated, do not embellish:\n{STORIES[:story_limit]}",
-    ])
+    return "\n\n".join(
+        [
+            f"You write professional cover letters for job applications.\n\n"
+            f"Tone: {tone_text}.\n\n"
+            f"Hard rules — no exceptions:\n" + "\n".join(rules_lines),
+            f"LENGTH: target {target_words} words, hard maximum {max_words} words, {paragraphs} paragraphs.",
+            f"CANDIDATE BACKGROUND:\n{candidate_background}",
+            f"STORY LIBRARY — use these facts and metrics exactly as stated, do not embellish:\n{STORIES[:story_limit]}",
+        ]
+    )
 
 
 def _build_user_prompt(cover_cfg: dict, jd: str, company: str, title: str) -> str:

@@ -205,7 +205,9 @@ class LLMClient:
                     cache_ctrl: dict = {"type": "ephemeral"}
                     if cache_ttl == "1h":
                         cache_ctrl["ttl"] = "1h"
-                    kwargs["system"] = [{"type": "text", "text": system, "cache_control": cache_ctrl}]
+                    kwargs["system"] = [
+                        {"type": "text", "text": system, "cache_control": cache_ctrl}
+                    ]
                 else:
                     kwargs["system"] = system
             resp = self._raw.messages.create(**kwargs)
