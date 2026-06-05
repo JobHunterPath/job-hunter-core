@@ -35,20 +35,6 @@ global_search:
     - "Product Manager"
     - "Product Owner"
 
-job_boards:
-  arbeitnow:
-    enabled: true
-    max_pages: 3
-  jsearch:
-    enabled: true
-    num_pages: 1
-  adzuna:
-    enabled: true
-    results_per_page: 50
-  reed:
-    enabled: true
-    results_wanted: 50
-
 exclusion_rules:
   exclude_german_language: true
   excluded_url_patterns:
@@ -114,13 +100,6 @@ exclusion_rules:
     - stellenangebot
     - berufserfahrung
     - deutschkenntnisse
-
-jobspy:
-  enabled: true
-  hours_old: 72
-  results_per_query: 20
-  glassdoor_enabled: true
-  linkedin_enabled: false
 
 discovery:
   max_workers: 10

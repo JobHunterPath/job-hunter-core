@@ -21,7 +21,7 @@ from job_hunter_core.core.api_budget import (
     mark_api_exhausted,
     reserve_api_call,
 )
-from job_hunter_core.core.config import get_timeout
+from job_hunter_core.core.config import get_timeout, load_api_config
 from job_hunter_core.core.utils import title_matches
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def fetch_reed_jobs(
         logger.warning("[reed] REED_API_KEY not set — skipping")
         return []
 
-    reed_cfg = config.get("job_boards", {}).get("reed", {}) or {}
+    reed_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("reed", {}) or {}
     if not reed_cfg.get("enabled", False):
         return []
 

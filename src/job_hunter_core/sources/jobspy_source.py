@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from job_hunter_core.core.config import load_api_config
 from job_hunter_core.core.utils import location_matches, title_matches
 
 logger = logging.getLogger(__name__)
@@ -131,7 +132,7 @@ def fetch_jobspy_jobs(
         logger.warning("[jobspy] python-jobspy not installed — skipping JobSpy discovery")
         return []
 
-    jobspy_cfg = config.get("jobspy", {}) or {}
+    jobspy_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("jobspy", {}) or {}
     if not jobspy_cfg.get("enabled", False):
         return []
 
