@@ -37,8 +37,11 @@ from job_hunter_core.sources.ats import fetch_ats_jobs
 from job_hunter_core.sources.himalayas_source import fetch_himalayas_jobs
 from job_hunter_core.sources.job_boards import fetch_arbeitnow_jobs, fetch_jsearch_jobs
 from job_hunter_core.sources.job_policy import JobPolicy, make_job_filter
+from job_hunter_core.sources.jobicy_source import fetch_jobicy_jobs
 from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
+from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
 from job_hunter_core.sources.reed_source import fetch_reed_jobs
+from job_hunter_core.sources.remoteok_source import fetch_remoteok_jobs
 from job_hunter_core.sources.remotive_source import fetch_remotive_jobs
 from job_hunter_core.sources.search_providers import (
     BraveProvider,
@@ -49,9 +52,6 @@ from job_hunter_core.sources.search_providers import (
     fetch_static_career_jobs,
     search_web,
 )
-from job_hunter_core.sources.jobicy_source import fetch_jobicy_jobs
-from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
-from job_hunter_core.sources.remoteok_source import fetch_remoteok_jobs
 from job_hunter_core.sources.the_muse_source import fetch_the_muse_jobs
 from job_hunter_core.sources.weworkremotely_source import fetch_weworkremotely_jobs
 from job_hunter_core.tracking.discovery_cache import (
