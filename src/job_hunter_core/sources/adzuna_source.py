@@ -24,7 +24,7 @@ from job_hunter_core.core.api_budget import (
     reserve_api_call,
 )
 from job_hunter_core.core.config import get_timeout, load_api_config
-from job_hunter_core.core.utils import title_matches
+from job_hunter_core.core.utils import location_matches, title_matches
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +88,7 @@ def fetch_adzuna_jobs(
         return []
 
     results_per_page = int(adzuna_cfg.get("results_per_page", 50))
+    max_pages = int(adzuna_cfg.get("max_pages_per_query", 1))
     excluded_title_terms: list[str] = (
         config.get("exclusion_rules", {}).get("excluded_title_terms", []) or []
     )
@@ -114,48 +115,67 @@ def fetch_adzuna_jobs(
             if location:
                 params["where"] = location
 
-            url = _BASE_URL.format(country=country, page=1)
-            if not reserve_api_call("adzuna"):
-                continue
+            for page in range(1, max_pages + 1):
+                if not reserve_api_call("adzuna"):
+                    break
 
-            try:
-                resp = requests.get(url, params=params, timeout=_TIMEOUT)
-                resp.raise_for_status()
-                data = resp.json().get("results", [])
-            except Exception as exc:
-                if is_api_quota_exhausted(exc):
-                    mark_api_exhausted("adzuna", exc=exc)
-                    return jobs
-                logger.warning("[adzuna] request failed for %r in %r: %s", title, region_name, exc)
-                continue
+                url = _BASE_URL.format(country=country, page=page)
+                try:
+                    resp = requests.get(url, params=params, timeout=_TIMEOUT)
+                    resp.raise_for_status()
+                    data = resp.json().get("results", [])
+                except Exception as exc:
+                    if is_api_quota_exhausted(exc):
+                        mark_api_exhausted("adzuna", exc=exc)
+                        return jobs
+                    logger.warning(
+                        "[adzuna] request failed for %r in %r page %s: %s",
+                        title,
+                        region_name,
+                        page,
+                        exc,
+                    )
+                    break
 
-            region_term = location.lower().replace("remote ", "").replace(" remote", "").strip()
+                if not data:
+                    break
 
-            before = len(jobs)
-            for item in data:
-                job_title = item.get("title", "")
-                if not title_matches(job_title, title_filters, excluded_title_terms):
-                    continue
-
-                location_str = item.get("location", {}).get("display_name", "")
-                if location_str and "remote" not in location_str.lower():
-                    if region_term and region_term not in location_str.lower():
+                before = len(jobs)
+                for item in data:
+                    job_title = item.get("title", "")
+                    if not title_matches(job_title, title_filters, excluded_title_terms):
                         continue
-                description = (item.get("description") or "")[:1000]
-                snippet = f"{location_str} — {description}" if location_str else description
 
-                jobs.append(
-                    {
-                        "title": job_title,
-                        "company": item.get("company", {}).get("display_name", ""),
-                        "url": item.get("redirect_url", ""),
-                        "posted": _parse_date(item.get("created")),
-                        "snippet": snippet,
-                        "source": "Adzuna",
-                    }
+                    location_str = item.get("location", {}).get("display_name", "")
+                    if location_str and "remote" not in location_str.lower():
+                        if location and not location_matches(location_str, location):
+                            continue
+                    description = (item.get("description") or "")[:1000]
+                    snippet = f"{location_str} — {description}" if location_str else description
+
+                    jobs.append(
+                        {
+                            "title": job_title,
+                            "company": item.get("company", {}).get("display_name", ""),
+                            "url": item.get("redirect_url", ""),
+                            "posted": _parse_date(item.get("created")),
+                            "location": location_str,
+                            "snippet": snippet,
+                            "source": "Adzuna",
+                            "query": f"{title} @ {region_name}",
+                            "region": region_name,
+                        }
+                    )
+
+                logger.info(
+                    "[adzuna] +%d jobs for %r in %r page %s",
+                    len(jobs) - before,
+                    title,
+                    region_name,
+                    page,
                 )
-
-            logger.info("[adzuna] +%d jobs for %r in %r", len(jobs) - before, title, region_name)
+                if len(data) < results_per_page:
+                    break
 
     logger.info("[adzuna] Complete: %d total jobs found", len(jobs))
     return jobs

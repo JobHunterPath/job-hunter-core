@@ -180,9 +180,67 @@
               }
             },
             "jsearch": { "type": "object" },
-            "adzuna": { "type": "object" },
-            "reed": { "type": "object" },
-            "jobspy": { "type": "object" }
+            "adzuna": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "results_per_page": { "type": "integer", "minimum": 1 },
+                "max_pages_per_query": { "type": "integer", "minimum": 1 }
+              }
+            },
+            "reed": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "results_wanted": { "type": "integer", "minimum": 1 },
+                "max_pages_per_query": { "type": "integer", "minimum": 1 }
+              }
+            },
+            "jobspy": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "hours_old": { "type": "integer", "minimum": 1 },
+                "results_per_query": { "type": "integer", "minimum": 1 },
+                "glassdoor_enabled": { "type": "boolean" },
+                "linkedin_enabled": { "type": "boolean" },
+                "linkedin_fetch_description": { "type": "boolean" },
+                "sites": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "jobicy": {
+              "type": "object",
+              "description": "Jobicy free remote jobs API source.",
+              "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "timeout_seconds": { "type": "integer", "minimum": 1, "default": 15 }
+              }
+            },
+            "remoteok": {
+              "type": "object",
+              "description": "RemoteOK public JSON feed source.",
+              "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "timeout_seconds": { "type": "integer", "minimum": 1, "default": 15 }
+              }
+            },
+            "weworkremotely": {
+              "type": "object",
+              "description": "We Work Remotely RSS feed source.",
+              "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "timeout_seconds": { "type": "integer", "minimum": 1, "default": 15 }
+              }
+            },
+            "jooble": {
+              "type": "object",
+              "description": "Jooble aggregator source (free API key required).",
+              "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "max_pages_per_query": { "type": "integer", "minimum": 1, "default": 3 },
+                "timeout_seconds": { "type": "integer", "minimum": 1, "default": 15 }
+              }
+            }
           }
         }
       }

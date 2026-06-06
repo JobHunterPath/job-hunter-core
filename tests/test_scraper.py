@@ -46,6 +46,10 @@ def _disable_external_scrape_paths():
         patch("job_hunter_core.sources.scraper.discover_ats_jobs_by_search", return_value=[]),
         patch("job_hunter_core.sources.scraper.fetch_ai_web_search_jobs", return_value=[]),
         patch("job_hunter_core.sources.scraper.fetch_jobspy_jobs", return_value=[]),
+        patch("job_hunter_core.sources.scraper.fetch_jobicy_jobs", return_value=[]),
+        patch("job_hunter_core.sources.scraper.fetch_remoteok_jobs", return_value=[]),
+        patch("job_hunter_core.sources.scraper.fetch_weworkremotely_jobs", return_value=[]),
+        patch("job_hunter_core.sources.scraper.fetch_jooble_jobs", return_value=[]),
         patch("job_hunter_core.sources.scraper.load_cached_candidate_urls", return_value=set()),
         patch("job_hunter_core.sources.scraper.save_cached_candidate_urls"),
     ):

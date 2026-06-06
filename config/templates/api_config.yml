@@ -74,6 +74,9 @@ secrets:
   rapidapi:
     env_var: "RAPIDAPI_KEY"
     required: false
+  jooble:
+    env_var: "JOOBLE_API_KEY"
+    required: false
 
 http:
   api_budgets:
@@ -91,6 +94,8 @@ http:
       brave: 900
       jsearch: 180
       adzuna: 2250
+      jobicy: 1000
+      jooble: 500
 
   url_verification:
     enabled: true
@@ -208,15 +213,23 @@ http:
     adzuna:
       enabled: true
       results_per_page: 50
+      max_pages_per_query: 1
     reed:
       enabled: true
       results_wanted: 50
+      max_pages_per_query: 1
     jobspy:
       enabled: true
       hours_old: 72
       results_per_query: 30
       glassdoor_enabled: true
       linkedin_enabled: false
+      linkedin_fetch_description: false
+      sites:
+        - google
+        - indeed
+        - glassdoor
+        - zip_recruiter
     remotive:
       enabled: true
       max_pages_per_query: 1
@@ -224,6 +237,19 @@ http:
     the_muse:
       enabled: true
       max_pages_per_query: 2
+      timeout_seconds: 15
+    jobicy:
+      enabled: true
+      timeout_seconds: 15
+    remoteok:
+      enabled: true
+      timeout_seconds: 15
+    weworkremotely:
+      enabled: true
+      timeout_seconds: 15
+    jooble:
+      enabled: true
+      max_pages_per_query: 3
       timeout_seconds: 15
 
 profile:

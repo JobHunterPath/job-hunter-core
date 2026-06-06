@@ -185,6 +185,10 @@ REED_API_KEY = get_secret(
     _secrets.get("reed", {}).get("env_var", "REED_API_KEY"),
     required=False,
 )
+JOOBLE_API_KEY = get_secret(
+    _secrets.get("jooble", {}).get("env_var", "JOOBLE_API_KEY"),
+    required=False,
+)
 
 
 def get_timeout(section: str) -> int:

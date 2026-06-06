@@ -60,6 +60,7 @@ def fetch_reed_jobs(
         return []
 
     results_wanted = int(reed_cfg.get("results_wanted", 50))
+    max_pages = int(reed_cfg.get("max_pages_per_query", 1))
     excluded_title_terms: list[str] = (
         config.get("exclusion_rules", {}).get("excluded_title_terms", []) or []
     )
@@ -74,55 +75,74 @@ def fetch_reed_jobs(
 
         for title in title_filters:
             logger.info("[reed] [%s] Searching for %r", region_name, title)
-            params: dict = {
-                "keywords": title,
-                "resultsToTake": results_wanted,
-            }
+            base_params: dict = {"keywords": title, "resultsToTake": results_wanted}
             if location:
-                params["locationName"] = location
-                params["distancefromLocation"] = 15
+                base_params["locationName"] = location
+                base_params["distancefromLocation"] = 15
 
-            if not reserve_api_call("reed"):
-                continue
+            for page in range(1, max_pages + 1):
+                if not reserve_api_call("reed"):
+                    break
 
-            try:
-                resp = requests.get(
-                    _SEARCH_URL,
-                    params=params,
-                    auth=(api_key, ""),
-                    timeout=_TIMEOUT,
+                params = {**base_params, "resultsToSkip": (page - 1) * results_wanted}
+                try:
+                    resp = requests.get(
+                        _SEARCH_URL,
+                        params=params,
+                        auth=(api_key, ""),
+                        timeout=_TIMEOUT,
+                    )
+                    resp.raise_for_status()
+                    data = resp.json().get("results", [])
+                except Exception as exc:
+                    if is_api_quota_exhausted(exc):
+                        mark_api_exhausted("reed", exc=exc)
+                        return jobs
+                    logger.warning(
+                        "[reed] request failed for %r in %r page %s: %s",
+                        title,
+                        region_name,
+                        page,
+                        exc,
+                    )
+                    break
+
+                if not data:
+                    break
+
+                before = len(jobs)
+                for item in data:
+                    job_title = item.get("jobTitle", "")
+                    if not title_matches(job_title, title_filters, excluded_title_terms):
+                        continue
+
+                    location_str = item.get("locationName", "")
+                    description = (item.get("jobDescription") or "")[:1000]
+                    snippet = f"{location_str} — {description}" if location_str else description
+
+                    jobs.append(
+                        {
+                            "title": job_title,
+                            "company": item.get("employerName", ""),
+                            "url": item.get("jobUrl", ""),
+                            "posted": _parse_date(item.get("date")),
+                            "location": location_str,
+                            "snippet": snippet,
+                            "source": "Reed",
+                            "query": f"{title} @ {region_name}",
+                            "region": region_name,
+                        }
+                    )
+
+                logger.info(
+                    "[reed] +%d jobs for %r in %r page %s",
+                    len(jobs) - before,
+                    title,
+                    region_name,
+                    page,
                 )
-                resp.raise_for_status()
-                data = resp.json().get("results", [])
-            except Exception as exc:
-                if is_api_quota_exhausted(exc):
-                    mark_api_exhausted("reed", exc=exc)
-                    return jobs
-                logger.warning("[reed] request failed for %r in %r: %s", title, region_name, exc)
-                continue
-
-            before = len(jobs)
-            for item in data:
-                job_title = item.get("jobTitle", "")
-                if not title_matches(job_title, title_filters, excluded_title_terms):
-                    continue
-
-                location_str = item.get("locationName", "")
-                description = (item.get("jobDescription") or "")[:1000]
-                snippet = f"{location_str} — {description}" if location_str else description
-
-                jobs.append(
-                    {
-                        "title": job_title,
-                        "company": item.get("employerName", ""),
-                        "url": item.get("jobUrl", ""),
-                        "posted": _parse_date(item.get("date")),
-                        "snippet": snippet,
-                        "source": "Reed",
-                    }
-                )
-
-            logger.info("[reed] +%d jobs for %r in %r", len(jobs) - before, title, region_name)
+                if len(data) < results_wanted:
+                    break
 
     logger.info("[reed] Complete: %d total jobs found", len(jobs))
     return jobs

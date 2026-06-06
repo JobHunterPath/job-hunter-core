@@ -140,6 +140,8 @@ def fetch_jobspy_jobs(
     results_per_query = int(jobspy_cfg.get("results_per_query", 15))
     glassdoor_enabled: bool = bool(jobspy_cfg.get("glassdoor_enabled", True))
     linkedin_enabled: bool = bool(jobspy_cfg.get("linkedin_enabled", False))
+    linkedin_fetch_description: bool = bool(jobspy_cfg.get("linkedin_fetch_description", False))
+    configured_sites: list[str] = list(jobspy_cfg.get("sites") or [])
 
     excluded_title_terms: list[str] = (
         config.get("exclusion_rules", {}).get("excluded_title_terms", []) or []
@@ -152,13 +154,16 @@ def fetch_jobspy_jobs(
 
         country_indeed = _ISO_TO_INDEED.get(iso, "")
 
-        sources = ["google"]
-        if country_indeed:
-            sources.append("indeed")
-        if glassdoor_enabled:
-            sources.append("glassdoor")
-        if linkedin_enabled:
-            sources.append("linkedin")
+        if configured_sites:
+            sources = configured_sites
+        else:
+            sources = ["google"]
+            if country_indeed:
+                sources.append("indeed")
+            if glassdoor_enabled:
+                sources.append("glassdoor")
+            if linkedin_enabled:
+                sources.append("linkedin")
 
         for title in title_filters:
             search_batches = [(sources, location)]
@@ -176,6 +181,7 @@ def fetch_jobspy_jobs(
                         hours_old=hours_old,
                         country_indeed=country_indeed or "usa",
                         description_format="markdown",
+                        linkedin_fetch_description=linkedin_fetch_description,
                         verbose=0,
                     )
                 except Exception as exc:

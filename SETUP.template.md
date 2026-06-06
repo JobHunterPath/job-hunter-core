@@ -350,16 +350,29 @@ Job-search providers — add the ones relevant to your region and search strateg
 | RapidAPI / JSearch | `RAPIDAPI_KEY` |
 | Adzuna (Canada, UK, DE, NL, SG, AU…) | `ADZUNA_APP_ID` + `ADZUNA_API_KEY` |
 | Reed.co.uk (UK / Ireland) | `REED_API_KEY` |
+| Jooble (global aggregator) | `JOOBLE_API_KEY` |
 
-The pipeline skips each source silently if its key is absent.
+The pipeline skips each keyed source silently if its key is absent.
 
-Remotive and The Muse are free job sources and do not need API keys. They are
-enabled by default in `config/api_config.yml`; set
-`http.job_boards.remotive.enabled: false` or
-`http.job_boards.the_muse.enabled: false` only if you want to opt out.
+**Job source reference** — no-key sources are enabled by default:
+
+| Source | Key Required | Notes |
+|---|---|---|
+| Arbeitnow, Remotive, Himalayas, The Muse, WeWorkRemotely, RemoteOK, Jobicy | None | Enabled by default |
+| Jooble | `JOOBLE_API_KEY` (free registration) | Broad aggregator; page-budgeted |
+| Adzuna | `ADZUNA_APP_ID` + `ADZUNA_API_KEY` (free) | 20 countries |
+| Reed | `REED_API_KEY` (free) | GB / IE |
+| JSearch | `RAPIDAPI_KEY` | Global via RapidAPI |
+| JobSpy | None (scraper library) | Configurable sites; LinkedIn off by default |
+
+To disable a no-key source, set `http.job_boards.<name>.enabled: false` in `config/api_config.yml`.
+
+**Expanding job titles** — to search more title variants, add them directly to `global_search.job_titles` in `search_config.yml`. To generate ideas, ask an AI chatbot:
+> *"I'm searching for [role]. Suggest 8–10 adjacent job titles I could add to broaden my search without changing my career target. Exclude intern and junior variants."*
 
 - **Adzuna**: Register free at https://developer.adzuna.com/ — both `ADZUNA_APP_ID` and `ADZUNA_API_KEY` appear on your application dashboard.
 - **Reed**: Register free at https://www.reed.co.uk/developers/jobseeker — the key is shown on your profile page.
+- **Jooble**: Register free at https://jooble.org/api/about — the key is shown on your account page.
 
 **Add each key as a GitHub secret:**
 

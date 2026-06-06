@@ -24,6 +24,7 @@ import yaml
 from job_hunter_core.core.config import (
     ADZUNA_API_KEY,
     ADZUNA_APP_ID,
+    JOOBLE_API_KEY,
     RAPIDAPI_KEY,
     REED_API_KEY,
     load_api_config,
@@ -48,7 +49,11 @@ from job_hunter_core.sources.search_providers import (
     fetch_static_career_jobs,
     search_web,
 )
+from job_hunter_core.sources.jobicy_source import fetch_jobicy_jobs
+from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
+from job_hunter_core.sources.remoteok_source import fetch_remoteok_jobs
 from job_hunter_core.sources.the_muse_source import fetch_the_muse_jobs
+from job_hunter_core.sources.weworkremotely_source import fetch_weworkremotely_jobs
 from job_hunter_core.tracking.discovery_cache import (
     load_cached_candidate_urls,
     load_cached_candidate_urls_with_metadata,
@@ -587,6 +592,66 @@ def scrape(region: str | None = None) -> list[dict]:
             add_job(job, cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] The Muse failed: %s", e)
+
+    stats.record("jobicy", attempted=1)
+    try:
+        jobicy_jobs = list(fetch_jobicy_jobs(title_filters, enabled_regions, config))
+        stats.record("jobicy", returned=len(jobicy_jobs))
+        jobicy_accepted = 0
+        for job in jobicy_jobs:
+            if add_job(job, cache_candidate=True):
+                jobicy_accepted += 1
+        stats.record("jobicy", accepted=jobicy_accepted, skipped=len(jobicy_jobs) - jobicy_accepted)
+    except Exception as e:
+        stats.record("jobicy", failed=1)
+        logger.warning("[scraper] Jobicy failed: %s", e)
+
+    stats.record("remoteok", attempted=1)
+    try:
+        remoteok_jobs = list(fetch_remoteok_jobs(title_filters, enabled_regions, config))
+        stats.record("remoteok", returned=len(remoteok_jobs))
+        remoteok_accepted = 0
+        for job in remoteok_jobs:
+            if add_job(job, cache_candidate=True):
+                remoteok_accepted += 1
+        stats.record(
+            "remoteok", accepted=remoteok_accepted, skipped=len(remoteok_jobs) - remoteok_accepted
+        )
+    except Exception as e:
+        stats.record("remoteok", failed=1)
+        logger.warning("[scraper] RemoteOK failed: %s", e)
+
+    stats.record("weworkremotely", attempted=1)
+    try:
+        wwr_jobs = list(fetch_weworkremotely_jobs(title_filters, enabled_regions, config))
+        stats.record("weworkremotely", returned=len(wwr_jobs))
+        wwr_accepted = 0
+        for job in wwr_jobs:
+            if add_job(job, cache_candidate=True):
+                wwr_accepted += 1
+        stats.record(
+            "weworkremotely", accepted=wwr_accepted, skipped=len(wwr_jobs) - wwr_accepted
+        )
+    except Exception as e:
+        stats.record("weworkremotely", failed=1)
+        logger.warning("[scraper] WeWorkRemotely failed: %s", e)
+
+    stats.record("jooble", attempted=1)
+    try:
+        jooble_jobs = list(
+            fetch_jooble_jobs(title_filters, enabled_regions, config, JOOBLE_API_KEY)
+        )
+        stats.record("jooble", returned=len(jooble_jobs))
+        jooble_accepted = 0
+        for job in jooble_jobs:
+            if add_job(job, cache_candidate=True):
+                jooble_accepted += 1
+        stats.record(
+            "jooble", accepted=jooble_accepted, skipped=len(jooble_jobs) - jooble_accepted
+        )
+    except Exception as e:
+        stats.record("jooble", failed=1)
+        logger.warning("[scraper] Jooble failed: %s", e)
 
     stats.record("arbeitsagentur", attempted=1)
     try:
