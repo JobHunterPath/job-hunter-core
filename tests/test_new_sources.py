@@ -14,6 +14,7 @@ from job_hunter_core.sources.weworkremotely_source import fetch_weworkremotely_j
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+
 def _mock_get(json_data, status=200):
     resp = MagicMock()
     resp.status_code = status
@@ -47,9 +48,7 @@ _EXCL = {"exclusion_rules": {"excluded_title_terms": []}}
 # Jobicy
 # ═══════════════════════════════════════════════════════════════════════════
 
-_JOBICY_CFG = {
-    "http": {"job_boards": {"jobicy": {"enabled": True, "timeout_seconds": 10}}}
-}
+_JOBICY_CFG = {"http": {"job_boards": {"jobicy": {"enabled": True, "timeout_seconds": 10}}}}
 
 _JOBICY_JOB = {
     "jobTitle": "Software Engineer",
@@ -131,9 +130,7 @@ def test_jobicy_disabled():
 # RemoteOK
 # ═══════════════════════════════════════════════════════════════════════════
 
-_REMOTEOK_CFG = {
-    "http": {"job_boards": {"remoteok": {"enabled": True, "timeout_seconds": 10}}}
-}
+_REMOTEOK_CFG = {"http": {"job_boards": {"remoteok": {"enabled": True, "timeout_seconds": 10}}}}
 
 _REMOTEOK_METADATA = {"legal": "see remoteok.com"}
 
@@ -246,9 +243,7 @@ def test_remoteok_disabled():
 # WeWorkRemotely
 # ═══════════════════════════════════════════════════════════════════════════
 
-_WWR_CFG = {
-    "http": {"job_boards": {"weworkremotely": {"enabled": True, "timeout_seconds": 10}}}
-}
+_WWR_CFG = {"http": {"job_boards": {"weworkremotely": {"enabled": True, "timeout_seconds": 10}}}}
 
 _WWR_RSS_MATCHING = b"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
@@ -348,9 +343,7 @@ def test_wwr_disabled():
 
 _JOOBLE_CFG = {
     "http": {
-        "job_boards": {
-            "jooble": {"enabled": True, "timeout_seconds": 10, "max_pages_per_query": 3}
-        }
+        "job_boards": {"jooble": {"enabled": True, "timeout_seconds": 10, "max_pages_per_query": 3}}
     }
 }
 
@@ -446,9 +439,7 @@ def test_jooble_disabled():
 
 _ADZUNA_CFG_PAGINATE = {
     "http": {
-        "job_boards": {
-            "adzuna": {"enabled": True, "results_per_page": 2, "max_pages_per_query": 3}
-        }
+        "job_boards": {"adzuna": {"enabled": True, "results_per_page": 2, "max_pages_per_query": 3}}
     }
 }
 
@@ -524,9 +515,7 @@ def test_adzuna_stops_when_page_is_underfull():
 
 _REED_CFG_PAGINATE = {
     "http": {
-        "job_boards": {
-            "reed": {"enabled": True, "results_wanted": 2, "max_pages_per_query": 3}
-        }
+        "job_boards": {"reed": {"enabled": True, "results_wanted": 2, "max_pages_per_query": 3}}
     }
 }
 
@@ -595,6 +584,7 @@ def test_reed_stops_when_page_is_underfull():
 # JobSpy — sites config override
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def test_jobspy_sites_config_override(monkeypatch):
     """When sites is set in config, scrape_jobs receives exactly those sites."""
     calls = []
@@ -602,7 +592,10 @@ def test_jobspy_sites_config_override(monkeypatch):
     def fake_scrape_jobs(**kwargs):
         calls.append(kwargs)
         import pandas as pd
-        return pd.DataFrame(columns=["title", "company", "job_url", "date_posted", "description", "site"])
+
+        return pd.DataFrame(
+            columns=["title", "company", "job_url", "date_posted", "description", "site"]
+        )
 
     monkeypatch.setitem(sys.modules, "jobspy", SimpleNamespace(scrape_jobs=fake_scrape_jobs))
 
@@ -640,7 +633,10 @@ def test_jobspy_sites_auto_derive_when_not_configured(monkeypatch):
     def fake_scrape_jobs(**kwargs):
         calls.append(kwargs)
         import pandas as pd
-        return pd.DataFrame(columns=["title", "company", "job_url", "date_posted", "description", "site"])
+
+        return pd.DataFrame(
+            columns=["title", "company", "job_url", "date_posted", "description", "site"]
+        )
 
     monkeypatch.setitem(sys.modules, "jobspy", SimpleNamespace(scrape_jobs=fake_scrape_jobs))
 

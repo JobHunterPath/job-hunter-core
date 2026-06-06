@@ -49,9 +49,7 @@ def fetch_remoteok_jobs(
     items = raw[1:]
 
     region_locations = [
-        rc.get("location", "")
-        for rc in enabled_regions.values()
-        if rc.get("location")
+        rc.get("location", "") for rc in enabled_regions.values() if rc.get("location")
     ]
     first_region = next(iter(enabled_regions), "")
 

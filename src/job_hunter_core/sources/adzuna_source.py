@@ -81,9 +81,7 @@ def fetch_adzuna_jobs(
         logger.warning("[adzuna] ADZUNA_APP_ID or ADZUNA_API_KEY not set — skipping")
         return []
 
-    adzuna_cfg = (
-        load_api_config().get("http", {}).get("job_boards", {}).get("adzuna", {}) or {}
-    )
+    adzuna_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("adzuna", {}) or {}
     if not adzuna_cfg.get("enabled", False):
         return []
 

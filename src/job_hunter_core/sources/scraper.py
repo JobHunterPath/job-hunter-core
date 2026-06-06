@@ -629,9 +629,7 @@ def scrape(region: str | None = None) -> list[dict]:
         for job in wwr_jobs:
             if add_job(job, cache_candidate=True):
                 wwr_accepted += 1
-        stats.record(
-            "weworkremotely", accepted=wwr_accepted, skipped=len(wwr_jobs) - wwr_accepted
-        )
+        stats.record("weworkremotely", accepted=wwr_accepted, skipped=len(wwr_jobs) - wwr_accepted)
     except Exception as e:
         stats.record("weworkremotely", failed=1)
         logger.warning("[scraper] WeWorkRemotely failed: %s", e)
@@ -646,9 +644,7 @@ def scrape(region: str | None = None) -> list[dict]:
         for job in jooble_jobs:
             if add_job(job, cache_candidate=True):
                 jooble_accepted += 1
-        stats.record(
-            "jooble", accepted=jooble_accepted, skipped=len(jooble_jobs) - jooble_accepted
-        )
+        stats.record("jooble", accepted=jooble_accepted, skipped=len(jooble_jobs) - jooble_accepted)
     except Exception as e:
         stats.record("jooble", failed=1)
         logger.warning("[scraper] Jooble failed: %s", e)

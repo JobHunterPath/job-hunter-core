@@ -123,9 +123,7 @@ def test_hunt_no_new_jobs_is_successful_empty_run():
         patch("job_hunter_core.pipeline.orchestrator.load_api_config", return_value={}),
         patch("job_hunter_core.pipeline.orchestrator.yaml.safe_load", return_value={"scoring": {}}),
         patch("builtins.open"),
-        patch(
-            "job_hunter_core.pipeline.orchestrator.run_hunt", return_value=([], set(), set())
-        ),
+        patch("job_hunter_core.pipeline.orchestrator.run_hunt", return_value=([], set(), set())),
     ):
         code = orchestrator.run(args)
 
