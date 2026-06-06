@@ -8,6 +8,9 @@ permissions:
   contents: write
   discussions: write
 
+env:
+  PATCH_ROLLOVER_LIMIT: 9
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -63,6 +66,8 @@ jobs:
 
       - name: Compute new version
         id: version
+        # Patch releases roll over to the next minor after PATCH_ROLLOVER_LIMIT.
+        # Major versions stay explicit and only come from breaking-change markers.
         run: |
           CURRENT=$(grep '^version' pyproject.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/')
           if [ -z "${{ steps.bump.outputs.last_tag }}" ]; then
@@ -76,7 +81,13 @@ jobs:
           case "${{ steps.bump.outputs.bump }}" in
             major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
             minor) MINOR=$((MINOR+1)); PATCH=0 ;;
-            patch) PATCH=$((PATCH+1)) ;;
+            patch)
+              PATCH=$((PATCH+1))
+              if [ "$PATCH" -gt "$PATCH_ROLLOVER_LIMIT" ]; then
+                MINOR=$((MINOR+1))
+                PATCH=0
+              fi
+              ;;
           esac
           echo "new=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
