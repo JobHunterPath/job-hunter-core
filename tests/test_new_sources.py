@@ -2,18 +2,15 @@
 
 import sys
 from types import SimpleNamespace
-from unittest.mock import MagicMock, call, patch
-
-import requests.exceptions
+from unittest.mock import MagicMock, patch
 
 from job_hunter_core.sources.adzuna_source import fetch_adzuna_jobs
 from job_hunter_core.sources.jobicy_source import fetch_jobicy_jobs
-from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
 from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
+from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
 from job_hunter_core.sources.reed_source import fetch_reed_jobs
 from job_hunter_core.sources.remoteok_source import fetch_remoteok_jobs
 from job_hunter_core.sources.weworkremotely_source import fetch_weworkremotely_jobs
-
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
