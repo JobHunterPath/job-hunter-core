@@ -24,6 +24,9 @@ COPY requirements.txt /tmp/requirements.txt
 RUN python -m pip install --no-cache-dir --upgrade pip && \
     python -m pip install --no-cache-dir -r /tmp/requirements.txt && \
     python -m playwright install --with-deps chromium && \
+    curl -fsSL -o /usr/local/bin/lightpanda \
+      https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-x86_64-linux && \
+    chmod 0755 /usr/local/bin/lightpanda && \
     chmod -R a+rX /ms-playwright
 
 COPY pyproject.toml /workspace/

@@ -71,6 +71,9 @@ secrets:
   exa:
     env_var: "EXA_API_KEY"
     required: false
+  firecrawl:
+    env_var: "FIRECRAWL_API_KEY"
+    required: false
   rapidapi:
     env_var: "RAPIDAPI_KEY"
     required: false
@@ -96,6 +99,7 @@ http:
       adzuna: 2250
       jobicy: 1000
       jooble: 500
+      firecrawl: 100
 
   url_verification:
     enabled: true
@@ -116,6 +120,11 @@ http:
       - tavily
       - exa
     searxng_base_url: "http://127.0.0.1:8080"
+    searxng_categories: "general"
+    searxng_engines:
+      - bing
+      - duckduckgo
+      - brave
     ats_discovery:
       # ATS discovery queries public ATS job APIs directly without any search
       # provider key. It runs regardless of whether SearXNG or Brave/Tavily/Exa
@@ -191,9 +200,16 @@ http:
             - '"{title}" "{location}" job apply -site:glassdoor.com -site:indeed.com -site:linkedin.com -site:monster.com -site:xing.com -site:stepstone.de'
   ats_scraper:
     timeout_seconds: 10
+    detail_timeout_seconds: 15
+    snippet_chars: 2000
 
   playwright:
     timeout_seconds: 10
+  lightpanda:
+    timeout_seconds: 8
+  firecrawl:
+    timeout_seconds: 20
+    api_url: "https://api.firecrawl.dev/v2/scrape"
 
   jd_enrichment:
     # Full JD fetching is best-effort. Some hosts, especially LinkedIn, throttle
@@ -204,6 +220,7 @@ http:
   job_boards:
     timeout_seconds: 10
     max_consecutive_failures: 3
+    snippet_chars: 2000
     arbeitnow:
       enabled: true
       max_pages: 8

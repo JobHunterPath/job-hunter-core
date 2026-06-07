@@ -48,6 +48,8 @@ from job_hunter_core.sources.search_providers import (
     all_providers_exhausted,
     canonicalize_url,  # noqa: F401
     discover_ats_jobs_by_search,
+    fetch_firecrawl_career_jobs,
+    fetch_lightpanda_career_jobs,
     fetch_playwright_career_jobs,
     fetch_static_career_jobs,
     search_web,
@@ -416,6 +418,29 @@ def scrape(region: str | None = None) -> list[dict]:
             logger.debug("[scraper] HTTP career scrape failed for %s: %s", company["name"], e)
 
         if direct_found == 0:
+            stats.record("lightpanda_career_page", attempted=1)
+            try:
+                lp_jobs = list(
+                    fetch_lightpanda_career_jobs(company, title_filters, excluded_title_terms)
+                )
+                stats.record("lightpanda_career_page", returned=len(lp_jobs))
+                lp_accepted = 0
+                for job in lp_jobs:
+                    if add_job({**job, "region": company_region}):
+                        direct_found += 1
+                        lp_accepted += 1
+                stats.record(
+                    "lightpanda_career_page",
+                    accepted=lp_accepted,
+                    skipped=len(lp_jobs) - lp_accepted,
+                )
+            except Exception as e:
+                stats.record("lightpanda_career_page", failed=1)
+                logger.debug(
+                    "[scraper] Lightpanda career scrape failed for %s: %s", company["name"], e
+                )
+
+        if direct_found == 0:
             stats.record("playwright_career_page", attempted=1)
             try:
                 pw_jobs = list(
@@ -436,6 +461,29 @@ def scrape(region: str | None = None) -> list[dict]:
                 stats.record("playwright_career_page", failed=1)
                 logger.debug(
                     "[scraper] Playwright career scrape failed for %s: %s", company["name"], e
+                )
+
+        if direct_found == 0:
+            stats.record("firecrawl_career_page", attempted=1)
+            try:
+                fc_jobs = list(
+                    fetch_firecrawl_career_jobs(company, title_filters, excluded_title_terms)
+                )
+                stats.record("firecrawl_career_page", returned=len(fc_jobs))
+                fc_accepted = 0
+                for job in fc_jobs:
+                    if add_job({**job, "region": company_region}):
+                        direct_found += 1
+                        fc_accepted += 1
+                stats.record(
+                    "firecrawl_career_page",
+                    accepted=fc_accepted,
+                    skipped=len(fc_jobs) - fc_accepted,
+                )
+            except Exception as e:
+                stats.record("firecrawl_career_page", failed=1)
+                logger.debug(
+                    "[scraper] Firecrawl career scrape failed for %s: %s", company["name"], e
                 )
 
         if direct_found:

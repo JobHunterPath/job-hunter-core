@@ -52,7 +52,12 @@ job-hunter-core scrapes jobs from 15+ sources (ATS APIs, job boards, AI-assisted
 | The Muse | Job board API | Free, no API key required |
 | Bundesagentur für Arbeit | Job board | German market |
 | Arbeitnow | Job board | |
-| AI web search | Search | Brave / Tavily / Exa |
+| SearXNG | Search | Free local metasearch in GitHub Actions; uses simple per-site queries |
+| Brave / Tavily / Exa | Search APIs | Optional keyed fallbacks with monthly budgets |
+| Playwright | Browser renderer | Automatic JS-rendering fallback in the core image |
+| Lightpanda | Fast renderer | Used automatically when the binary is present |
+| Firecrawl | Cloud extraction | Used when `FIRECRAWL_API_KEY` and budget are available |
+| AI web search | Search | LLM-assisted breadth source |
 
 ## Configuration
 

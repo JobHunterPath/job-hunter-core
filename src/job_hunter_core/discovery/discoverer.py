@@ -47,6 +47,25 @@ ATS_PATTERNS = [
 ]
 
 CAREER_PATH_PATTERNS = ["/careers", "/jobs", "/work-with-us", "/join-us"]
+GENERIC_ATS_SLUGS = {
+    "jobs",
+    "job",
+    "careers",
+    "career",
+    "apply",
+    "search",
+    "positions",
+    "openings",
+}
+PATH_BASED_ATS_HOSTS = {
+    "boards.greenhouse.io",
+    "job-boards.greenhouse.io",
+    "jobs.lever.co",
+    "jobs.smartrecruiters.com",
+    "apply.workable.com",
+    "jobs.ashbyhq.com",
+    "jobs.personio.com",
+}
 DEFAULT_DISCOVERY_MAX_WORKERS = 10
 DEFAULT_DISCOVERY_TOTAL_TIMEOUT_SECONDS = 1800
 DEFAULT_DISCOVERY_RESERVE_SECONDS = 600
@@ -182,16 +201,27 @@ def has_jobs_in_location(company_name: str, region_config: dict) -> bool:
     """Check if a company has job postings in a specific location."""
     location = region_config.get("location", "")
     job_titles = region_config.get("job_titles", [])
-    title_query = " OR ".join(f'"{title}"' for title in job_titles)
-    query = f'"{company_name}" "{location}" {title_query} site:jobs OR site:careers'
+    queries = [
+        f'"{company_name}" "{location}" "{title}" careers jobs' for title in (job_titles or ["job"])
+    ]
+    queries.extend(
+        f'"{company_name}" "{location}" {site}'
+        for site in (
+            "site:jobs.lever.co",
+            "site:boards.greenhouse.io",
+            "site:jobs.ashbyhq.com",
+            "site:jobs.smartrecruiters.com",
+        )
+    )
     try:
-        results = search_web(query, region_config, count=3)
-        for result in results:
-            url = result.get("url", "").lower()
-            if company_name.lower() in url and (
-                location.lower() in url or "jobs" in url or "careers" in url
-            ):
-                return True
+        for query in queries:
+            results = search_web(query, region_config, count=3)
+            for result in results:
+                url = result.get("url", "").lower()
+                if company_name.lower() in url and (
+                    location.lower() in url or "jobs" in url or "careers" in url
+                ):
+                    return True
     except Exception as e:
         print(f"  [check] Error checking {company_name} in {location}: {e}")
     return False
@@ -275,6 +305,70 @@ def _career_url_from_job_url(job_url: str) -> str:
     return f"{parsed.netloc}{base_path}" if parsed.netloc else job_url
 
 
+def _career_url_is_specific(career_url: str) -> bool:
+    """Reject generic ATS roots that cause false duplicates across companies."""
+    candidate = career_url if "://" in career_url else f"https://{career_url}"
+    parsed = urlparse(candidate)
+    host = parsed.netloc.lower()
+    parts = [part for part in parsed.path.strip("/").split("/") if part]
+
+    if host in PATH_BASED_ATS_HOSTS:
+        return bool(parts and parts[0].lower() not in GENERIC_ATS_SLUGS)
+    if host.endswith(".jobs.personio.de"):
+        return host.split(".jobs.personio.de", 1)[0] not in GENERIC_ATS_SLUGS
+    if host.endswith(".recruitee.com"):
+        return host.split(".recruitee.com", 1)[0] not in GENERIC_ATS_SLUGS
+    if host.endswith(".careers.hibob.com"):
+        return host.split(".careers.hibob.com", 1)[0] not in GENERIC_ATS_SLUGS
+    if host.endswith(".teamtailor.com"):
+        return host.split(".teamtailor.com", 1)[0] not in GENERIC_ATS_SLUGS
+    if host.endswith(".breezy.hr"):
+        return host.split(".breezy.hr", 1)[0] not in GENERIC_ATS_SLUGS
+    if host.endswith(".myworkdayjobs.com"):
+        return host.split(".myworkdayjobs.com", 1)[0] not in GENERIC_ATS_SLUGS
+    return bool(host)
+
+
+def _is_ats_career_url(career_url: str) -> bool:
+    candidate = career_url if "://" in career_url else f"https://{career_url}"
+    parsed = urlparse(candidate)
+    host = parsed.netloc.lower()
+    return host in PATH_BASED_ATS_HOSTS or any(
+        host.endswith(suffix)
+        for suffix in (
+            ".jobs.personio.de",
+            ".recruitee.com",
+            ".careers.hibob.com",
+            ".teamtailor.com",
+            ".breezy.hr",
+            ".myworkdayjobs.com",
+        )
+    )
+
+
+def _career_url_has_job_signal(
+    company: dict, region_config: dict, title_filters: list[str]
+) -> bool:
+    """Validate custom career pages before auto-add."""
+    career_url = str(company.get("career_url") or "")
+    if not _career_url_is_specific(career_url):
+        return False
+    if _is_ats_career_url(career_url):
+        return True
+    try:
+        from job_hunter_core.sources.career_pages import extract_career_page_jobs
+
+        candidate = {
+            "name": company.get("name", ""),
+            "career_url": career_url,
+            "location": region_config.get("location", ""),
+        }
+        return bool(extract_career_page_jobs(candidate, title_filters, []))
+    except Exception as exc:
+        print(f"  [validate] Career page validation failed for {company.get('name')}: {exc}")
+        return False
+
+
 def discover_company_candidates(
     search_config: dict,
     region_name: str,
@@ -303,11 +397,14 @@ def discover_company_candidates(
         url = str(job.get("url") or "").strip()
         if not name or not url:
             continue
+        career_url = _career_url_from_job_url(url)
+        if not _career_url_is_specific(career_url):
+            continue
         name_key = name.lower()
         if name_key in seen_names:
             continue
         seen_names.add(name_key)
-        candidates.append({"name": name, "career_url": _career_url_from_job_url(url)})
+        candidates.append({"name": name, "career_url": career_url})
     return candidates
 
 
@@ -340,7 +437,7 @@ def find_career_url(company_name: str, existing_urls: set[str], region_config: d
             if match:
                 slug = match.group(1).rstrip("/")
                 career_url = template.format(slug=slug)
-                if career_url.lower() not in existing_urls:
+                if career_url.lower() not in existing_urls and _career_url_is_specific(career_url):
                     print(f"  [found] {company_name} -> {career_url} (ATS)")
                     return {"name": company_name, "career_url": career_url}
 
@@ -350,7 +447,9 @@ def find_career_url(company_name: str, existing_urls: set[str], region_config: d
                 if domain_match:
                     domain = domain_match.group(1)
                     career_url = f"{domain}{path}"
-                    if career_url.lower() not in existing_urls:
+                    if career_url.lower() not in existing_urls and _career_url_is_specific(
+                        career_url
+                    ):
                         print(f"  [found] {company_name} -> {career_url} (direct)")
                         return {"name": company_name, "career_url": career_url}
 
@@ -422,15 +521,32 @@ def run() -> None:
         location = region_config.get("location", region_name.title())
         print(f"\n[discover] Discovering companies for region: {region_name} ({location})")
 
+        ats_entries = []
+        if not deadline_hit and not _deadline_reached(deadline):
+            print(f"[discover] Searching ATS postings for {region_name} (deterministic mode)...")
+            try:
+                ats_entries = discover_company_candidates(
+                    search_config,
+                    region_name,
+                    region_config,
+                    job_titles,
+                )
+                print(
+                    f"[discover] ATS posting discovery found {len(ats_entries)} candidate(s) "
+                    f"(source: real postings, no LLM names used)."
+                )
+            except Exception as e:
+                print(f"[discover] ATS discovery failed for {region_name}: {e}")
+
         suggested = []
         sector_names = ", ".join(_normalize_sectors(sectors, location))
-        if sector_names:
+        if sector_names and not deadline_hit and not _deadline_reached(deadline):
             print(f"[discover] Querying LLM across sectors: {sector_names}")
             suggested = discover_company_names(
                 existing, location, region_config["job_titles"], sectors, excluded_industries
             )
             print(f"[discover] LLM suggested {len(suggested)} companies: {suggested}\n")
-        else:
+        elif not sector_names:
             print("[discover] No LLM sectors configured; running in deterministic ATS-only mode.")
 
         new_names = [
@@ -464,23 +580,6 @@ def run() -> None:
 
         llm_entries = [entry for entry in lookup_results if entry]
 
-        ats_entries = []
-        if not deadline_hit and not _deadline_reached(deadline):
-            print(f"[discover] Searching ATS postings for {region_name} (deterministic mode)...")
-            try:
-                ats_entries = discover_company_candidates(
-                    search_config,
-                    region_name,
-                    region_config,
-                    job_titles,
-                )
-                print(
-                    f"[discover] ATS posting discovery found {len(ats_entries)} candidate(s) "
-                    f"(source: real postings, no LLM names used)."
-                )
-            except Exception as e:
-                print(f"[discover] ATS discovery failed for {region_name}: {e}")
-
         # Surface origin so users can see where companies came from.
         combined_entries = list(llm_entries)
         combined_entries.extend(ats_entries)
@@ -493,7 +592,14 @@ def run() -> None:
         for entry in sorted(combined_entries, key=lambda e: e["name"].lower()):
             entry_name = entry["name"].lower()
             entry_url = entry["career_url"].lower()
-            if entry_name in existing_names or entry_url in existing_urls or entry_name in excluded:
+            valid_titles = region_config.get("job_titles", []) or job_titles
+            if (
+                entry_name in existing_names
+                or entry_url in existing_urls
+                or entry_name in excluded
+                or not _career_url_is_specific(entry["career_url"])
+                or not _career_url_has_job_signal(entry, region_config, valid_titles)
+            ):
                 continue
             new_entries.append(entry)
             existing_urls.add(entry_url)

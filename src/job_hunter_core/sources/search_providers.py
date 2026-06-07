@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 import os
 import re
+import shutil
+import subprocess
 import threading
 from dataclasses import dataclass
 from html import unescape
@@ -147,12 +149,7 @@ def all_providers_exhausted(api_cfg: dict | None = None) -> bool:
     exa_out = _is_exhausted("exa", state)
     paid_exhausted = brave_out and tavily_out and exa_out
 
-    with _SEARXNG_ZERO_LOCK:
-        consecutive_zeros = _searxng_consecutive_zeros
-
-    searxng_unavailable = (not SearxngProvider().enabled()) or (
-        consecutive_zeros >= _SEARXNG_ZERO_THRESHOLD
-    )
+    searxng_unavailable = not SearxngProvider().enabled()
 
     result = paid_exhausted and searxng_unavailable
 
@@ -277,8 +274,9 @@ class SearxngProvider(SearchProvider):
     name = "searxng"
 
     def __init__(self) -> None:
+        self.search_cfg = _search_cfg()
         self.base_url = (
-            os.environ.get("SEARXNG_BASE_URL") or _search_cfg().get("searxng_base_url") or ""
+            os.environ.get("SEARXNG_BASE_URL") or self.search_cfg.get("searxng_base_url") or ""
         ).rstrip("/")
 
     def enabled(self) -> bool:
@@ -289,7 +287,11 @@ class SearxngProvider(SearchProvider):
             "q": query,
             "format": "json",
             "safesearch": 0,
+            "categories": self.search_cfg.get("searxng_categories", "general"),
         }
+        engines = self.search_cfg.get("searxng_engines")
+        if engines:
+            params["engines"] = ",".join(engines) if isinstance(engines, list) else str(engines)
         if region_config.get("search_lang"):
             params["language"] = region_config["search_lang"]
         resp = requests.get(
@@ -301,12 +303,6 @@ class SearxngProvider(SearchProvider):
         resp.raise_for_status()
         raw = resp.json().get("results", [])[:count]
         results = normalize_web_results(raw, "SearXNG")
-        with _SEARXNG_ZERO_LOCK:
-            global _searxng_consecutive_zeros
-            if len(results) == 0:
-                _searxng_consecutive_zeros += 1
-            else:
-                _searxng_consecutive_zeros = 0
         return results
 
 
@@ -584,6 +580,20 @@ _ATS_DISCOVERY_SITES = {
 }
 
 
+def _site_queries(site_query: str) -> list[str]:
+    """Split grouped site queries into simple engine-friendly query fragments."""
+    return [part.strip(" ()") for part in site_query.split(" OR ") if part.strip(" ()")]
+
+
+def _ats_search_queries(site_query: str, title: str, location: str) -> list[str]:
+    queries: list[str] = []
+    for site in _site_queries(site_query):
+        if location:
+            queries.append(f'{site} "{title}" "{location}"')
+        queries.append(f'{site} "{title}"')
+    return queries
+
+
 def _passes_ats_discovery_shape(url: str, source: str) -> bool:
     _, host_pattern, path_pattern = _ATS_DISCOVERY_SITES[source]
     parsed = urlparse(url)
@@ -739,6 +749,16 @@ def _verify_ats_location(url: str, source: str, location_filter: str) -> bool:
     return True
 
 
+def _enrich_ats_discovery_job(url: str) -> dict | None:
+    try:
+        from job_hunter_core.sources.jd_fetcher import fetch_jd
+
+        return fetch_jd(url, use_llm=False)
+    except Exception as exc:
+        logger.debug("[search-discovery] ATS enrichment failed for %s: %s", url, exc)
+        return None
+
+
 def discover_ats_jobs_by_search(
     title_filters: list[str],
     regions: dict[str, dict],
@@ -785,39 +805,67 @@ def discover_ats_jobs_by_search(
                     logger.info("[search-discovery] complete: %s jobs found", len(jobs))
                     return jobs
                 site_query, _, _ = _ATS_DISCOVERY_SITES[source]
-                query = f'({site_query}) "{title}" "{location}"'
-                region_queries += 1
-                total_queries += 1
-                for result in router.search(query, region_config, count=max_results_per_query):
-                    if not _passes_ats_discovery_shape(result.url, source):
-                        continue
-                    if not title_matches(result.title, title_filters, excluded_title_terms):
-                        continue
-                    if source in _ATS_LOCATION_VERIFIABLE and not _verify_ats_location(
-                        result.url, source, location
-                    ):
-                        logger.debug(
-                            "[search-discovery] %s location mismatch, skipping: %s",
-                            source,
-                            result.url,
+                for query in _ats_search_queries(site_query, title, location):
+                    if max_queries_per_region > 0 and region_queries >= max_queries_per_region:
+                        logger.info(
+                            "[search-discovery] query cap reached for region=%s", region_name
                         )
-                        continue
-                    canonical = canonicalize_url(result.url)
-                    if canonical in seen:
-                        continue
-                    seen.add(canonical)
-                    jobs.append(
-                        {
-                            "title": result.title,
-                            "company": _company_from_ats_url(result.url, source),
-                            "location": location,
-                            "url": result.url,
-                            "posted": "",
-                            "snippet": result.description,
-                            "source": f"{result.source} ATS discovery: {source}",
-                            "query": query,
-                        }
-                    )
+                        break
+                    if max_total_queries > 0 and total_queries >= max_total_queries:
+                        logger.info("[search-discovery] total query cap reached")
+                        logger.info("[search-discovery] complete: %s jobs found", len(jobs))
+                        return jobs
+                    region_queries += 1
+                    total_queries += 1
+                    for result in router.search(query, region_config, count=max_results_per_query):
+                        if not _passes_ats_discovery_shape(result.url, source):
+                            continue
+                        canonical = canonicalize_url(result.url)
+                        if canonical in seen:
+                            continue
+                        seen.add(canonical)
+                        enriched = _enrich_ats_discovery_job(result.url)
+                        job_title = enriched.get("title", "") if enriched else result.title
+                        if not title_matches(job_title, title_filters, excluded_title_terms):
+                            continue
+                        enriched_location = str((enriched or {}).get("location") or "")
+                        if enriched_location and not location_matches(enriched_location, location):
+                            logger.debug(
+                                "[search-discovery] %s location mismatch, skipping: %s",
+                                source,
+                                result.url,
+                            )
+                            continue
+                        if (
+                            not enriched_location
+                            and source in _ATS_LOCATION_VERIFIABLE
+                            and not _verify_ats_location(result.url, source, location)
+                        ):
+                            logger.debug(
+                                "[search-discovery] %s location mismatch, skipping: %s",
+                                source,
+                                result.url,
+                            )
+                            continue
+                        jobs.append(
+                            {
+                                "title": enriched.get("title", job_title)
+                                if enriched
+                                else job_title,
+                                "company": (enriched or {}).get("company")
+                                or _company_from_ats_url(result.url, source),
+                                "location": enriched_location or location,
+                                "url": result.url,
+                                "posted": (enriched or {}).get("posted", ""),
+                                "snippet": (enriched or {}).get("snippet", result.description),
+                                "source": (
+                                    f"{result.source} ATS discovery: {source} API"
+                                    if enriched
+                                    else f"{result.source} ATS discovery: {source}"
+                                ),
+                                "query": query,
+                            }
+                        )
 
     logger.info("[search-discovery] complete: %s jobs found", len(jobs))
     return jobs
@@ -901,6 +949,148 @@ def fetch_static_career_jobs(
     )
 
 
+def _jobs_from_markdown_links(
+    markdown: str,
+    base_url: str,
+    company_name: str,
+    title_filters: list[str],
+    location: str,
+    source: str,
+    excluded_title_terms: list[str] | None = None,
+) -> list[dict]:
+    jobs: list[dict] = []
+    seen: set[str] = set()
+    for match in re.finditer(r"\[([^\]]{2,160})\]\((https?://[^)\s]+|/[^)\s]+)\)", markdown):
+        text = " ".join(match.group(1).split())
+        url = urljoin(base_url, match.group(2))
+        haystack = f"{text} {url}"
+        if not _looks_like_job_url(url) and not title_matches(
+            haystack, title_filters, excluded_title_terms
+        ):
+            continue
+        if not title_matches(text or haystack, title_filters, excluded_title_terms):
+            continue
+        if not _location_match(markdown[:4000], location):
+            continue
+        canonical = canonicalize_url(url)
+        if canonical in seen:
+            continue
+        seen.add(canonical)
+        jobs.append(
+            {
+                "title": text,
+                "company": company_name,
+                "url": url,
+                "posted": "",
+                "snippet": text,
+                "source": source,
+            }
+        )
+    return jobs
+
+
+def fetch_lightpanda_career_jobs(
+    company: dict,
+    title_filters: list[str],
+    excluded_title_terms: list[str] | None = None,
+) -> list[dict]:
+    binary = shutil.which("lightpanda")
+    if not binary:
+        logger.debug("[search] lightpanda binary not found; skipping career render")
+        return []
+
+    url = _with_scheme(company["career_url"])
+    timeout_seconds = int(
+        load_api_config().get("http", {}).get("lightpanda", {}).get("timeout_seconds", 8)
+    )
+    timeout_ms = timeout_seconds * 1000
+    try:
+        completed = subprocess.run(
+            [
+                binary,
+                "fetch",
+                "--dump",
+                "html",
+                "--log_level",
+                "error",
+                "--http_timeout",
+                str(timeout_ms),
+                url,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds + 2,
+            check=False,
+        )
+    except Exception as exc:
+        logger.debug("[search] Lightpanda failed for %s: %s", url, exc)
+        return []
+    if completed.returncode != 0 or not completed.stdout:
+        logger.debug("[search] Lightpanda returned no content for %s", url)
+        return []
+    return extract_jobs_from_html(
+        completed.stdout,
+        url,
+        company["name"],
+        title_filters,
+        company.get("location", ""),
+        "Lightpanda career page",
+        excluded_title_terms,
+    )
+
+
+def fetch_firecrawl_career_jobs(
+    company: dict,
+    title_filters: list[str],
+    excluded_title_terms: list[str] | None = None,
+) -> list[dict]:
+    api_key = os.environ.get("FIRECRAWL_API_KEY", "")
+    if not api_key:
+        logger.debug("[search] FIRECRAWL_API_KEY not set; skipping cloud scrape")
+        return []
+    if not reserve_api_call("firecrawl"):
+        return []
+
+    cfg = load_api_config().get("http", {}).get("firecrawl", {}) or {}
+    timeout_seconds = int(cfg.get("timeout_seconds", 20))
+    url = _with_scheme(company["career_url"])
+    try:
+        resp = requests.post(
+            cfg.get("api_url", "https://api.firecrawl.dev/v2/scrape"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "url": url,
+                "formats": ["markdown"],
+                "onlyMainContent": True,
+                "timeout": timeout_seconds * 1000,
+                "parsers": [],
+            },
+            timeout=timeout_seconds + 5,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+    except Exception as exc:
+        logger.debug("[search] Firecrawl failed for %s: %s", url, exc)
+        return []
+
+    data = payload.get("data", payload) if isinstance(payload, dict) else {}
+    markdown = str((data or {}).get("markdown") or "")
+    if not markdown:
+        return []
+    return _jobs_from_markdown_links(
+        markdown,
+        url,
+        company["name"],
+        title_filters,
+        company.get("location", ""),
+        "Firecrawl career page",
+        excluded_title_terms,
+    )
+
+
 def fetch_playwright_career_jobs(
     company: dict,
     title_filters: list[str],
@@ -948,17 +1138,25 @@ def search_career_urls(company_name: str, region_config: dict, count: int = 7) -
     location = region_config.get("location", "")
     job_titles = region_config.get("job_titles", [])
     title_query = " OR ".join(f'"{title}"' for title in job_titles)
-    ats_sites = (
-        "site:boards.greenhouse.io OR site:job-boards.greenhouse.io "
-        "OR site:jobs.lever.co OR site:jobs.smartrecruiters.com "
-        "OR site:apply.workable.com OR site:jobs.ashbyhq.com "
-        "OR site:careers.hibob.com OR site:recruitee.com "
-        "OR site:jobs.personio.de OR site:jobs.personio.com "
-        "OR site:teamtailor.com OR site:breezy.hr OR site:myworkdayjobs.com"
-    )
-    queries = [f'"{company_name}" {location} {ats_sites}']
+    ats_sites = [
+        "site:boards.greenhouse.io",
+        "site:job-boards.greenhouse.io",
+        "site:jobs.lever.co",
+        "site:jobs.smartrecruiters.com",
+        "site:apply.workable.com",
+        "site:jobs.ashbyhq.com",
+        "site:careers.hibob.com",
+        "site:recruitee.com",
+        "site:jobs.personio.de",
+        "site:jobs.personio.com",
+        "site:teamtailor.com",
+        "site:breezy.hr",
+        "site:myworkdayjobs.com",
+    ]
+    queries = [f'"{company_name}" "{location}" {site}' for site in ats_sites]
     if title_query:
         queries.append(f'"{company_name}" {location} {title_query} careers jobs')
+    queries.append(f'"{company_name}" "{location}" careers jobs')
     out: list[dict] = []
     seen = set()
     for query in queries:

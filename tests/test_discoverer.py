@@ -94,6 +94,44 @@ def test_career_url_lookups_add_returned_companies(monkeypatch, tmp_path):
     ]
 
 
+def test_ats_discovery_runs_before_llm_discovery(monkeypatch, tmp_path):
+    cfg = tmp_path / "search_config.yml"
+    _write_search_config(
+        cfg,
+        {
+            "berlin": {
+                "enabled": True,
+                "location": "Berlin",
+                "companies": [],
+            }
+        },
+        discovery={"sectors": ["saas"]},
+    )
+    monkeypatch.setattr(discoverer, "SEARCH_CONFIG_FILE", str(cfg))
+    order = []
+
+    def fake_ats(*args):
+        order.append("ats")
+        return [{"name": "AtsCo", "career_url": "jobs.lever.co/atsco"}]
+
+    def fake_llm(*args):
+        order.append("llm")
+        return ["LlmCo"]
+
+    monkeypatch.setattr(discoverer, "discover_company_candidates", fake_ats)
+    monkeypatch.setattr(discoverer, "discover_company_names", fake_llm)
+    monkeypatch.setattr(
+        discoverer,
+        "find_career_url",
+        lambda name, urls, rc: {"name": name, "career_url": f"jobs.lever.co/{name.lower()}"},
+    )
+    monkeypatch.setattr(discoverer, "has_jobs_in_location", lambda *args: False)
+
+    discoverer.run()
+
+    assert order == ["ats", "llm"]
+
+
 def test_deadline_during_lookup_saves_partial_results_and_stops(monkeypatch, tmp_path):
     cfg = tmp_path / "search_config.yml"
     _write_search_config(
@@ -210,6 +248,91 @@ def test_ats_discovery_runs_without_llm_sectors(monkeypatch, tmp_path):
 
 
 # ── Task 4: Deterministic company discovery mode ─────────────────────────────
+
+
+def test_generic_ats_career_urls_are_not_auto_added(monkeypatch, tmp_path):
+    cfg = tmp_path / "search_config.yml"
+    _write_search_config(
+        cfg,
+        {
+            "munich": {
+                "enabled": True,
+                "location": "Munich",
+                "companies": [],
+            }
+        },
+        discovery={"sectors": []},
+    )
+    monkeypatch.setattr(discoverer, "SEARCH_CONFIG_FILE", str(cfg))
+    monkeypatch.setattr(discoverer, "discover_company_names", lambda *args: [])
+    monkeypatch.setattr(
+        discoverer,
+        "discover_company_candidates",
+        lambda *args: [
+            {"name": "GenericCo", "career_url": "jobs.smartrecruiters.com/jobs"},
+            {"name": "SpecificCo", "career_url": "jobs.smartrecruiters.com/SpecificCo"},
+        ],
+    )
+    monkeypatch.setattr(discoverer, "has_jobs_in_location", lambda *args: False)
+
+    discoverer.run()
+
+    companies = _read_search_config(cfg)["regions"]["munich"]["companies"]
+    assert companies == [
+        {"name": "SpecificCo", "career_url": "jobs.smartrecruiters.com/SpecificCo"}
+    ]
+
+
+def test_llm_custom_career_url_without_jobs_is_not_auto_added(monkeypatch, tmp_path):
+    cfg = tmp_path / "search_config.yml"
+    _write_search_config(
+        cfg,
+        {
+            "berlin": {
+                "enabled": True,
+                "location": "Berlin",
+                "companies": [],
+            }
+        },
+        discovery={"sectors": ["saas"]},
+    )
+    monkeypatch.setattr(discoverer, "SEARCH_CONFIG_FILE", str(cfg))
+    monkeypatch.setattr(discoverer, "discover_company_candidates", lambda *args: [])
+    monkeypatch.setattr(discoverer, "discover_company_names", lambda *args: ["NoSignalCo"])
+    monkeypatch.setattr(
+        discoverer,
+        "find_career_url",
+        lambda name, urls, rc: {"name": name, "career_url": "careers.nosignal.example.com"},
+    )
+    monkeypatch.setattr(
+        "job_hunter_core.sources.career_pages.extract_career_page_jobs", lambda *args: []
+    )
+    monkeypatch.setattr(discoverer, "has_jobs_in_location", lambda *args: False)
+
+    discoverer.run()
+
+    companies = _read_search_config(cfg)["regions"]["berlin"]["companies"]
+    assert companies == []
+
+
+def test_has_jobs_in_location_uses_simple_queries(monkeypatch):
+    queries = []
+
+    def fake_search(query, region_config, count):
+        queries.append(query)
+        return []
+
+    monkeypatch.setattr(discoverer, "search_web", fake_search)
+
+    assert (
+        discoverer.has_jobs_in_location(
+            "Acme",
+            {"location": "Berlin", "job_titles": ["Product Manager", "Product Owner"]},
+        )
+        is False
+    )
+    assert queries
+    assert all(" OR " not in query for query in queries)
 
 
 def test_ats_only_discovery_adds_companies_without_llm(monkeypatch, tmp_path):

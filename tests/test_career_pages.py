@@ -271,3 +271,57 @@ def test_extract_career_page_jobs_no_search_provider_called():
         )
 
     mock_search.assert_not_called()
+
+
+def test_extract_career_page_jobs_uses_lightpanda_before_playwright():
+    company = {
+        "name": "LightCo",
+        "career_url": "https://careers.lightco.example",
+        "location": "Berlin",
+    }
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.text = "<html></html>"
+    mock_resp.url = company["career_url"]
+
+    with (
+        patch("job_hunter_core.sources.career_pages.requests.get", return_value=mock_resp),
+        patch("job_hunter_core.sources.career_pages.discover_via_sitemap", return_value=[]),
+        patch(
+            "job_hunter_core.sources.career_pages.extract_from_lightpanda",
+            return_value=[{"title": "Product Manager", "url": "https://example.com/jobs/1"}],
+        ),
+        patch("job_hunter_core.sources.career_pages.extract_from_rendered_html") as mock_pw,
+    ):
+        jobs = career_pages.extract_career_page_jobs(company, ["Product Manager"])
+
+    assert len(jobs) == 1
+    assert jobs[0]["title"] == "Product Manager"
+    mock_pw.assert_not_called()
+
+
+def test_extract_career_page_jobs_uses_firecrawl_after_local_fallbacks():
+    company = {
+        "name": "CloudCo",
+        "career_url": "https://careers.cloudco.example",
+        "location": "Berlin",
+    }
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.text = "<html></html>"
+    mock_resp.url = company["career_url"]
+
+    with (
+        patch("job_hunter_core.sources.career_pages.requests.get", return_value=mock_resp),
+        patch("job_hunter_core.sources.career_pages.discover_via_sitemap", return_value=[]),
+        patch("job_hunter_core.sources.career_pages.extract_from_lightpanda", return_value=[]),
+        patch("job_hunter_core.sources.career_pages.extract_from_rendered_html", return_value=[]),
+        patch(
+            "job_hunter_core.sources.career_pages.extract_from_firecrawl",
+            return_value=[{"title": "Product Owner", "url": "https://example.com/jobs/2"}],
+        ),
+    ):
+        jobs = career_pages.extract_career_page_jobs(company, ["Product Owner"])
+
+    assert len(jobs) == 1
+    assert jobs[0]["title"] == "Product Owner"

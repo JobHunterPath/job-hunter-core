@@ -7,7 +7,7 @@
   "properties": {
     "scoring": {
       "type": "object",
-      "required": ["min_fit_score", "max_tailor_per_run", "max_years_experience_required"],
+      "required": ["min_fit_score", "max_years_experience_required"],
       "properties": {
         "min_fit_score": { "type": "integer", "minimum": 0, "maximum": 100 },
         "max_tailor_per_run": { "type": "integer", "minimum": 1 },
@@ -35,6 +35,12 @@
             "max_gaps": { "type": "integer", "minimum": 1 }
           }
         }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "log_all_scores": { "type": "boolean" }
       }
     }
   }

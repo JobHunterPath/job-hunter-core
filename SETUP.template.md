@@ -542,8 +542,9 @@ note says otherwise.
 
 ## 13. Advanced Features
 
-These are all disabled by default. Enable them once the basic pipeline is
-running and you are satisfied with the results.
+Some features are automatic fallbacks, and some are opt-in workflows. Browser
+and cloud scraping fallbacks run when the runtime, key, and monthly budget are
+available; optional content workflows still require explicit setup.
 
 ### More Regions
 
@@ -586,6 +587,15 @@ http:
     ai_web_search:
       enabled: true
 ```
+
+### Browser And Cloud Extraction
+
+The maintained core image includes Playwright and uses it automatically when a
+career page needs JavaScript rendering. If `lightpanda` is present on the runner,
+the scraper uses it as a fast read-only extraction pass before Playwright. If
+`FIRECRAWL_API_KEY` is configured and the monthly `firecrawl` budget is not
+exhausted, public career pages that local extraction cannot solve are retried
+through Firecrawl markdown extraction.
 
 ### LinkedIn Content
 
@@ -667,7 +677,7 @@ table below to diagnose thin results without adding more API keys.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| SearXNG returns zero results | SearXNG container failed to start, or returned no matches for the region and title | Check the Actions log for container errors. Broaden or rephrase titles in `global_search.job_titles`. SearXNG does not need any key. |
+| SearXNG returns zero results | SearXNG container failed to start, or strict title/location/site queries returned no matches | Check the Actions log for container errors. The scraper now uses simple per-site queries with Bing/DuckDuckGo/Brave engine hints. Broaden or rephrase titles in `global_search.job_titles` if a region is still thin. SearXNG does not need any key. |
 | Free search APIs exhausted (Brave/Tavily/Exa) | Monthly budget reached | Check `config/api_usage.json`. The pipeline falls through to the next provider automatically; no action needed until the month resets. Do not add more keys as the first fix. |
 | JobSpy returns very few jobs | RapidAPI key absent, exhausted, or the searched boards had few matches | Confirm `RAPIDAPI_KEY` is set as a GitHub secret and `jobspy.enabled: true` in `config/search_config.yml`. Increase `hours_old` to broaden the time window. |
 | ATS discovery returns zero | No live postings on any of the 11 ATS platforms for your titles and region | The region or title combination may be thin on those platforms. Add more companies manually to `config/search_config.yml`. Run Company Discovery to find more. |

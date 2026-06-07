@@ -32,6 +32,8 @@ from job_hunter_core.sources.search_providers import (
     USER_AGENT,
     canonicalize_url,
     extract_jobs_from_html,
+    fetch_firecrawl_career_jobs,
+    fetch_lightpanda_career_jobs,
 )
 
 logger = logging.getLogger(__name__)
@@ -497,6 +499,30 @@ def extract_from_rendered_html(
     return raw_jobs
 
 
+def extract_from_lightpanda(
+    company: dict,
+    title_filters: list[str],
+    excluded_title_terms: list[str] | None = None,
+) -> list[dict]:
+    """Render a public page with Lightpanda when the binary is available."""
+    jobs = fetch_lightpanda_career_jobs(company, title_filters, excluded_title_terms)
+    for job in jobs:
+        job["extraction_method"] = "lightpanda"
+    return jobs
+
+
+def extract_from_firecrawl(
+    company: dict,
+    title_filters: list[str],
+    excluded_title_terms: list[str] | None = None,
+) -> list[dict]:
+    """Scrape public pages through Firecrawl when key and budget are available."""
+    jobs = fetch_firecrawl_career_jobs(company, title_filters, excluded_title_terms)
+    for job in jobs:
+        job["extraction_method"] = "firecrawl"
+    return jobs
+
+
 # ---------------------------------------------------------------------------
 # Main ladder entry point
 # ---------------------------------------------------------------------------
@@ -583,10 +609,24 @@ def extract_career_page_jobs(
             logger.debug("[career_pages] rung=static_html company=%s jobs=%d", name, len(raw_jobs))
             return raw_jobs
 
-    # Rung 5: Playwright rendering (only when all static rungs yield nothing)
+    # Rung 5: Lightpanda read-only rendering
+    lightpanda_jobs = extract_from_lightpanda(company, title_filters, excluded_title_terms)
+    if lightpanda_jobs:
+        logger.debug(
+            "[career_pages] rung=lightpanda company=%s jobs=%d", name, len(lightpanda_jobs)
+        )
+        return lightpanda_jobs
+
+    # Rung 6: Playwright rendering (only when all cheaper rungs yield nothing)
     pw_jobs = extract_from_rendered_html(
         career_url, name, title_filters, location, excluded_title_terms
     )
     if pw_jobs:
         logger.debug("[career_pages] rung=playwright company=%s jobs=%d", name, len(pw_jobs))
-    return pw_jobs
+        return pw_jobs
+
+    # Rung 7: Firecrawl cloud markdown when local extraction remains weak.
+    firecrawl_jobs = extract_from_firecrawl(company, title_filters, excluded_title_terms)
+    if firecrawl_jobs:
+        logger.debug("[career_pages] rung=firecrawl company=%s jobs=%d", name, len(firecrawl_jobs))
+    return firecrawl_jobs

@@ -85,6 +85,7 @@ jobs:
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           SEARXNG_BASE_URL: http://127.0.0.1:8080
           LOG_LEVEL: INFO
           RUNNER_IMAGE: ${{ steps.runner_image.outputs.image }}
@@ -98,6 +99,7 @@ jobs:
             -e BRAVE_API_KEY \
             -e TAVILY_API_KEY \
             -e EXA_API_KEY \
+            -e FIRECRAWL_API_KEY \
             -e SEARXNG_BASE_URL \
             -e LOG_LEVEL \
             -e JOB_HUNTER_ROOT=/workspace \

@@ -100,6 +100,7 @@ def test_discover_ats_jobs_by_search_extracts_expanded_ats_shapes(monkeypatch):
             }
         },
     )
+    monkeypatch.setattr(search_providers, "_enrich_ats_discovery_job", lambda _url: None)
 
     jobs = search_providers.discover_ats_jobs_by_search(
         ["Product Manager"],
@@ -138,6 +139,7 @@ def test_discover_ats_jobs_respects_query_caps(monkeypatch):
             }
         },
     )
+    monkeypatch.setattr(search_providers, "_enrich_ats_discovery_job", lambda _url: None)
 
     jobs = search_providers.discover_ats_jobs_by_search(
         ["Product Manager", "Product Owner"],
@@ -381,11 +383,12 @@ def test_discover_ats_jobs_by_search_returns_empty_when_exhausted(monkeypatch, c
     _reset_exhaustion_state()
 
 
-def test_searxng_consecutive_zeros_increments(monkeypatch):
-    """SearxngProvider.search() increments _searxng_consecutive_zeros on zero results."""
+def test_searxng_uses_configured_engines_without_zero_penalty(monkeypatch):
+    """Empty SearXNG results should not globally mark the provider as unavailable."""
     import job_hunter_core.sources.search_providers as sp
 
     _reset_exhaustion_state()
+    calls = []
 
     class FakeResponse:
         def raise_for_status(self):
@@ -394,16 +397,158 @@ def test_searxng_consecutive_zeros_increments(monkeypatch):
         def json(self):
             return {"results": []}
 
-    monkeypatch.setattr(search_providers.requests, "get", lambda *a, **kw: FakeResponse())
+    def fake_get(*args, **kwargs):
+        calls.append(kwargs["params"])
+        return FakeResponse()
 
-    provider = sp.SearxngProvider.__new__(sp.SearxngProvider)
-    provider.base_url = "http://localhost:8888"
+    monkeypatch.setattr(search_providers.requests, "get", fake_get)
+    monkeypatch.setattr(
+        search_providers,
+        "_search_cfg",
+        lambda: {
+            "searxng_base_url": "http://localhost:8888",
+            "searxng_categories": "general",
+            "searxng_engines": ["bing", "duckduckgo", "brave"],
+        },
+    )
 
-    for _ in range(3):
-        provider.search("test query", {})
+    provider = sp.SearxngProvider()
+    provider.search("test query", {})
 
     with sp._SEARXNG_ZERO_LOCK:
         count = sp._searxng_consecutive_zeros
-    assert count == 3
+    assert count == 0
+    assert calls[0]["categories"] == "general"
+    assert calls[0]["engines"] == "bing,duckduckgo,brave"
 
     _reset_exhaustion_state()
+
+
+def test_ats_search_queries_split_grouped_site_queries():
+    queries = search_providers._ats_search_queries(
+        "site:boards.greenhouse.io OR site:job-boards.greenhouse.io",
+        "Product Manager",
+        "Berlin",
+    )
+
+    assert queries == [
+        'site:boards.greenhouse.io "Product Manager" "Berlin"',
+        'site:boards.greenhouse.io "Product Manager"',
+        'site:job-boards.greenhouse.io "Product Manager" "Berlin"',
+        'site:job-boards.greenhouse.io "Product Manager"',
+    ]
+
+
+def test_discover_ats_jobs_enriches_generic_search_title(monkeypatch):
+    class FakeRouter:
+        def __init__(self, provider_order):
+            self.provider_order = provider_order
+
+        def search(self, query: str, region_config: dict, count: int = 10):
+            return [
+                search_providers.SearchResult(
+                    url="https://boards.greenhouse.io/acme/jobs/123",
+                    title="Jobs at Acme",
+                    description="Current openings",
+                    source="SearXNG",
+                )
+            ]
+
+    monkeypatch.setattr(search_providers, "ProviderSearchRouter", FakeRouter)
+    monkeypatch.setattr(
+        search_providers,
+        "_search_cfg",
+        lambda: {
+            "ats_discovery": {
+                "enabled": True,
+                "sources": ["greenhouse"],
+                "results_per_query": 10,
+            }
+        },
+    )
+    monkeypatch.setattr(
+        search_providers,
+        "_enrich_ats_discovery_job",
+        lambda _url: {
+            "title": "Product Manager",
+            "company": "Acme",
+            "location": "Berlin",
+            "posted": "2026-06-01",
+            "snippet": "Own product discovery.",
+        },
+    )
+
+    jobs = search_providers.discover_ats_jobs_by_search(
+        ["Product Manager"],
+        {"berlin": {"location": "Berlin"}},
+        provider_order=["searxng"],
+    )
+
+    assert len(jobs) == 1
+    assert jobs[0]["title"] == "Product Manager"
+    assert jobs[0]["source"] == "SearXNG ATS discovery: greenhouse API"
+
+
+def test_lightpanda_career_jobs_parse_rendered_html(monkeypatch):
+    class Completed:
+        returncode = 0
+        stdout = '<a href="/jobs/product-manager-berlin">Product Manager</a>'
+
+    monkeypatch.setattr(search_providers.shutil, "which", lambda _name: "lightpanda")
+    monkeypatch.setattr(search_providers.subprocess, "run", lambda *a, **k: Completed())
+    monkeypatch.setattr(
+        search_providers,
+        "load_api_config",
+        lambda: {"http": {"lightpanda": {"timeout_seconds": 8}}},
+    )
+
+    jobs = search_providers.fetch_lightpanda_career_jobs(
+        {"name": "ExampleCo", "career_url": "https://example.com/careers", "location": "Berlin"},
+        ["Product Manager"],
+    )
+
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "Lightpanda career page"
+
+
+def test_firecrawl_career_jobs_require_key_and_budget(monkeypatch):
+    calls = {"reserved": 0, "posted": 0}
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "data": {
+                    "markdown": "[Product Manager](https://example.com/jobs/product-manager-berlin)"
+                }
+            }
+
+    def reserve(provider: str) -> bool:
+        calls["reserved"] += 1
+        assert provider == "firecrawl"
+        return True
+
+    def post(*args, **kwargs):
+        calls["posted"] += 1
+        assert kwargs["json"]["formats"] == ["markdown"]
+        return Response()
+
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "key")
+    monkeypatch.setattr(search_providers, "reserve_api_call", reserve)
+    monkeypatch.setattr(search_providers.requests, "post", post)
+    monkeypatch.setattr(
+        search_providers,
+        "load_api_config",
+        lambda: {"http": {"firecrawl": {"timeout_seconds": 20}}},
+    )
+
+    jobs = search_providers.fetch_firecrawl_career_jobs(
+        {"name": "ExampleCo", "career_url": "https://example.com/careers", "location": "Berlin"},
+        ["Product Manager"],
+    )
+
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "Firecrawl career page"
+    assert calls == {"reserved": 1, "posted": 1}

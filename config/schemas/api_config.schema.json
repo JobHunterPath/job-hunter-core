@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "api_config",
   "type": "object",
-  "required": ["agent_ai", "http", "profile"],
+  "required": ["http", "profile"],
   "properties": {
     "agent_ai": {
       "type": "object",
@@ -25,7 +25,7 @@
     },
     "http": {
       "type": "object",
-      "required": ["search_providers", "ats_scraper", "playwright", "jd_fetcher", "pdf", "job_boards"],
+      "required": ["search_providers", "ats_scraper", "playwright", "job_boards"],
       "properties": {
         "api_budgets": {
           "type": "object",
@@ -54,6 +54,8 @@
             "max_consecutive_failures": { "type": "integer", "minimum": 1 },
             "order": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
             "searxng_base_url": { "type": "string" },
+            "searxng_categories": { "type": "string" },
+            "searxng_engines": { "type": "array", "items": { "type": "string" } },
             "ats_discovery": {
               "type": "object",
               "properties": {
@@ -91,6 +93,19 @@
           "required": ["timeout_seconds"],
           "properties": {
             "timeout_seconds": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "lightpanda": {
+          "type": "object",
+          "properties": {
+            "timeout_seconds": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "firecrawl": {
+          "type": "object",
+          "properties": {
+            "timeout_seconds": { "type": "integer", "minimum": 1 },
+            "api_url": { "type": "string" }
           }
         },
         "jd_fetcher": {
