@@ -67,8 +67,10 @@ extensions that add breadth when free sources return thin results.
 - **SearXNG** — a free search engine GitHub Actions starts temporarily during each run.
   No account needed.
 - **ArbeitNow** — a free EU job board, enabled by default.
-- **Broad job boards** — JobSpy, Adzuna, Reed, Remotive, and several other boards are
-  queried globally and filtered by title and region. No API key is needed for most of them.
+- **Broad job boards** — JobSpy, Remotive, and several other boards are queried globally
+  and filtered by title and region. JobSpy uses the bundled python-jobspy library and does
+  not use `RAPIDAPI_KEY`. Keyed board APIs such as Adzuna, Reed, Jooble, and JSearch are
+  listed separately below.
 
 **Requires an API key:**
 
@@ -76,8 +78,9 @@ extensions that add breadth when free sources return thin results.
   beyond SearXNG results. Add the key as a GitHub secret and it will be used automatically.
   When a provider's monthly budget is reached (`http.api_budgets.monthly_limits`), it is
   skipped silently and the next provider in the fallback order takes over.
-- **RapidAPI / JobSpy** — searches Google Jobs, Glassdoor, and ZipRecruiter. Set
-  `jobspy.enabled: true` in `config/search_config.yml` and add `RAPIDAPI_KEY`.
+- **RapidAPI / JSearch** — optional aggregate job search through JSearch on RapidAPI.
+  Set `http.job_boards.jsearch.enabled: true` in `config/api_config.yml` and add
+  `RAPIDAPI_KEY`.
 
 **Uses LLM credits:**
 
@@ -131,7 +134,8 @@ What to look for:
   startup errors) or may have returned zero results for the configured titles and region.
 - `ats_discovery=0` — no live postings found on the 11 ATS platforms for your titles and
   region. This can happen in smaller markets or for niche titles.
-- `jobspy=0` — JobSpy (RapidAPI) returned no results, or its key is absent/exhausted.
+- `jobspy=0` — python-jobspy is unavailable, JobSpy is disabled, or the searched boards had
+  few matches.
 - All sources low — see the troubleshooting section below.
 
 **LLM providers:**
@@ -210,7 +214,7 @@ people usually keep tuning:
 | `config/scoring_config.yml` | Fit threshold, seniority filter, or strategic company overrides change |
 | `config/tailoring_config.yml` | Resume summary, bullet, project, keyword, or page-limit rules need tuning |
 | `config/cover_letter_config.yml` | Candidate background, tone, salutation, or forbidden phrases change |
-| `config/api_config.yml` | Model/provider, concurrency, rate limits, search-provider order, AI web search, or JD enrichment changes |
+| `config/api_config.yml` | Model/provider, concurrency, rate limits, source enablement, AI web search, or JD enrichment changes |
 | `config/applied_jobs.yml` | You want to reprocess a URL or allow a similar title at the same company |
 
 The pipeline writes `config/applied_jobs.yml` automatically. Edit it manually

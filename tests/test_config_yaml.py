@@ -8,7 +8,7 @@ import yaml
 
 def test_workflow_and_config_yaml_parse():
     files = [
-        ".github/workflows/build_runner_image.yml",
+        ".github/workflows/preflight_publish.yml",
     ]
 
     for file in files:
@@ -165,9 +165,20 @@ def _workflow_step(workflow_path: str, job_name: str, step_name: str) -> dict:
     return next(step for step in steps if step.get("name") == step_name)
 
 
+def test_preflight_publish_jobs_require_lint_and_tests():
+    workflow = yaml.safe_load(
+        (_REPO_ROOT / ".github/workflows/preflight_publish.yml").read_text(encoding="utf-8")
+    )
+    jobs = workflow["jobs"]
+
+    assert jobs["release"]["needs"] == ["lint", "test"]
+    assert jobs["sync-template"]["needs"] == ["lint", "test"]
+    assert jobs["build-runner-image"]["needs"] == ["lint", "test"]
+
+
 def test_release_workflow_creates_core_release_and_announcements():
     step = _workflow_step(
-        ".github/workflows/release.yml",
+        ".github/workflows/preflight_publish.yml",
         "release",
         "Create release",
     )
@@ -179,7 +190,7 @@ def test_release_workflow_creates_core_release_and_announcements():
     assert "--target main" in run
 
     discussion_step = _workflow_step(
-        ".github/workflows/release.yml",
+        ".github/workflows/preflight_publish.yml",
         "release",
         "Post Discussion announcement",
     )
@@ -192,7 +203,7 @@ def test_release_workflow_creates_core_release_and_announcements():
 
 def test_release_workflow_can_announce_to_template_repo():
     step = _workflow_step(
-        ".github/workflows/release.yml",
+        ".github/workflows/preflight_publish.yml",
         "release",
         "Post cross-repo announcement to job-hunter-template",
     )
@@ -208,15 +219,15 @@ def test_release_workflow_can_announce_to_template_repo():
 
 def test_sync_template_workflow_assembles_template_repo_pr():
     step = _workflow_step(
-        ".github/workflows/sync_template.yml",
-        "sync",
+        ".github/workflows/preflight_publish.yml",
+        "sync-template",
         "Sync maintained template files",
     )
     assert step["run"] == "python .github/scripts/build_template_repo.py job-hunter-template"
 
     pr_step = _workflow_step(
-        ".github/workflows/sync_template.yml",
-        "sync",
+        ".github/workflows/preflight_publish.yml",
+        "sync-template",
         "Open PR in job-hunter-template",
     )
     assert pr_step["with"]["token"] == "${{ secrets.TEMPLATE_REPO_PAT }}"

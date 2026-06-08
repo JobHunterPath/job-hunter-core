@@ -42,11 +42,12 @@ job-hunter-core scrapes jobs from 15+ sources (ATS APIs, job boards, AI-assisted
 | Breezy | ATS API | |
 | Teamtailor | ATS API | |
 | Workday | ATS API | |
-| Indeed | Job board | Via python-jobspy |
-| LinkedIn | Job board | Via python-jobspy |
-| Google Jobs | Job board | Via python-jobspy |
+| Indeed | Job board | Via python-jobspy; no API key |
+| LinkedIn | Job board | Via python-jobspy; no API key |
+| Google Jobs | Job board | Via python-jobspy; no API key |
 | Adzuna | Job board API | Requires API key |
 | Reed | Job board API | Requires API key |
+| JSearch | Job board API | Optional RapidAPI source; requires `RAPIDAPI_KEY` |
 | Himalayas | Job board | Remote-focused |
 | Remotive | Job board API | Free, no API key required |
 | The Muse | Job board API | Free, no API key required |
