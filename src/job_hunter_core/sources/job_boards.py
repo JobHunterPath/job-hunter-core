@@ -16,6 +16,11 @@ from datetime import UTC, datetime
 
 import requests
 
+from job_hunter_core.core.api_budget import (
+    is_api_quota_exhausted,
+    mark_api_exhausted,
+    reserve_api_call,
+)
 from job_hunter_core.core.config import get_timeout, load_api_config
 from job_hunter_core.core.utils import location_matches, strip_html, title_matches
 
@@ -162,6 +167,9 @@ def fetch_jsearch_jobs(
             if language:
                 params["language"] = language
 
+            if not reserve_api_call("jsearch"):
+                return jobs
+
             try:
                 resp = requests.get(
                     JSEARCH_URL,
@@ -173,6 +181,9 @@ def fetch_jsearch_jobs(
                 data = resp.json().get("data", [])
                 _JSEARCH_FAILURES = 0
             except Exception as e:
+                if is_api_quota_exhausted(e):
+                    mark_api_exhausted("jsearch", exc=e)
+                    return jobs
                 _JSEARCH_FAILURES += 1
                 max_failures = _jsearch_max_consecutive_failures()
                 logger.warning(

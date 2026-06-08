@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from job_hunter_core.core import api_budget
 from job_hunter_core.sources import job_boards
 
 
@@ -13,6 +14,19 @@ def _mock_get(data, status=200):
     resp.raise_for_status = MagicMock()
     resp.json.return_value = data
     return resp
+
+
+class ErrorResponse:
+    def __init__(self, status_code: int, text: str = "", reason: str = "") -> None:
+        self.status_code = status_code
+        self.text = text
+        self.reason = reason
+
+    def raise_for_status(self) -> None:
+        raise job_boards.requests.exceptions.HTTPError(response=self)
+
+    def json(self) -> dict:
+        return {}
 
 
 @pytest.fixture(autouse=True)
@@ -280,3 +294,33 @@ def test_jsearch_handles_missing_city_gracefully():
         jobs = job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key")
     assert len(jobs) == 1
     assert jobs[0]["snippet"] == job["job_description"]
+
+
+def test_jsearch_budget_cap_skips_http(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(job_boards, "reserve_api_call", lambda _provider: False)
+    monkeypatch.setattr(
+        job_boards.requests,
+        "get",
+        lambda *args, **kwargs: pytest.fail("HTTP should not run"),
+    )
+
+    jobs = job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key")
+
+    assert jobs == []
+
+
+def test_jsearch_quota_error_disables_provider_for_month(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(api_budget, "ROOT", tmp_path)
+    calls = {"count": 0}
+
+    def fake_get(*args, **kwargs):
+        calls["count"] += 1
+        return ErrorResponse(429, text="Monthly quota exceeded")
+
+    monkeypatch.setattr(job_boards.requests, "get", fake_get)
+
+    assert job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key") == []
+    assert job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key") == []
+    assert calls["count"] == 1
