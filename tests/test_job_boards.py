@@ -309,9 +309,7 @@ def test_jsearch_budget_cap_skips_http(monkeypatch: pytest.MonkeyPatch):
     assert jobs == []
 
 
-def test_jsearch_quota_error_disables_provider_for_month(
-    tmp_path, monkeypatch: pytest.MonkeyPatch
-):
+def test_jsearch_quota_error_disables_provider_for_month(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(api_budget, "ROOT", tmp_path)
     calls = {"count": 0}
 
