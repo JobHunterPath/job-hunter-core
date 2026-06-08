@@ -1,10 +1,10 @@
 regions:
-  berlin:
+  your_city:
     enabled: true
     primary: true
-    country: "DE"
+    country: "DE"          # ISO 3166-1 alpha-2 country code
     search_lang: "en"
-    location: "Berlin"
+    location: "Your City"  # City name passed to job board APIs
     description: "Primary search region"
     job_titles:
       - "Product Manager"
