@@ -81,7 +81,7 @@ def test_canonicalize_url_strips_tracking_for_dedupe():
 
 def test_discover_ats_jobs_by_search_extracts_expanded_ats_shapes(monkeypatch):
     class FakeRouter:
-        def __init__(self, provider_order):
+        def __init__(self, provider_order, **kwargs):
             self.provider_order = provider_order
 
         def search(self, query: str, region_config: dict, count: int = 10):
@@ -118,7 +118,7 @@ def test_discover_ats_jobs_respects_query_caps(monkeypatch):
     queries = []
 
     class FakeRouter:
-        def __init__(self, provider_order):
+        def __init__(self, provider_order, **kwargs):
             self.provider_order = provider_order
 
         def search(self, query: str, region_config: dict, count: int = 10):
@@ -441,7 +441,7 @@ def test_ats_search_queries_split_grouped_site_queries():
 
 def test_discover_ats_jobs_enriches_generic_search_title(monkeypatch):
     class FakeRouter:
-        def __init__(self, provider_order):
+        def __init__(self, provider_order, **kwargs):
             self.provider_order = provider_order
 
         def search(self, query: str, region_config: dict, count: int = 10):

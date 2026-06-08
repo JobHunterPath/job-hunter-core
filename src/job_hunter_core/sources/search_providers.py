@@ -412,7 +412,9 @@ class SearchRouter:
         )
         self.max_consecutive_failures = int(_search_cfg().get("max_consecutive_failures", 3))
         self._disabled: set[str] = {p.lower() for p in (disabled or set())}
-        self._allowed: set[str] | None = {p.lower() for p in allowed} if allowed is not None else None
+        self._allowed: set[str] | None = (
+            {p.lower() for p in allowed} if allowed is not None else None
+        )
 
     def _is_suppressed(self, provider: SearchProvider) -> bool:
         if self.max_consecutive_failures <= 0:

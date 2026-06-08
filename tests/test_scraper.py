@@ -242,7 +242,7 @@ def test_scrape_brave_deduplicates_same_url():
         patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
         patch("job_hunter_core.sources.scraper.load_companies", return_value=COMPANIES),
         patch("job_hunter_core.sources.scraper.fetch_ats_jobs", return_value=None),
-        patch("job_hunter_core.sources.scraper.requests.get", return_value=_mock_http(raw)),
+        patch("job_hunter_core.sources.scraper.search_web", return_value=raw),
     ):
         jobs = scraper.scrape()
     urls = [j["url"] for j in jobs]
@@ -266,7 +266,7 @@ def test_scrape_deduplicates_canonical_urls():
         patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
         patch("job_hunter_core.sources.scraper.load_companies", return_value=COMPANIES[:1]),
         patch("job_hunter_core.sources.scraper.fetch_ats_jobs", return_value=None),
-        patch("job_hunter_core.sources.scraper.requests.get", return_value=_mock_http(raw)),
+        patch("job_hunter_core.sources.scraper.search_web", return_value=raw),
     ):
         jobs = scraper.scrape()
     assert len(jobs) == 1
@@ -280,7 +280,7 @@ def test_scrape_brave_skips_invalid_urls():
         patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
         patch("job_hunter_core.sources.scraper.load_companies", return_value=COMPANIES),
         patch("job_hunter_core.sources.scraper.fetch_ats_jobs", return_value=None),
-        patch("job_hunter_core.sources.scraper.requests.get", return_value=_mock_http(raw)),
+        patch("job_hunter_core.sources.scraper.search_web", return_value=raw),
     ):
         jobs = scraper.scrape()
     assert jobs == []
@@ -298,7 +298,7 @@ def test_scrape_brave_skips_stale_postings():
         patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
         patch("job_hunter_core.sources.scraper.load_companies", return_value=COMPANIES),
         patch("job_hunter_core.sources.scraper.fetch_ats_jobs", return_value=None),
-        patch("job_hunter_core.sources.scraper.requests.get", return_value=_mock_http(raw)),
+        patch("job_hunter_core.sources.scraper.search_web", return_value=raw),
     ):
         jobs = scraper.scrape()
     assert jobs == []
@@ -310,7 +310,7 @@ def test_scrape_brave_skips_german_postings():
         patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
         patch("job_hunter_core.sources.scraper.load_companies", return_value=COMPANIES),
         patch("job_hunter_core.sources.scraper.fetch_ats_jobs", return_value=None),
-        patch("job_hunter_core.sources.scraper.requests.get", return_value=_mock_http(raw)),
+        patch("job_hunter_core.sources.scraper.search_web", return_value=raw),
     ):
         jobs = scraper.scrape()
     assert jobs == []
@@ -391,7 +391,7 @@ def test_scrape_brave_skips_too_senior():
         patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
         patch("job_hunter_core.sources.scraper.load_companies", return_value=COMPANIES),
         patch("job_hunter_core.sources.scraper.fetch_ats_jobs", return_value=None),
-        patch("job_hunter_core.sources.scraper.requests.get", return_value=_mock_http(raw)),
+        patch("job_hunter_core.sources.scraper.search_web", return_value=raw),
     ):
         jobs = scraper.scrape()
     assert jobs == []
@@ -421,7 +421,7 @@ def test_scrape_brave_skips_excluded_industry():
         patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
         patch("job_hunter_core.sources.scraper.load_companies", return_value=COMPANIES),
         patch("job_hunter_core.sources.scraper.fetch_ats_jobs", return_value=None),
-        patch("job_hunter_core.sources.scraper.requests.get", return_value=_mock_http(raw)),
+        patch("job_hunter_core.sources.scraper.search_web", return_value=raw),
     ):
         jobs = scraper.scrape()
     assert jobs == []
@@ -526,7 +526,7 @@ def test_scrape_brave_continues_after_api_error():
         patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
         patch("job_hunter_core.sources.scraper.load_companies", return_value=COMPANIES),
         patch("job_hunter_core.sources.scraper.fetch_ats_jobs", return_value=None),
-        patch("job_hunter_core.sources.scraper.requests.get", side_effect=Exception("timeout")),
+        patch("job_hunter_core.sources.scraper.search_web", side_effect=Exception("timeout")),
     ):
         jobs = scraper.scrape()
     assert jobs == []

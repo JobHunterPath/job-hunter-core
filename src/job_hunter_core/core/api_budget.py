@@ -204,14 +204,17 @@ def get_exhausted_providers(api_cfg: dict[str, Any] | None = None) -> set[str]:
         state = _read_state(path)
 
     exhausted: set[str] = set(state.get("exhausted", {}).keys())
-    limits = cfg.get("monthly_limits") or {}
     for name, count in (state.get("providers") or {}).items():
         limit = _provider_limit(name, cfg)
         if limit is not None and int(count or 0) >= limit:
             exhausted.add(name)
 
     if exhausted:
-        logger.info("[api-budget] pre-flight: exhausted providers for %s: %s", state["month"], sorted(exhausted))
+        logger.info(
+            "[api-budget] pre-flight: exhausted providers for %s: %s",
+            state["month"],
+            sorted(exhausted),
+        )
     return exhausted
 
 

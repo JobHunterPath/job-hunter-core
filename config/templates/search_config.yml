@@ -92,7 +92,10 @@ exclusion_rules:
     - deutschkenntnisse
 
 discovery:
+  max_workers: 4
   total_timeout_seconds: 1800
+  reserve_seconds: 30
+  overlap_scope: region
   # LLM discovery uses these simple sector names. ATS/search discovery also
   # runs from your configured regions and job titles.
   # To run company discovery without LLM sector suggestions, clear this list
