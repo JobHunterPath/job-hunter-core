@@ -292,8 +292,15 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       github.repository == 'JobHunterPath/job-hunter-core' &&
-      github.event_name != 'pull_request' &&
-      !startsWith(github.ref, 'refs/tags/')
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          !startsWith(github.event.head_commit.message, 'chore(release):') &&
+          !startsWith(github.event.head_commit.message, 'chore: bump version')
+        )
+      )
     steps:
       - name: Checkout job-hunter-core
         uses: actions/checkout@v5
@@ -328,7 +335,16 @@ jobs:
     timeout-minutes: 90
     if: |
       github.repository == 'JobHunterPath/job-hunter-core' &&
-      github.event_name != 'pull_request'
+      (
+        github.event_name == 'workflow_dispatch' ||
+        startsWith(github.ref, 'refs/tags/v') ||
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          !startsWith(github.event.head_commit.message, 'chore(release):') &&
+          !startsWith(github.event.head_commit.message, 'chore: bump version')
+        )
+      )
 
     env:
       IMAGE_NAME: ghcr.io/jobhunterpath/job-hunter-core

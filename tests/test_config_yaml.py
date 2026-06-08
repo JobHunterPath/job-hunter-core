@@ -176,6 +176,18 @@ def test_preflight_publish_jobs_require_lint_and_tests():
     assert jobs["build-runner-image"]["needs"] == ["lint", "test"]
 
 
+def test_preflight_publish_jobs_skip_release_maintenance_commits():
+    workflow = yaml.safe_load(
+        (_REPO_ROOT / ".github/workflows/preflight_publish.yml").read_text(encoding="utf-8")
+    )
+    jobs = workflow["jobs"]
+
+    for job_name in ("release", "sync-template", "build-runner-image"):
+        condition = jobs[job_name]["if"]
+        assert "!startsWith(github.event.head_commit.message, 'chore(release):')" in condition
+        assert "!startsWith(github.event.head_commit.message, 'chore: bump version')" in condition
+
+
 def test_release_workflow_creates_core_release_and_announcements():
     step = _workflow_step(
         ".github/workflows/preflight_publish.yml",
