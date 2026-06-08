@@ -197,6 +197,7 @@ _TIMEOUT_DEFAULTS: dict[str, int] = {
     "lightpanda": 8,
     "firecrawl": 20,
     "job_boards": 15,
+    "search_providers": 10,
 }
 
 

@@ -13,10 +13,14 @@ def _run_pipeline(argv: list[str]) -> int:
     return run(_build_parser().parse_args(argv))
 
 
-def _run_discovery(_argv: list[str]) -> int:
+def _run_discovery(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="job-hunter discover")
+    parser.add_argument("--region", default=None, help="Region key; omit for all enabled regions.")
+    args = parser.parse_args(argv)
+
     from job_hunter_core.discovery.discoverer import run
 
-    run()
+    run(region=args.region)
     return 0
 
 
@@ -105,7 +109,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     discover = subparsers.add_parser("discover", help="Run weekly company discovery.")
-    discover.set_defaults(func=lambda ns: _run_discovery([]))
+    discover.add_argument(
+        "--region", default=None, help="Region key; omit for all enabled regions."
+    )
+    discover.set_defaults(
+        func=lambda ns: _run_discovery(["--region", ns.region] if ns.region else [])
+    )
 
     merge_tracker = subparsers.add_parser(
         "merge-tracker",

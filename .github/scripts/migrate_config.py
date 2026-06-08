@@ -20,6 +20,7 @@ own region names, custom company exclusions).
 The combined effect: the result always looks like the current template shape,
 while preserving every value the user has customised.
 """
+
 from __future__ import annotations
 
 import sys
@@ -31,20 +32,24 @@ import yaml
 # template.  Pruning never touches anything under these prefixes.
 # Keys are config file basenames; values are sets of dot-delimited path prefixes.
 USER_PRESERVED_PREFIXES: dict[str, frozenset[str]] = {
-    "api_config.yml": frozenset({
-        "profile",               # user-specific file paths
-        "llm.providers",         # user assigns tasks to LLM providers
-        "llm.models",            # user picks model names per task
-        "llm.max_tokens",        # user may tune per-task token budgets
-        "http.api_budgets.monthly_limits",  # user sets their own quota numbers
-    }),
-    "search_config.yml": frozenset({
-        "regions",               # user adds their own region definitions
-        "excluded_companies",    # user's personal exclusion list
-        "exclusion_rules",       # user's custom filter rules
-        "global_search.job_titles",  # user's job title list
-        "discovery.sectors",     # user's sector list for LLM discovery
-    }),
+    "api_config.yml": frozenset(
+        {
+            "profile",  # user-specific file paths
+            "llm.providers",  # user assigns tasks to LLM providers
+            "llm.models",  # user picks model names per task
+            "llm.max_tokens",  # user may tune per-task token budgets
+            "http.api_budgets.monthly_limits",  # user sets their own quota numbers
+        }
+    ),
+    "search_config.yml": frozenset(
+        {
+            "regions",  # user adds their own region definitions
+            "excluded_companies",  # user's personal exclusion list
+            "exclusion_rules",  # user's custom filter rules
+            "global_search.job_titles",  # user's job title list
+            "discovery.sectors",  # user's sector list for LLM discovery
+        }
+    ),
 }
 
 
@@ -96,9 +101,7 @@ def prune_obsolete_keys(
             continue
 
         if isinstance(val, dict) and isinstance(template[key], dict):
-            pruned_child, child_removed = prune_obsolete_keys(
-                val, template[key], preserved, full
-            )
+            pruned_child, child_removed = prune_obsolete_keys(val, template[key], preserved, full)
             result[key] = pruned_child
             removed.extend(child_removed)
         else:
@@ -137,12 +140,16 @@ def main() -> int:
     )
 
     if added:
-        print(f"[migrate-config] {upstream_path.name}: added {len(added)} key(s): {', '.join(added)}")
+        print(
+            f"[migrate-config] {upstream_path.name}: added {len(added)} key(s): {', '.join(added)}"
+        )
     else:
         print(f"[migrate-config] {upstream_path.name}: no new keys")
 
     if removed:
-        print(f"[migrate-config] {upstream_path.name}: pruned {len(removed)} obsolete key(s): {', '.join(removed)}")
+        print(
+            f"[migrate-config] {upstream_path.name}: pruned {len(removed)} obsolete key(s): {', '.join(removed)}"
+        )
     else:
         print(f"[migrate-config] {upstream_path.name}: no obsolete keys")
 

@@ -16,10 +16,23 @@ from urllib.parse import urlparse
 
 import yaml
 
+from job_hunter_core.core.config import (
+    ADZUNA_API_KEY,
+    ADZUNA_APP_ID,
+    JOOBLE_API_KEY,
+    RAPIDAPI_KEY,
+    load_api_config,
+)
 from job_hunter_core.core.config import ROOT as REPO_ROOT
 from job_hunter_core.core.llm_client import get_llm_client
 from job_hunter_core.core.llm_utils import get_llm_role_settings
+from job_hunter_core.sources.adzuna_source import fetch_adzuna_jobs
+from job_hunter_core.sources.arbeitsagentur_source import fetch_arbeitsagentur_jobs
 from job_hunter_core.sources.ats_urls import extract_career_url
+from job_hunter_core.sources.himalayas_source import fetch_himalayas_jobs
+from job_hunter_core.sources.job_boards import fetch_arbeitnow_jobs, fetch_jsearch_jobs
+from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
+from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
 from job_hunter_core.sources.search_providers import (
     discover_ats_jobs_by_search,
     search_career_urls,
@@ -408,6 +421,71 @@ def discover_company_candidates(
     return candidates
 
 
+def discover_company_names_from_job_sources(
+    search_config: dict,
+    region_name: str,
+    region_config: dict,
+    job_titles: list[str],
+) -> list[str]:
+    """Discover company names from the existing broad job-board search sources."""
+    exclusion_rules = search_config.get("exclusion_rules", {}) or {}
+    excluded_title_terms = exclusion_rules.get("excluded_title_terms", []) or []
+    region_titles = region_config.get("job_titles", []) or []
+    title_filters = list(dict.fromkeys([*job_titles, *region_titles]))
+    if not title_filters:
+        return []
+
+    api_cfg = load_api_config()
+    boards_cfg = api_cfg.get("http", {}).get("job_boards", {}) or {}
+    location = region_config.get("location") or region_name
+    names: list[str] = []
+    seen: set[str] = set()
+
+    def _add_jobs(jobs: list[dict]) -> None:
+        for job in jobs:
+            name = str(job.get("company") or "").strip()
+            if not name or name.lower() in seen:
+                continue
+            seen.add(name.lower())
+            names.append(name)
+
+    if boards_cfg.get("arbeitnow", {}).get("enabled", False):
+        max_pages = int(boards_cfg["arbeitnow"].get("max_pages", 3))
+        _add_jobs(fetch_arbeitnow_jobs(title_filters, location, max_pages, excluded_title_terms))
+
+    if boards_cfg.get("jsearch", {}).get("enabled", False):
+        num_pages = int(boards_cfg["jsearch"].get("num_pages", 1))
+        _add_jobs(
+            fetch_jsearch_jobs(
+                title_filters,
+                location,
+                RAPIDAPI_KEY,
+                num_pages,
+                excluded_title_terms,
+                region_config.get("country", ""),
+                region_config.get("search_lang", ""),
+            )
+        )
+
+    enabled_region = {region_name: region_config}
+
+    if boards_cfg.get("adzuna", {}).get("enabled", False):
+        _add_jobs(
+            fetch_adzuna_jobs(
+                title_filters, enabled_region, search_config, ADZUNA_APP_ID, ADZUNA_API_KEY
+            )
+        )
+
+    if boards_cfg.get("jooble", {}).get("enabled", False):
+        _add_jobs(fetch_jooble_jobs(title_filters, enabled_region, search_config, JOOBLE_API_KEY))
+
+    _add_jobs(fetch_jobspy_jobs(title_filters, enabled_region, search_config))
+    _add_jobs(fetch_arbeitsagentur_jobs(title_filters, enabled_region, search_config))
+    _add_jobs(fetch_himalayas_jobs(title_filters, enabled_region, search_config))
+
+    return names
+
+
 def brave_search(query: str, count: int = 5, region_config: dict | None = None) -> list[dict]:
     """Compatibility wrapper; now uses the full search provider chain."""
     return search_web(region_config=region_config or {}, query=query, count=count)
@@ -457,7 +535,7 @@ def find_career_url(company_name: str, existing_urls: set[str], region_config: d
     return None
 
 
-def run() -> None:
+def run(region: str | None = None) -> None:
     print("\n" + "=" * 50)
     print("Weekly Company Discovery")
     print("=" * 50 + "\n")
@@ -474,7 +552,12 @@ def run() -> None:
         with open(SEARCH_CONFIG_FILE, encoding="utf-8") as f:
             search_config = yaml.safe_load(f) or {}
 
-    regions = {k: v for k, v in search_config.get("regions", {}).items() if v.get("enabled", True)}
+    all_regions = search_config.get("regions", {}) or {}
+    regions = {
+        k: v
+        for k, v in all_regions.items()
+        if v.get("enabled", True) and (region is None or k == region)
+    }
     job_titles = search_config.get("global_search", {}).get("job_titles", [])
     sectors = search_config.get("discovery", {}).get("sectors", [])
     settings = _discovery_settings(search_config)
@@ -538,6 +621,23 @@ def run() -> None:
             except Exception as e:
                 print(f"[discover] ATS discovery failed for {region_name}: {e}")
 
+        job_source_names = []
+        if not deadline_hit and not _deadline_reached(deadline):
+            print(f"[discover] Searching existing job sources for {region_name} companies...")
+            try:
+                job_source_names = discover_company_names_from_job_sources(
+                    search_config,
+                    region_name,
+                    region_config,
+                    job_titles,
+                )
+                print(
+                    f"[discover] Existing job sources found {len(job_source_names)} "
+                    "company name(s)."
+                )
+            except Exception as e:
+                print(f"[discover] Existing job-source discovery failed for {region_name}: {e}")
+
         suggested = []
         sector_names = ", ".join(_normalize_sectors(sectors, location))
         if sector_names and not deadline_hit and not _deadline_reached(deadline):
@@ -549,6 +649,7 @@ def run() -> None:
         elif not sector_names:
             print("[discover] No LLM sectors configured; running in deterministic ATS-only mode.")
 
+        suggested = list(dict.fromkeys([*job_source_names, *suggested]))
         new_names = [
             name
             for name in suggested
@@ -578,14 +679,27 @@ def run() -> None:
         if lookup_timed_out:
             deadline_hit = True
 
-        llm_entries = [entry for entry in lookup_results if entry]
+        job_source_name_keys = {name.lower() for name in job_source_names}
+        job_source_entries = [
+            entry
+            for entry in lookup_results
+            if entry and entry["name"].lower() in job_source_name_keys
+        ]
+        llm_entries = [
+            entry
+            for entry in lookup_results
+            if entry and entry["name"].lower() not in job_source_name_keys
+        ]
 
         # Surface origin so users can see where companies came from.
         combined_entries = list(llm_entries)
+        combined_entries.extend(job_source_entries)
         combined_entries.extend(ats_entries)
         print(
             f"[discover] Company origin summary for {region_name}: "
-            f"llm={len(llm_entries)}, ats_postings={len(ats_entries)}, "
+            f"llm={len(llm_entries)}, job_sources={len(job_source_entries)}, "
+            f"job_source_names={len(job_source_names)}, "
+            f"ats_postings={len(ats_entries)}, "
             f"combined={len(combined_entries)}"
         )
 
