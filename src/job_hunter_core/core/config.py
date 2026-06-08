@@ -191,10 +191,22 @@ JOOBLE_API_KEY = get_secret(
 )
 
 
+_TIMEOUT_DEFAULTS: dict[str, int] = {
+    "ats_scraper": 10,
+    "playwright": 10,
+    "lightpanda": 8,
+    "firecrawl": 20,
+    "job_boards": 15,
+}
+
+
 def get_timeout(section: str) -> int:
-    """Return http.<section>.timeout_seconds from api_config.yml."""
+    """Return http.<section>.timeout_seconds from api_config.yml, falling back to hardcoded defaults."""
     value = _API_CFG.get("http", {}).get(section, {}).get("timeout_seconds")
     if value is None:
+        default = _TIMEOUT_DEFAULTS.get(section)
+        if default is not None:
+            return default
         raise KeyError(f"Missing api_config.yml key: http.{section}.timeout_seconds")
     return int(value)
 

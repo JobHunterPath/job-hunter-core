@@ -25,9 +25,14 @@ _FILES = {
 }
 
 
+_OBSOLETE_KEYS = {"applied_titles"}
+
+
 def _union(ours: dict, theirs: dict) -> dict:
     merged: dict = {}
     for k in set(list(ours) + list(theirs)):
+        if k in _OBSOLETE_KEYS:
+            continue
         o = ours.get(k) or []
         t = theirs.get(k) or []
         if isinstance(o, list) or isinstance(t, list):

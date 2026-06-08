@@ -18,14 +18,13 @@
         "properties": {
           "env_var": { "type": "string" },
           "app_id_env_var": { "type": "string" },
-          "api_key_env_var": { "type": "string" },
-          "required": { "type": "boolean" }
+          "api_key_env_var": { "type": "string" }
         }
       }
     },
     "http": {
       "type": "object",
-      "required": ["search_providers", "ats_scraper", "playwright", "job_boards"],
+      "required": ["search_providers", "job_boards"],
       "properties": {
         "api_budgets": {
           "type": "object",
@@ -38,31 +37,13 @@
             }
           }
         },
-        "url_verification": {
-          "type": "object",
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "timeout_seconds": { "type": "integer", "minimum": 1 },
-            "max_workers": { "type": "integer", "minimum": 1 }
-          }
-        },
         "search_providers": {
           "type": "object",
-          "required": ["timeout_seconds", "order"],
           "properties": {
-            "timeout_seconds": { "type": "integer", "minimum": 1 },
-            "max_consecutive_failures": { "type": "integer", "minimum": 1 },
-            "order": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
-            "searxng_base_url": { "type": "string" },
-            "searxng_categories": { "type": "string" },
-            "searxng_engines": { "type": "array", "items": { "type": "string" } },
             "ats_discovery": {
               "type": "object",
               "properties": {
                 "enabled": { "type": "boolean" },
-                "results_per_query": { "type": "integer", "minimum": 1 },
-                "max_queries_per_region": { "type": "integer", "minimum": 0 },
-                "max_total_queries": { "type": "integer", "minimum": 0 },
                 "sources": {
                   "type": "array",
                   "items": {
@@ -75,42 +56,32 @@
                   }
                 }
               }
+            },
+            "ai_web_search": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "run_if_fewer_than_jobs": { "type": "integer", "minimum": 0 },
+                "prompt_delay_seconds": { "type": "number", "minimum": 0 },
+                "max_prompts_per_run": { "type": "integer", "minimum": 0 },
+                "max_prompts_per_region": { "type": "integer", "minimum": 0 },
+                "max_results_per_prompt": { "type": "integer", "minimum": 0 },
+                "max_results_per_region": { "type": "integer", "minimum": 0 },
+                "max_total_results_per_run": { "type": "integer", "minimum": 0 },
+                "min_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "sources": { "type": "object" }
+              }
             }
           }
         },
         "ats_scraper": {
           "type": "object",
-          "required": ["timeout_seconds", "detail_timeout_seconds", "snippet_chars"],
           "properties": {
-            "timeout_seconds": { "type": "integer", "minimum": 1 },
-            "detail_timeout_seconds": { "type": "integer", "minimum": 1 },
-            "hibob_playwright_timeout_seconds": { "type": "integer", "minimum": 1 },
-            "snippet_chars": { "type": "integer", "minimum": 100 }
-          }
-        },
-        "playwright": {
-          "type": "object",
-          "required": ["timeout_seconds"],
-          "properties": {
-            "timeout_seconds": { "type": "integer", "minimum": 1 }
-          }
-        },
-        "lightpanda": {
-          "type": "object",
-          "properties": {
-            "timeout_seconds": { "type": "integer", "minimum": 1 }
-          }
-        },
-        "firecrawl": {
-          "type": "object",
-          "properties": {
-            "timeout_seconds": { "type": "integer", "minimum": 1 },
-            "api_url": { "type": "string" }
+            "hibob_playwright_timeout_seconds": { "type": "integer", "minimum": 1 }
           }
         },
         "jd_fetcher": {
           "type": "object",
-          "required": ["timeout_seconds", "max_description_chars"],
           "properties": {
             "timeout_seconds": { "type": "integer", "minimum": 1 },
             "min_text_length": { "type": "integer", "minimum": 0 },
@@ -120,16 +91,8 @@
             "hash_chars": { "type": "integer", "minimum": 4 }
           }
         },
-        "jd_enrichment": {
-          "type": "object",
-          "properties": {
-            "max_workers": { "type": "integer", "minimum": 1 },
-            "skip_url_patterns": { "type": "array", "items": { "type": "string" } }
-          }
-        },
         "pdf": {
           "type": "object",
-          "required": ["texlive_image", "log_tail_chars"],
           "properties": {
             "texlive_image": { "type": "string" },
             "docker_pull_timeout_seconds": { "type": "integer", "minimum": 30 },
@@ -140,122 +103,30 @@
         },
         "job_boards": {
           "type": "object",
-          "required": ["timeout_seconds", "snippet_chars"],
           "properties": {
-            "timeout_seconds": { "type": "integer", "minimum": 1 },
-            "max_consecutive_failures": { "type": "integer", "minimum": 1 },
-            "snippet_chars": { "type": "integer", "minimum": 100 },
-            "arbeitnow": { "type": "object" },
-            "arbeitsagentur": { "type": "object" },
-            "himalayas": { "type": "object" },
-            "remotive": {
-              "type": "object",
-              "description": "Remotive free remote jobs API source.",
-              "properties": {
-                "enabled": {
-                  "type": "boolean",
-                  "description": "Enable or disable the Remotive source.",
-                  "default": true
-                },
-                "max_pages_per_query": {
-                  "type": "integer",
-                  "description": "Maximum pages to fetch per title query.",
-                  "minimum": 1,
-                  "default": 1
-                },
-                "timeout_seconds": {
-                  "type": "integer",
-                  "description": "HTTP request timeout in seconds.",
-                  "minimum": 1,
-                  "default": 15
-                }
-              }
-            },
-            "the_muse": {
-              "type": "object",
-              "description": "The Muse free jobs API source.",
-              "properties": {
-                "enabled": {
-                  "type": "boolean",
-                  "description": "Enable or disable the The Muse source.",
-                  "default": true
-                },
-                "max_pages_per_query": {
-                  "type": "integer",
-                  "description": "Maximum pages to fetch per title query.",
-                  "minimum": 1,
-                  "default": 2
-                },
-                "timeout_seconds": {
-                  "type": "integer",
-                  "description": "HTTP request timeout in seconds.",
-                  "minimum": 1,
-                  "default": 15
-                }
-              }
-            },
-            "jsearch": { "type": "object" },
-            "adzuna": {
-              "type": "object",
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "results_per_page": { "type": "integer", "minimum": 1 },
-                "max_pages_per_query": { "type": "integer", "minimum": 1 }
-              }
-            },
-            "reed": {
-              "type": "object",
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "results_wanted": { "type": "integer", "minimum": 1 },
-                "max_pages_per_query": { "type": "integer", "minimum": 1 }
-              }
-            },
+            "arbeitnow": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "arbeitsagentur": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "himalayas": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "remotive": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "the_muse": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "jsearch": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "adzuna": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "reed": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "jobspy": {
               "type": "object",
               "properties": {
                 "enabled": { "type": "boolean" },
                 "hours_old": { "type": "integer", "minimum": 1 },
-                "results_per_query": { "type": "integer", "minimum": 1 },
                 "glassdoor_enabled": { "type": "boolean" },
                 "linkedin_enabled": { "type": "boolean" },
                 "linkedin_fetch_description": { "type": "boolean" },
                 "sites": { "type": "array", "items": { "type": "string" } }
               }
             },
-            "jobicy": {
-              "type": "object",
-              "description": "Jobicy free remote jobs API source.",
-              "properties": {
-                "enabled": { "type": "boolean", "default": true },
-                "timeout_seconds": { "type": "integer", "minimum": 1, "default": 15 }
-              }
-            },
-            "remoteok": {
-              "type": "object",
-              "description": "RemoteOK public JSON feed source.",
-              "properties": {
-                "enabled": { "type": "boolean", "default": true },
-                "timeout_seconds": { "type": "integer", "minimum": 1, "default": 15 }
-              }
-            },
-            "weworkremotely": {
-              "type": "object",
-              "description": "We Work Remotely RSS feed source.",
-              "properties": {
-                "enabled": { "type": "boolean", "default": true },
-                "timeout_seconds": { "type": "integer", "minimum": 1, "default": 15 }
-              }
-            },
-            "jooble": {
-              "type": "object",
-              "description": "Jooble aggregator source (free API key required).",
-              "properties": {
-                "enabled": { "type": "boolean", "default": true },
-                "max_pages_per_query": { "type": "integer", "minimum": 1, "default": 3 },
-                "timeout_seconds": { "type": "integer", "minimum": 1, "default": 15 }
-              }
-            }
+            "jobicy": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "remoteok": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "weworkremotely": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "jooble": { "type": "object", "properties": { "enabled": { "type": "boolean" } } }
           }
         }
       }

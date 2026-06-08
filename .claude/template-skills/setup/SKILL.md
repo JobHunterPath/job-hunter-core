@@ -35,9 +35,9 @@ Ask: "Which LLM provider do you want to use? Anthropic / OpenAI / Google"
 
 Based on their answer, set `llm.default_provider` and update all `llm.providers.*` and `llm.models.*` keys:
 
-- **Anthropic** — provider: `anthropic`; most roles: `claude-sonnet-4-6`; validation, jd_extraction, ai_web_search: `claude-haiku-4-5-20251001`; set `secrets.anthropic.required: true`, others `false`
-- **OpenAI** — provider: `openai`; most roles: `gpt-4o`; validation, jd_extraction, ai_web_search: `gpt-4o-mini`; set `secrets.openai.required: true`, others `false`
-- **Google** — provider: `google`; all roles: `gemini-2.0-flash`; set `secrets.google.required: true`, others `false`; also set `llm.max_workers: 2` for free-tier rate limits
+- **Anthropic** — provider: `anthropic`; most roles: `claude-sonnet-4-6`; validation, jd_extraction, ai_web_search: `claude-haiku-4-5-20251001`
+- **OpenAI** — provider: `openai`; most roles: `gpt-4o`; validation, jd_extraction, ai_web_search: `gpt-4o-mini`
+- **Google** — provider: `google`; all roles: `gemini-2.0-flash`
 
 Confirm: "LLM provider set to [provider]. GitHub secret to add: [SECRET_NAME]."
 

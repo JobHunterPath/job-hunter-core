@@ -301,19 +301,6 @@ Industries listed in `exclusion_rules.excluded_industries` are passed to the LLM
 as off-limits during discovery and are also used by the scraper's job filter to
 skip postings from those industries.
 
-**Cache revalidation** — if you notice thin results after API providers are exhausted, enable
-cache revalidation in `config/search_config.yml`:
-
-```yaml
-scraping:
-  cache_revalidation:
-    enabled: true
-    threshold: 5    # re-check cache when fewer than 5 live results found
-    max_urls: 20    # check at most 20 cached URLs per run
-```
-
-This re-checks URLs the pipeline has already discovered in `config/discovery_cache.yml`
-when live sources return fewer results than `threshold`. It costs no API credits.
 
 **`config/scoring_config.yml`** — fit threshold:
 
@@ -623,8 +610,7 @@ Google Gemini has a free API tier. To use it:
 
 1. In `config/api_config.yml`, set `llm.default_provider: google` and update
    `llm.models.*` to Gemini model names.
-2. Set `llm.max_workers: 2` to stay within the free-tier rate limit.
-3. Add `GOOGLE_API_KEY` as a GitHub secret and set `secrets.google.required: true`.
+2. Add `GOOGLE_API_KEY` as a GitHub secret.
 
 Find Gemini model names at `https://ai.google.dev/gemini-api/docs/models`.
 
@@ -648,9 +634,9 @@ and **Workflows: Read and write** on this repository.
 
 **Workflow says an LLM provider key is missing**
 
-Confirm both the GitHub secret (e.g. `ANTHROPIC_API_KEY`) and the matching
-`config/api_config.yml` `secrets.<provider>.required: true` setting are in
-place.
+Confirm the GitHub secret (e.g. `ANTHROPIC_API_KEY`) is present in your
+repository secrets and that `llm.default_provider` in `config/api_config.yml`
+matches the provider name.
 
 **Generated PDFs are missing**
 
@@ -681,7 +667,7 @@ table below to diagnose thin results without adding more API keys.
 | Free search APIs exhausted (Brave/Tavily/Exa) | Monthly budget reached | Check `config/api_usage.json`. The pipeline falls through to the next provider automatically; no action needed until the month resets. Do not add more keys as the first fix. |
 | JobSpy returns very few jobs | RapidAPI key absent, exhausted, or the searched boards had few matches | Confirm `RAPIDAPI_KEY` is set as a GitHub secret and `jobspy.enabled: true` in `config/search_config.yml`. Increase `hours_old` to broaden the time window. |
 | ATS discovery returns zero | No live postings on any of the 11 ATS platforms for your titles and region | The region or title combination may be thin on those platforms. Add more companies manually to `config/search_config.yml`. Run Company Discovery to find more. |
-| Discovery cache suppressing too many URLs | Broad discovery cache contains URLs that are now stale or not yet revalidated | Enable `scraping.cache_revalidation` in `config/search_config.yml` to re-check cached URLs when live yield is thin. Or clear outdated entries from `config/discovery_cache.yml` manually. |
+| Discovery cache suppressing too many URLs | Broad discovery cache contains URLs that are now stale | Clear outdated entries from `config/discovery_cache.yml` manually, or delete the file entirely to start fresh — it will be rebuilt on the next run. |
 | Jobs found but all filtered out | Title or industry exclusion rules dropped all candidates | Check `exclusion_rules.excluded_title_terms` and `excluded_industries` in `config/search_config.yml`. A term match in the job title causes the whole posting to be skipped. |
 | You found a job manually that the scraper missed | The job URL was not in any source the pipeline reached | Use the browser-capture import workflow: place a JSON file with the `url` field in a `captures/` folder and run `job-hunter import-captures --captures-dir captures/` locally or trigger it via Docker. The job is then scored and tailored like any other. |
 
@@ -690,7 +676,5 @@ table below to diagnose thin results without adding more API keys.
 1. Add more companies directly to `config/search_config.yml` under your region's `companies` list.
 2. Run **Company Discovery** from the Actions tab. With `discovery.sectors: []` it runs in
    ATS-only mode (no LLM calls, no extra keys) and finds companies from live postings.
-3. Enable `scraping.cache_revalidation` in `config/search_config.yml` to re-check URLs the
-   pipeline has already discovered.
-4. Broaden `global_search.job_titles` to include adjacent role names you would accept.
-5. Add a second region in `config/search_config.yml` if remote roles are acceptable.
+3. Broaden `global_search.job_titles` to include adjacent role names you would accept.
+4. Add a second region in `config/search_config.yml` if remote roles are acceptable.

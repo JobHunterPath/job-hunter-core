@@ -67,10 +67,8 @@ extensions that add breadth when free sources return thin results.
 - **SearXNG** — a free search engine GitHub Actions starts temporarily during each run.
   No account needed.
 - **ArbeitNow** — a free EU job board, enabled by default.
-- **Cache revalidation** — when enabled in `config/search_config.yml`, the pipeline
-  re-checks URLs already stored in `config/discovery_cache.yml` if the live run returns
-  fewer than `cache_revalidation.threshold` results. Disabled by default; costs no API
-  credits.
+- **Broad job boards** — JobSpy, Adzuna, Reed, Remotive, and several other boards are
+  queried globally and filtered by title and region. No API key is needed for most of them.
 
 **Requires an API key:**
 
@@ -78,8 +76,8 @@ extensions that add breadth when free sources return thin results.
   beyond SearXNG results. Add the key as a GitHub secret and it will be used automatically.
   When a provider's monthly budget is reached (`http.api_budgets.monthly_limits`), it is
   skipped silently and the next provider in the fallback order takes over.
-- **RapidAPI / JobSpy** — searches Google Jobs and Indeed. Set `jobspy.enabled: true` in
-  `config/search_config.yml` and add `RAPIDAPI_KEY`.
+- **RapidAPI / JobSpy** — searches Google Jobs, Glassdoor, and ZipRecruiter. Set
+  `jobspy.enabled: true` in `config/search_config.yml` and add `RAPIDAPI_KEY`.
 
 **Uses LLM credits:**
 
@@ -88,21 +86,10 @@ extensions that add breadth when free sources return thin results.
   when you want to conserve credits. Controlled by
   `http.search_providers.ai_web_search.enabled` in `config/api_config.yml`.
 
-The provider fallback order is set in `config/api_config.yml`:
-
-```yaml
-http:
-  search_providers:
-    order:
-      - searxng
-      - brave
-      - tavily
-      - exa
-```
-
 If a provider fails or its monthly budget is exhausted, the pipeline continues with the
 next one. Exhausted providers are suppressed for the rest of the month without affecting
-the failure counter.
+the failure counter. Paid search APIs (Brave, Tavily, Exa) are used only for global ATS
+discovery at the start of each run — never for per-company career page fallback.
 
 Every result — regardless of source — passes through URL verification, full job description
 fetching, freshness validation, and fit scoring before tailoring or cover letter generation.
@@ -130,7 +117,7 @@ the discovery step and produces companies with verified live postings.
 After every hunt run, the log includes a per-source yield summary. A line such as:
 
 ```
-[scrape] sources: direct_ats=12 career_page=3 searxng=5 ats_discovery=8 jobspy=2 cache_revalidation=0
+[scrape] sources: direct_ats=12 career_page=3 searxng=5 ats_discovery=8 jobspy=2
 ```
 
 shows how many jobs each source contributed. Use this to identify which sources are
@@ -153,16 +140,11 @@ What to look for:
 |---|---|---|
 | Anthropic (recommended) | `ANTHROPIC_API_KEY` | Reliable at all tiers |
 | OpenAI | `OPENAI_API_KEY` | Use `gpt-4o-mini` for lower cost |
-| Google | `GOOGLE_API_KEY` | Free tier: set `max_workers: 2` in api_config.yml |
+| Google | `GOOGLE_API_KEY` | Free tier available |
 | Ollama | none | Self-hosted local models |
 
-Set `secrets.<provider>.required: true` only for the provider you use.
-
-**Parallelism:** `llm.max_workers` (default `5`) controls concurrent LLM calls.
-For Google free tier, start with `max_workers: 2` and configure
-`llm.rate_limits.google.requests_per_minute`. `scraping.max_workers` (default `10`)
-controls concurrent company scrapes. The LLM client retries 429s and transient errors
-automatically.
+Add the key as a GitHub secret; the pipeline picks it up automatically. The LLM client
+retries 429s and transient errors automatically.
 
 ## Local Run
 

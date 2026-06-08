@@ -34,34 +34,20 @@
     "scraping": {
       "type": "object",
       "properties": {
-        "max_workers": { "type": "integer", "minimum": 1 },
-        "total_timeout_seconds": { "type": "integer", "minimum": 60 },
-        "cache_revalidation": {
-          "type": "object",
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "threshold": { "type": "integer", "minimum": 0 },
-            "max_urls": { "type": "integer", "minimum": 0 }
-          }
-        }
+        "total_timeout_seconds": { "type": "integer", "minimum": 60 }
       }
     },
     "ats_discovery": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean" },
-        "max_workers": { "type": "integer", "minimum": 0 },
-        "results_per_query": { "type": "integer", "minimum": 0 },
-        "max_queries_per_region": { "type": "integer", "minimum": 0 },
-        "max_total_queries": { "type": "integer", "minimum": 0 }
+        "enabled": { "type": "boolean" }
       }
     },
     "global_search": {
       "type": "object",
       "required": ["job_titles"],
       "properties": {
-        "results_per_query": { "type": "integer", "minimum": 1 },
-        "job_titles": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        "job_titles": { "type": "array", "items": { "type": "string" } }
       }
     },
     "llm_job_search": {
@@ -75,10 +61,7 @@
     "discovery": {
       "type": "object",
       "properties": {
-        "max_workers": { "type": "integer", "minimum": 1 },
         "total_timeout_seconds": { "type": "integer", "minimum": 60 },
-        "reserve_seconds": { "type": "integer", "minimum": 0 },
-        "overlap_scope": { "type": "string" },
         "sectors": { "type": "array", "items": { "type": "string" } }
       }
     },

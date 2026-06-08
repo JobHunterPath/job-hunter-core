@@ -43,12 +43,11 @@ def test_save_processed_writes_sorted_urls(tmp_path):
 def test_save_and_reload_roundtrip(tmp_path):
     f = tmp_path / "applied_jobs.yml"
     urls = {"https://x.com/job/1", "https://y.com/job/2"}
-    titles = {"testco::product manager"}
     with patch.object(tracker, "TRACKER_FILE", str(f)):
-        tracker.save_processed(urls, titles)
+        tracker.save_processed(urls, set())
         reloaded_urls, reloaded_titles = tracker.load_processed()
     assert reloaded_urls == urls
-    assert reloaded_titles == titles
+    assert reloaded_titles == set()
 
 
 def test_filter_new_jobs_removes_already_processed(tmp_path):
@@ -102,8 +101,8 @@ def test_mark_processed_deduplicates(tmp_path):
     assert reloaded_urls == {"https://a.com", "https://b.com"}
 
 
-def test_filter_new_jobs_skips_by_title_key(tmp_path):
-    # Same company+title should be skipped even with a different URL
+def test_filter_new_jobs_does_not_skip_by_title_key(tmp_path):
+    # Title-key dedup removed from persistent tracking — same title at same company is not blocked
     f = tmp_path / "applied_jobs.yml"
     f.write_text(yaml.dump({"applied_titles": ["testco::product manager"]}))
     jobs = [
@@ -111,4 +110,4 @@ def test_filter_new_jobs_skips_by_title_key(tmp_path):
     ]
     with patch.object(tracker, "TRACKER_FILE", str(f)):
         new_jobs, _, _ = tracker.filter_new_jobs(jobs)
-    assert len(new_jobs) == 0
+    assert len(new_jobs) == 1

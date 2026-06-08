@@ -392,13 +392,27 @@ class SearchRouter:
     counter so that a quota exhaustion does not suppress the next provider.
     Providers with no credentials are skipped silently at DEBUG level so that
     no-key deployments do not produce noisy warnings.
+
+    Args:
+        disabled: Provider names to skip for this run (e.g. pre-flight exhausted set).
+        allowed: When set, only attempt providers whose name is in this set.
+                 Use ``allowed={"searxng"}`` in per-company fallback to restrict
+                 paid API keys to the global ATS-discovery phase only.
     """
 
-    def __init__(self, providers: list[SearchProvider] | None = None) -> None:
+    def __init__(
+        self,
+        providers: list[SearchProvider] | None = None,
+        *,
+        disabled: set[str] | None = None,
+        allowed: set[str] | None = None,
+    ) -> None:
         self.providers = (
             providers if providers is not None else _providers_from_order(_provider_order())
         )
         self.max_consecutive_failures = int(_search_cfg().get("max_consecutive_failures", 3))
+        self._disabled: set[str] = {p.lower() for p in (disabled or set())}
+        self._allowed: set[str] | None = {p.lower() for p in allowed} if allowed is not None else None
 
     def _is_suppressed(self, provider: SearchProvider) -> bool:
         if self.max_consecutive_failures <= 0:
@@ -431,6 +445,14 @@ class SearchRouter:
         any_keyed_provider_tried = False
 
         for provider in self.providers:
+            pname = provider.name.lower()
+            if self._allowed is not None and pname not in self._allowed:
+                logger.debug("[search] %s skipped: not in allowed set", provider.name)
+                continue
+            if pname in self._disabled:
+                logger.debug("[search] %s skipped: pre-flight exhausted this run", provider.name)
+                continue
+
             if not provider.enabled():
                 logger.debug("[search] %s disabled or missing credentials", provider.name)
                 continue
@@ -486,8 +508,14 @@ class SearchRouter:
 class ProviderSearchRouter(SearchRouter):
     """Search router constrained to a caller-provided provider name order."""
 
-    def __init__(self, provider_names: list[str]) -> None:
-        super().__init__(_providers_from_order(provider_names))
+    def __init__(
+        self,
+        provider_names: list[str],
+        *,
+        disabled: set[str] | None = None,
+        allowed: set[str] | None = None,
+    ) -> None:
+        super().__init__(_providers_from_order(provider_names), disabled=disabled, allowed=allowed)
 
 
 def _provider_registry() -> dict[str, SearchProvider]:
@@ -508,8 +536,21 @@ def _providers_from_order(provider_names: list[str]) -> list[SearchProvider]:
     return [available[name] for name in provider_names if name in available]
 
 
-def search_web(query: str, region_config: dict, count: int = 10) -> list[dict]:
-    """Compatibility helper returning Brave-like dictionaries."""
+def search_web(
+    query: str,
+    region_config: dict,
+    count: int = 10,
+    *,
+    disabled: set[str] | None = None,
+    allowed: set[str] | None = None,
+) -> list[dict]:
+    """Compatibility helper returning Brave-like dictionaries.
+
+    Args:
+        disabled: Provider names exhausted this run (pre-flight gate).
+        allowed: When set, restrict to only these providers (e.g. ``{"searxng"}``
+                 for per-company fallback so paid APIs are not called per company).
+    """
     return [
         {
             "url": result.url,
@@ -517,7 +558,9 @@ def search_web(query: str, region_config: dict, count: int = 10) -> list[dict]:
             "description": result.description,
             "source": result.source,
         }
-        for result in SearchRouter().search(query, region_config, count=count)
+        for result in SearchRouter(disabled=disabled, allowed=allowed).search(
+            query, region_config, count=count
+        )
     ]
 
 
@@ -766,6 +809,7 @@ def discover_ats_jobs_by_search(
     *,
     provider_order: list[str] | None = None,
     ats_discovery_cfg: dict | None = None,
+    disabled: set[str] | None = None,
 ) -> list[dict]:
     """Find individual ATS job URLs from broad title+region search queries."""
     if not title_filters or not regions:
@@ -785,7 +829,7 @@ def discover_ats_jobs_by_search(
     max_queries_per_region = int(cfg.get("max_queries_per_region", 0) or 0)
     max_total_queries = int(cfg.get("max_total_queries", 0) or 0)
     sources = cfg.get("sources") or list(_ATS_DISCOVERY_SITES)
-    router = ProviderSearchRouter(provider_order or _provider_order())
+    router = ProviderSearchRouter(provider_order or _provider_order(), disabled=disabled)
     jobs: list[dict] = []
     seen: set[str] = set()
     total_queries = 0

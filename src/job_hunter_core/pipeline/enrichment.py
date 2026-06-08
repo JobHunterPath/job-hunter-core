@@ -34,7 +34,7 @@ def enrich_snippets(
 
     enrich_cfg = api_cfg.get("http", {}).get("jd_enrichment", {}) or {}
     max_workers = int(enrich_cfg.get("max_workers", 5))
-    skip_patterns = enrich_cfg.get("skip_url_patterns", []) or []
+    skip_patterns = enrich_cfg.get("skip_url_patterns") or [r"linkedin\.com/jobs/"]
 
     def _should_skip_enrichment(url: str) -> bool:
         return any(re.search(pattern, url, re.IGNORECASE) for pattern in skip_patterns)

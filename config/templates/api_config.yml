@@ -35,60 +35,38 @@ llm:
     jd_extraction: 1500
     ai_web_search: 1200
 
-  # Concurrent LLM workers for validation and scoring.
-  # Keep this conservative for provider rate limits. Retry-with-backoff handles
-  # transient 429s automatically.
-  # Google free tier (Gemini Flash / Flash Lite): set to 2 before raising it.
-  max_workers: 5
-
-  # Optional provider-level RPM throttle. This spaces calls before they hit the
-  # provider, which is different from retrying after a 429. Set to 0 to disable.
-  rate_limits:
-    google:
-      requests_per_minute: 4
-
 ollama:
   base_url: "http://localhost:11434"
 
 secrets:
-  # Set required: true only for providers used in llm.default_provider or
-  # llm.providers.*; set unused providers to false.
+  # Set the env_var value to match the environment variable name where your key lives.
   anthropic:
     env_var: "ANTHROPIC_API_KEY"
-    required: true
   openai:
     env_var: "OPENAI_API_KEY"
-    required: false
   google:
     env_var: "GOOGLE_API_KEY"
-    required: false
   brave:
     env_var: "BRAVE_API_KEY"
-    required: false
   tavily:
     env_var: "TAVILY_API_KEY"
-    required: false
   exa:
     env_var: "EXA_API_KEY"
-    required: false
   firecrawl:
     env_var: "FIRECRAWL_API_KEY"
-    required: false
   rapidapi:
     env_var: "RAPIDAPI_KEY"
-    required: false
   jooble:
     env_var: "JOOBLE_API_KEY"
-    required: false
 
 http:
   api_budgets:
     # Monthly call budgets for keyed search providers. When a provider exceeds
     # its limit the pipeline skips it silently for the rest of the month and
-    # falls through to the next provider in `search_providers.order`. Exhaustion
+    # falls through to the next provider in the search order. Exhaustion
     # is distinguished from transient failures: a quota-exhausted provider does
-    # not count toward `max_consecutive_failures` and does not suppress the run.
-    # Budget state is written to `state_path` after every run.
+    # not count toward the consecutive-failure limit and does not suppress the run.
+    # Budget state auto-resets at the start of each calendar month.
     enabled: true
     state_path: "config/api_usage.json"
     monthly_limits:
@@ -101,39 +79,12 @@ http:
       jooble: 500
       firecrawl: 100
 
-  url_verification:
-    enabled: true
-    timeout_seconds: 5
-    max_workers: 5
   search_providers:
-    timeout_seconds: 10
-    # A provider is suppressed for the rest of the run after this many consecutive
-    # transient failures. Quota-exhausted providers are skipped silently and do
-    # not increment this counter.
-    max_consecutive_failures: 3
-    # Fallback order: the pipeline tries each provider in turn and moves to the
-    # next one on failure or exhaustion. SearXNG is always free (no key needed).
-    # Brave/Tavily/Exa are optional; the pipeline runs without them.
-    order:
-      - searxng
-      - brave
-      - tavily
-      - exa
-    searxng_base_url: "http://127.0.0.1:8080"
-    searxng_categories: "general"
-    searxng_engines:
-      - bing
-      - duckduckgo
-      - brave
     ats_discovery:
       # ATS discovery queries public ATS job APIs directly without any search
       # provider key. It runs regardless of whether SearXNG or Brave/Tavily/Exa
       # are available, so it is the primary no-key discovery path.
       enabled: true
-      results_per_query: 10
-      # 0 means unlimited. Use these caps to constrain region x title x source query growth.
-      max_queries_per_region: 0
-      max_total_queries: 0
       # All ATS platforms supported in code are listed here.
       # Remove entries you do not want queried; all are no-key/public-endpoint sources.
       sources:
@@ -198,76 +149,38 @@ http:
           query_templates:
             # Exclude aggregators to force individual company career pages and ATS postings.
             - '"{title}" "{location}" job apply -site:glassdoor.com -site:indeed.com -site:linkedin.com -site:monster.com -site:xing.com -site:stepstone.de'
-  ats_scraper:
-    timeout_seconds: 10
-    detail_timeout_seconds: 15
-    snippet_chars: 2000
 
-  playwright:
-    timeout_seconds: 10
-  lightpanda:
-    timeout_seconds: 8
-  firecrawl:
-    timeout_seconds: 20
-    api_url: "https://api.firecrawl.dev/v2/scrape"
-
-  jd_enrichment:
-    # Full JD fetching is best-effort. Some hosts, especially LinkedIn, throttle
-    # direct scraping aggressively; keep their search snippets instead.
-    max_workers: 5
-    skip_url_patterns:
-      - 'linkedin\.com/jobs/'
   job_boards:
-    timeout_seconds: 10
-    max_consecutive_failures: 3
-    snippet_chars: 2000
     arbeitnow:
       enabled: true
-      max_pages: 8
     jsearch:
       enabled: true
-      num_pages: 5
     adzuna:
       enabled: true
-      results_per_page: 50
-      max_pages_per_query: 1
     reed:
       enabled: true
-      results_wanted: 50
-      max_pages_per_query: 1
     jobspy:
       enabled: true
       hours_old: 72
-      results_per_query: 30
       glassdoor_enabled: true
       linkedin_enabled: false
       linkedin_fetch_description: false
       sites:
         - google
-        - indeed
         - glassdoor
         - zip_recruiter
     remotive:
       enabled: true
-      max_pages_per_query: 1
-      timeout_seconds: 15
     the_muse:
       enabled: true
-      max_pages_per_query: 2
-      timeout_seconds: 15
     jobicy:
       enabled: true
-      timeout_seconds: 15
     remoteok:
       enabled: true
-      timeout_seconds: 15
     weworkremotely:
       enabled: true
-      timeout_seconds: 15
     jooble:
       enabled: true
-      max_pages_per_query: 3
-      timeout_seconds: 15
 
 profile:
   # Available resume templates:

@@ -18,19 +18,9 @@ regions:
         career_url: careers.example.com
 
 scraping:
-  max_workers: 10              # companies processed in parallel
   total_timeout_seconds: 1800  # 30 min ceiling for company scraping phase
-  cache_revalidation:
-    # When enabled, the scraper re-checks URLs stored in config/discovery_cache.yml
-    # if live sources return fewer results than `threshold`. This is a no-key fallback:
-    # it costs no API credits and works even when Brave/Tavily/Exa are exhausted.
-    # Enable once you have run discovery at least once and the cache has entries.
-    enabled: false             # re-check cached discovery URLs when live yield is thin
-    threshold: 5               # only activates when fewer than this many live results found
-    max_urls: 20               # upper bound on cached URLs checked per run
 
 global_search:
-  results_per_query: 10
   job_titles:
     - "Product Manager"
     - "Product Owner"
@@ -102,10 +92,7 @@ exclusion_rules:
     - deutschkenntnisse
 
 discovery:
-  max_workers: 10
   total_timeout_seconds: 1800
-  reserve_seconds: 600
-  overlap_scope: new_only
   # LLM discovery uses these simple sector names. ATS/search discovery also
   # runs from your configured regions and job titles.
   # To run company discovery without LLM sector suggestions, clear this list

@@ -26,6 +26,18 @@ You are working on the automation engine that powers the job search pipeline.
 - All imports use the `job_hunter_core.*` namespace (e.g., `from job_hunter_core.core.config import load_api_config`).
 - Multi-provider LLM support: Anthropic (primary), OpenAI, Google, Ollama — provider selection is config-driven.
 
+## Search Provider Architecture
+
+- **Pre-flight gate**: `_run_disabled = get_exhausted_providers()` at the top of `scrape()`. Passed into all search calls for the entire run — never read `api_usage.json` inside per-company loops.
+- **Per-company fallback**: `search_web(..., allowed={"searxng"}, disabled=_run_disabled)`. Paid APIs (Brave/Tavily/Exa) are restricted to the global ATS discovery phase only.
+- **ATS discovery** (once per run, global): `discover_ats_jobs_by_search(..., disabled=_run_disabled)`. No `allowed` restriction — paid providers are appropriate here.
+
+## Dedup Architecture
+
+- Persistent dedup is URL-only. `tracker.py` reads/writes only the `processed` key (list of URLs).
+- `applied_titles` is removed from persistent state. Title-key dedup caused false positives and blank-metadata poisoning.
+- In-run title-key dedup is intentionally absent from job-hunter-core. Use URL dedup only.
+
 ## Common Commands
 
 ```bash

@@ -37,6 +37,18 @@ Prefer the simplest readable code that fits the existing package shape.
 - Preserve the canonical package layout: importable code lives under `src/job_hunter_core/`, imports use `job_hunter_core.*`.
 - Require type hints on all public functions. Add `from __future__ import annotations` at the top of every module that uses them.
 
+## Search Provider Architecture
+
+- **Per-company fallback** (career page scraping failed): always call `search_web(..., allowed={"searxng"}, disabled=_run_disabled)`. Paid APIs (Brave/Tavily/Exa) are reserved for the global ATS discovery phase and must never be called once per company.
+- **ATS discovery** (global, once per pipeline run): call `discover_ats_jobs_by_search(..., disabled=_run_disabled)` — no `allowed` restriction; paid providers are appropriate here.
+- **Pre-flight gate**: `_run_disabled = get_exhausted_providers()` at the top of `scrape()`, passed into every search call. Never read `api_usage.json` inside per-company loops.
+
+## Dedup Architecture
+
+- Persistent dedup (across runs) is URL-only: `processed_urls` from `tracker.py`.
+- Title-key (`applied_titles`) is removed from persistent state entirely — same job title legitimately repeats at the same company; title-key poisoning silently blocked future jobs.
+- Within a single pipeline run, in-memory `seen_titles` may still dedup no-URL jobs (they have no URL identity).
+
 ## Multi-Provider LLM Guidelines
 
 job-hunter-core supports Anthropic, OpenAI, Google, and Ollama. Apply these rules when touching LLM integration code:

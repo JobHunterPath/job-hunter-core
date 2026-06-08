@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 import requests  # noqa: F401
 import yaml
 
+from job_hunter_core.core.api_budget import get_exhausted_providers
 from job_hunter_core.core.config import (
     ADZUNA_API_KEY,
     ADZUNA_APP_ID,
@@ -58,7 +59,6 @@ from job_hunter_core.sources.the_muse_source import fetch_the_muse_jobs
 from job_hunter_core.sources.weworkremotely_source import fetch_weworkremotely_jobs
 from job_hunter_core.tracking.discovery_cache import (
     load_cached_candidate_urls,
-    load_cached_candidate_urls_with_metadata,
     save_cached_candidate_urls,
 )
 
@@ -343,6 +343,10 @@ def scrape(region: str | None = None) -> list[dict]:
     companies = load_companies(region)
     stats = ScrapeStats()
 
+    # Read API budget state once at the start of the run. Exhausted paid providers
+    # are skipped for the entire pipeline without repeated file reads per company.
+    _run_disabled = get_exhausted_providers()
+
     global_cfg = config.get("global_search", {})
     title_filters = global_cfg.get("job_titles", [])
     excluded_title_terms = config.get("exclusion_rules", {}).get("excluded_title_terms", [])
@@ -496,7 +500,15 @@ def scrape(region: str | None = None) -> list[dict]:
         for query, company_name, _ in build_queries([company], config):
             stats.record("search_fallback", attempted=1)
             try:
-                raw = search_web(query, company_region_config, count=10)
+                # Restrict per-company fallback to SearXNG only — paid API keys
+                # (Brave/Tavily/Exa) are reserved for the global ATS discovery phase.
+                raw = search_web(
+                    query,
+                    company_region_config,
+                    count=10,
+                    allowed={"searxng"},
+                    disabled=_run_disabled,
+                )
                 stats.record("search_fallback", returned=len(raw))
             except Exception as e:
                 stats.record("search_fallback", failed=1)
@@ -587,6 +599,7 @@ def scrape(region: str | None = None) -> list[dict]:
                 enabled_regions,
                 excluded_title_terms,
                 ats_discovery_cfg=config.get("ats_discovery", {}),
+                disabled=_run_disabled,
             )
         )
         stats.record("ats_search_discovery", returned=len(discovery_jobs))
@@ -816,9 +829,6 @@ def scrape(region: str | None = None) -> list[dict]:
             stats.record("ai_web_search", failed=1)
             logger.warning("[scraper] AI web search failed: %s", e)
 
-    # --- revalidation fallback (Task 5) ---
-    _maybe_revalidate_cache(config, api_cfg_loaded, results, cached_candidate_urls, add_job, stats)
-
     stats.log_summary(ats_only=all_providers_exhausted())
     logger.info("[scraper] Complete: %s jobs found", len(results))
     if candidate_cache_updates:
@@ -827,89 +837,6 @@ def scrape(region: str | None = None) -> list[dict]:
             "[scraper] Cached %s new discovery candidate URL(s)", len(candidate_cache_updates)
         )
     return results
-
-
-# ---------------------------------------------------------------------------
-# Task 5: Cache revalidation as a bounded fallback
-# ---------------------------------------------------------------------------
-
-
-def _maybe_revalidate_cache(
-    config: dict,
-    _api_cfg: dict,
-    results: list[dict],
-    cached_candidate_urls: set[str],
-    add_job: Any,
-    stats: ScrapeStats,
-) -> None:
-    """Re-check cached broad-discovery URLs when live yield is below a threshold.
-
-    Controlled by ``scraping.cache_revalidation`` in search_config.yml:
-      enabled: false          # disabled by default
-      threshold: 5            # only run when fewer than this many live results
-      max_urls: 20            # upper bound on how many cached URLs to check
-    """
-    rev_cfg = config.get("scraping", {}).get("cache_revalidation", {}) or {}
-    if not rev_cfg.get("enabled", False):
-        return
-
-    threshold = int(rev_cfg.get("threshold", 5))
-    max_urls = int(rev_cfg.get("max_urls", 20))
-
-    if len(results) >= threshold:
-        logger.debug(
-            "[scraper][revalidation] skipped: %d live results >= threshold %d",
-            len(results),
-            threshold,
-        )
-        return
-
-    if not cached_candidate_urls:
-        logger.debug("[scraper][revalidation] no cached URLs to revalidate")
-        return
-
-    # Load with metadata so we can pick the most-recently-seen URLs first.
-    try:
-        all_cached = load_cached_candidate_urls_with_metadata()
-    except Exception:
-        # Fallback: use the flat set already loaded
-        all_cached = {url: {} for url in cached_candidate_urls}
-
-    # Skip URLs already found in this run.
-    result_urls = {canonicalize_url(j.get("url", "")) for j in results}
-    candidates = [url for url in all_cached if url not in result_urls]
-    candidates = candidates[:max_urls]
-
-    if not candidates:
-        logger.debug("[scraper][revalidation] all cached URLs already in results")
-        return
-
-    logger.info(
-        "[scraper][revalidation] live yield %d < threshold %d; revalidating up to %d cached URL(s)",
-        len(results),
-        threshold,
-        len(candidates),
-    )
-    stats.record("cache_revalidation", attempted=len(candidates))
-
-    accepted = 0
-    for url in candidates:
-        meta = all_cached.get(url) or {}
-        job = {
-            "title": meta.get("title", ""),
-            "company": meta.get("company", ""),
-            "url": url,
-            "posted": meta.get("posted", ""),
-            "snippet": meta.get("snippet", ""),
-            "source": "cache_revalidation",
-        }
-        if add_job(job, cache_candidate=False):
-            accepted += 1
-
-    stats.record("cache_revalidation", accepted=accepted, skipped=len(candidates) - accepted)
-    logger.info(
-        "[scraper][revalidation] accepted %d / %d revalidated URL(s)", accepted, len(candidates)
-    )
 
 
 if __name__ == "__main__":

@@ -1,6 +1,25 @@
 #!/usr/bin/env python3
-"""Deep-merge upstream config defaults into a user config file."""
+"""Deep-merge upstream config defaults into a user config file, then prune obsolete keys.
 
+Usage: migrate_config.py <upstream_file> <user_file> <output_file>
+
+Merge behaviour
+---------------
+- Keys present in upstream but missing from user are added (recursive for dicts).
+- Lists and scalar values: user wins; upstream value is added only when the key
+  is absent from user entirely.
+- User values are never overwritten.
+
+Prune behaviour
+---------------
+After merging, any key in the result that is no longer present in the upstream
+template is removed.  Paths listed in USER_PRESERVED_PREFIXES are excluded from
+pruning because the user is expected to add their own entries there (e.g. their
+own region names, custom company exclusions).
+
+The combined effect: the result always looks like the current template shape,
+while preserving every value the user has customised.
+"""
 from __future__ import annotations
 
 import sys
@@ -8,28 +27,84 @@ from pathlib import Path
 
 import yaml
 
-USER_NAMESPACE_PATHS = frozenset(
-    {
-        "search_config.yml.regions",
-    }
-)
+# Paths under which the user adds their own keys that are not in the upstream
+# template.  Pruning never touches anything under these prefixes.
+# Keys are config file basenames; values are sets of dot-delimited path prefixes.
+USER_PRESERVED_PREFIXES: dict[str, frozenset[str]] = {
+    "api_config.yml": frozenset({
+        "profile",               # user-specific file paths
+        "llm.providers",         # user assigns tasks to LLM providers
+        "llm.models",            # user picks model names per task
+        "llm.max_tokens",        # user may tune per-task token budgets
+        "http.api_budgets.monthly_limits",  # user sets their own quota numbers
+    }),
+    "search_config.yml": frozenset({
+        "regions",               # user adds their own region definitions
+        "excluded_companies",    # user's personal exclusion list
+        "exclusion_rules",       # user's custom filter rules
+        "global_search.job_titles",  # user's job title list
+        "discovery.sectors",     # user's sector list for LLM discovery
+    }),
+}
+
+
+def _is_preserved(path: str, preserved: frozenset[str]) -> bool:
+    """Return True if *path* is at or under any preserved prefix."""
+    return any(path == p or path.startswith(p + ".") for p in preserved)
 
 
 def deep_merge(upstream: dict, user: dict, prefix: str = "") -> tuple[dict, list[str]]:
+    """Merge upstream defaults into user dict.  Returns (merged, list_of_added_paths)."""
     result = dict(user)
     added: list[str] = []
 
     for key, upstream_value in upstream.items():
         key_path = f"{prefix}.{key}" if prefix else str(key)
         if key not in user:
-            if prefix not in USER_NAMESPACE_PATHS:
-                result[key] = upstream_value
-                added.append(key_path)
+            result[key] = upstream_value
+            added.append(key_path)
         elif isinstance(upstream_value, dict) and isinstance(user[key], dict):
             result[key], child_added = deep_merge(upstream_value, user[key], key_path)
             added.extend(child_added)
 
     return result, added
+
+
+def prune_obsolete_keys(
+    user: dict,
+    template: dict,
+    preserved: frozenset[str],
+    path: str = "",
+) -> tuple[dict, list[str]]:
+    """Remove keys from *user* that are no longer present in *template*.
+
+    Keys under *preserved* prefixes are never removed.
+    Returns (pruned_dict, list_of_removed_paths).
+    """
+    result: dict = {}
+    removed: list[str] = []
+
+    for key, val in user.items():
+        full = f"{path}.{key}" if path else key
+
+        if _is_preserved(full, preserved):
+            result[key] = val
+            continue
+
+        if key not in template:
+            removed.append(full)
+            continue
+
+        if isinstance(val, dict) and isinstance(template[key], dict):
+            pruned_child, child_removed = prune_obsolete_keys(
+                val, template[key], preserved, full
+            )
+            result[key] = pruned_child
+            removed.extend(child_removed)
+        else:
+            result[key] = val
+
+    return result, removed
 
 
 def main() -> int:
@@ -51,16 +126,26 @@ def main() -> int:
         print(f"::warning::Could not parse {user_path}: {exc}")
         return 0
 
-    merged, added = deep_merge(upstream, user, upstream_path.name)
+    merged, added = deep_merge(upstream, user)
+
+    preserved = USER_PRESERVED_PREFIXES.get(upstream_path.name, frozenset())
+    pruned, removed = prune_obsolete_keys(merged, upstream, preserved)
+
     output_path.write_text(
-        yaml.safe_dump(merged, sort_keys=False, allow_unicode=False),
+        yaml.safe_dump(pruned, sort_keys=False, allow_unicode=False),
         encoding="utf-8",
     )
 
     if added:
-        print(f"[migrate-config] {upstream_path.name}: added {len(added)} key(s)")
+        print(f"[migrate-config] {upstream_path.name}: added {len(added)} key(s): {', '.join(added)}")
     else:
         print(f"[migrate-config] {upstream_path.name}: no new keys")
+
+    if removed:
+        print(f"[migrate-config] {upstream_path.name}: pruned {len(removed)} obsolete key(s): {', '.join(removed)}")
+    else:
+        print(f"[migrate-config] {upstream_path.name}: no obsolete keys")
+
     return 0
 
 

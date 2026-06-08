@@ -188,6 +188,33 @@ def mark_api_exhausted(
         )
 
 
+def get_exhausted_providers(api_cfg: dict[str, Any] | None = None) -> set[str]:
+    """Read current-month state once and return providers that are at or over their limit.
+
+    Intended to be called once at pipeline start. The returned set can be passed
+    into search_providers.search() as `disabled` to skip exhausted providers for
+    the entire pipeline run without repeated file reads.
+    """
+    cfg = _budget_cfg(api_cfg)
+    if not cfg.get("enabled", True):
+        return set()
+
+    with _LOCK:
+        path = _state_path(cfg)
+        state = _read_state(path)
+
+    exhausted: set[str] = set(state.get("exhausted", {}).keys())
+    limits = cfg.get("monthly_limits") or {}
+    for name, count in (state.get("providers") or {}).items():
+        limit = _provider_limit(name, cfg)
+        if limit is not None and int(count or 0) >= limit:
+            exhausted.add(name)
+
+    if exhausted:
+        logger.info("[api-budget] pre-flight: exhausted providers for %s: %s", state["month"], sorted(exhausted))
+    return exhausted
+
+
 def reserve_api_call(provider: str, *, api_cfg: dict[str, Any] | None = None) -> bool:
     """Reserve one local monthly API call for provider.
 
