@@ -52,13 +52,29 @@ USER_PRESERVED_PREFIXES: dict[str, frozenset[str]] = {
     ),
 }
 
+# Sections the user owns entirely: once the user has any content under a key,
+# upstream template keys are never injected into it.  An absent or empty section
+# still receives the template seed (fresh-install behaviour is preserved).
+USER_OWNED_SECTIONS: dict[str, frozenset[str]] = {
+    "search_config.yml": frozenset(
+        {
+            "regions",  # user's region definitions are theirs alone
+        }
+    ),
+}
+
 
 def _is_preserved(path: str, preserved: frozenset[str]) -> bool:
     """Return True if *path* is at or under any preserved prefix."""
     return any(path == p or path.startswith(p + ".") for p in preserved)
 
 
-def deep_merge(upstream: dict, user: dict, prefix: str = "") -> tuple[dict, list[str]]:
+def deep_merge(
+    upstream: dict,
+    user: dict,
+    prefix: str = "",
+    owned: frozenset[str] = frozenset(),
+) -> tuple[dict, list[str]]:
     """Merge upstream defaults into user dict.  Returns (merged, list_of_added_paths)."""
     result = dict(user)
     added: list[str] = []
@@ -69,8 +85,14 @@ def deep_merge(upstream: dict, user: dict, prefix: str = "") -> tuple[dict, list
             result[key] = upstream_value
             added.append(key_path)
         elif isinstance(upstream_value, dict) and isinstance(user[key], dict):
-            result[key], child_added = deep_merge(upstream_value, user[key], key_path)
-            added.extend(child_added)
+            # User-owned sections with existing content are never overridden by
+            # upstream keys — the user's sub-tree is kept as-is.  An empty section
+            # still gets the template seed so fresh installs work correctly.
+            if key_path in owned and user[key]:
+                result[key] = user[key]
+            else:
+                result[key], child_added = deep_merge(upstream_value, user[key], key_path, owned)
+                added.extend(child_added)
 
     return result, added
 
@@ -129,9 +151,9 @@ def main() -> int:
         print(f"::warning::Could not parse {user_path}: {exc}")
         return 0
 
-    merged, added = deep_merge(upstream, user)
-
     preserved = USER_PRESERVED_PREFIXES.get(upstream_path.name, frozenset())
+    owned = USER_OWNED_SECTIONS.get(upstream_path.name, frozenset())
+    merged, added = deep_merge(upstream, user, owned=owned)
     pruned, removed = prune_obsolete_keys(merged, upstream, preserved)
 
     output_path.write_text(
