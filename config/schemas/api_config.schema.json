@@ -126,7 +126,16 @@
             "jobicy": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "remoteok": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "weworkremotely": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
-            "jooble": { "type": "object", "properties": { "enabled": { "type": "boolean" } } }
+            "jooble": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "mycareersfuture": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "eures": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "jobbank": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "wttj": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "glints": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "irishjobs": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "gulftalent": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "naukrigulf": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "jobstreet": { "type": "object", "properties": { "enabled": { "type": "boolean" } } }
           }
         }
       }

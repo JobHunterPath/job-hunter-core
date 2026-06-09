@@ -1,5 +1,0 @@
-# Tracks job URLs and title keys already processed by the pipeline.
-# This file starts empty for new users and is updated automatically.
-
-processed: []
-applied_titles: []

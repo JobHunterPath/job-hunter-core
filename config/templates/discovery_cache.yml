@@ -1,4 +1,0 @@
-# Broad discovery candidate URLs already seen by the pipeline.
-# This keeps SearXNG/search API/AI discovery from rediscovering the same listings.
-
-candidate_urls: []

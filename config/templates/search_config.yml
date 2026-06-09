@@ -17,6 +17,45 @@ regions:
       - name: Example Careers Site
         career_url: careers.example.com
 
+  # --- Optional region examples for new job board sources ---
+  # Uncomment and adjust to activate. Each region auto-enables the boards
+  # that match its country code (e.g. SG → MyCareersFuture + Glints + JobStreet).
+
+  # singapore:
+  #   enabled: false
+  #   country: "SG"
+  #   location: "Singapore"
+  #   job_titles:
+  #     - "Product Manager"
+
+  # ireland:
+  #   enabled: false
+  #   country: "IE"
+  #   location: "Dublin"
+  #   job_titles:
+  #     - "Product Manager"
+
+  # canada:
+  #   enabled: false
+  #   country: "CA"
+  #   location: "Toronto"
+  #   job_titles:
+  #     - "Product Manager"
+
+  # uae:
+  #   enabled: false
+  #   country: "AE"
+  #   location: "Dubai"
+  #   job_titles:
+  #     - "Product Manager"
+
+  # saudi_arabia:
+  #   enabled: false
+  #   country: "SA"
+  #   location: "Riyadh"
+  #   job_titles:
+  #     - "Product Manager"
+
 scraping:
   total_timeout_seconds: 1800  # 30 min ceiling for company scraping phase
 

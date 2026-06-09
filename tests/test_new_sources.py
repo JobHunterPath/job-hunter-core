@@ -4,13 +4,24 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import requests.exceptions
+
 from job_hunter_core.sources.adzuna_source import fetch_adzuna_jobs
+from job_hunter_core.sources.eures_source import fetch_eures_jobs
+from job_hunter_core.sources.glints_source import fetch_glints_jobs
+from job_hunter_core.sources.gulftalent_source import fetch_gulftalent_jobs
+from job_hunter_core.sources.irishjobs_source import fetch_irishjobs_jobs
+from job_hunter_core.sources.jobbank_source import fetch_jobbank_jobs
 from job_hunter_core.sources.jobicy_source import fetch_jobicy_jobs
 from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
+from job_hunter_core.sources.jobstreet_source import fetch_jobstreet_jobs
 from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
+from job_hunter_core.sources.mycareersfuture_source import fetch_mycareersfuture_jobs
+from job_hunter_core.sources.naukrigulf_source import fetch_naukrigulf_jobs
 from job_hunter_core.sources.reed_source import fetch_reed_jobs
 from job_hunter_core.sources.remoteok_source import fetch_remoteok_jobs
 from job_hunter_core.sources.weworkremotely_source import fetch_weworkremotely_jobs
+from job_hunter_core.sources.wttj_source import fetch_wttj_jobs
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -667,3 +678,626 @@ def test_jobspy_sites_auto_derive_when_not_configured(monkeypatch):
     assert "google" in calls[0]["site_name"]
     assert "indeed" in calls[0]["site_name"]
     assert "zip_recruiter" not in calls[0]["site_name"]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Regional sources — MyCareersFuture / EURES / JobBank / WTTJ / Glints /
+#                   IrishJobs / GulfTalent / Naukrigulf / JobStreet
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _mock_html(text: str, status: int = 200):
+    r = MagicMock()
+    r.status_code = status
+    r.raise_for_status = MagicMock()
+    r.text = text
+    r.json.return_value = {}
+    return r
+
+
+_EMPTY_CFG = {"http": {"job_boards": {}}}
+_CONFIG = {"exclusion_rules": {"excluded_title_terms": []}}
+
+
+def _disabled(board: str) -> dict:
+    return {"http": {"job_boards": {board: {"enabled": False}}}}
+
+
+# ── Region fixtures ──────────────────────────────────────────────────────────
+_SG = {"sg": {"country": "SG", "location": "Singapore"}}
+_NL = {"nl": {"country": "NL", "location": "Amsterdam"}}
+_CA = {"ca": {"country": "CA", "location": "Toronto"}}
+_FR = {"fr": {"country": "FR", "location": "Paris"}}
+_ID = {"id": {"country": "ID", "location": "Jakarta"}}
+_IE = {"ie": {"country": "IE", "location": "Dublin"}}
+_AE = {"ae": {"country": "AE", "location": "Dubai"}}
+_SA = {"sa": {"country": "SA", "location": "Riyadh"}}
+_MY = {"my": {"country": "MY", "location": "Kuala Lumpur"}}
+_DE = {"de": {"country": "DE", "location": "Berlin"}}
+_GB = {"gb": {"country": "GB", "location": "London"}}
+
+
+# ── MyCareersFuture ──────────────────────────────────────────────────────────
+
+_MCF_RESPONSE = {
+    "results": [
+        {
+            "uuid": "abc-123",
+            "title": "Product Manager",
+            "postedCompany": {"name": "GovTech"},
+            "description": "<p>Lead product strategy.</p>",
+            "metadata": {"dates": {"posting": "2026-06-01T00:00:00"}},
+            "salary": {"minimum": 6000, "maximum": 9000},
+            "address": {"street": "One North"},
+        }
+    ]
+}
+
+
+def test_mcf_success():
+    with (
+        patch(
+            "job_hunter_core.sources.mycareersfuture_source.load_api_config",
+            return_value=_EMPTY_CFG,
+        ),
+        patch(
+            "job_hunter_core.sources.mycareersfuture_source.requests.get",
+            return_value=_mock_get(_MCF_RESPONSE),
+        ),
+    ):
+        jobs = fetch_mycareersfuture_jobs(["Product Manager"], _SG, _CONFIG)
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "MyCareersFuture"
+    assert jobs[0]["company"] == "GovTech"
+    assert "abc-123" in jobs[0]["url"]
+
+
+def test_mcf_region_guard_skips_non_sg():
+    with (
+        patch(
+            "job_hunter_core.sources.mycareersfuture_source.load_api_config",
+            return_value=_EMPTY_CFG,
+        ),
+        patch("job_hunter_core.sources.mycareersfuture_source.requests.get") as mock_get,
+    ):
+        fetch_mycareersfuture_jobs(["Product Manager"], _DE, _CONFIG)
+    mock_get.assert_not_called()
+
+
+def test_mcf_http_error():
+    with (
+        patch(
+            "job_hunter_core.sources.mycareersfuture_source.load_api_config",
+            return_value=_EMPTY_CFG,
+        ),
+        patch(
+            "job_hunter_core.sources.mycareersfuture_source.requests.get",
+            side_effect=requests.exceptions.HTTPError("503"),
+        ),
+    ):
+        assert fetch_mycareersfuture_jobs(["Product Manager"], _SG, _CONFIG) == []
+
+
+def test_mcf_disabled():
+    with (
+        patch(
+            "job_hunter_core.sources.mycareersfuture_source.load_api_config",
+            return_value=_disabled("mycareersfuture"),
+        ),
+        patch("job_hunter_core.sources.mycareersfuture_source.requests.get") as mock_get,
+    ):
+        fetch_mycareersfuture_jobs(["Product Manager"], _SG, _CONFIG)
+    mock_get.assert_not_called()
+
+
+# ── EURES ────────────────────────────────────────────────────────────────────
+
+_EURES_RESPONSE = {
+    "jvs": [
+        {
+            "header": {
+                "id": "EU-12345",
+                "title": "Product Manager",
+                "employerName": "EuroCorp",
+                "placeOfWork": {"city": "Amsterdam", "countryCode": "NL"},
+                "startDate": "2026-06-01",
+            },
+            "jvDescription": {"description": "<p>Lead product in Amsterdam.</p>"},
+            "urls": {"applied": "https://eures.europa.eu/en/jobs-and-cts/jv/EU-12345"},
+        }
+    ]
+}
+
+
+def test_eures_success():
+    with (
+        patch("job_hunter_core.sources.eures_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.eures_source.requests.post",
+            return_value=_mock_post(_EURES_RESPONSE),
+        ),
+    ):
+        jobs = fetch_eures_jobs(["Product Manager"], _NL, _CONFIG)
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "EURES"
+    assert jobs[0]["company"] == "EuroCorp"
+
+
+def test_eures_region_guard_skips_non_eu():
+    with (
+        patch("job_hunter_core.sources.eures_source.load_api_config", return_value=_EMPTY_CFG),
+        patch("job_hunter_core.sources.eures_source.requests.post") as mock_post,
+    ):
+        fetch_eures_jobs(["Product Manager"], _SG, _CONFIG)
+    mock_post.assert_not_called()
+
+
+def test_eures_http_error():
+    with (
+        patch("job_hunter_core.sources.eures_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.eures_source.requests.post",
+            side_effect=requests.exceptions.HTTPError("500"),
+        ),
+    ):
+        assert fetch_eures_jobs(["Product Manager"], _NL, _CONFIG) == []
+
+
+def test_eures_disabled():
+    with (
+        patch(
+            "job_hunter_core.sources.eures_source.load_api_config", return_value=_disabled("eures")
+        ),
+        patch("job_hunter_core.sources.eures_source.requests.post") as mock_post,
+    ):
+        fetch_eures_jobs(["Product Manager"], _NL, _CONFIG)
+    mock_post.assert_not_called()
+
+
+# ── Job Bank Canada ──────────────────────────────────────────────────────────
+
+_JB_HTML = """<html><body>
+<article class="resultcount">
+  <h3><a href="/job-posting/12345">Product Manager</a></h3>
+  <span class="business-title">CanadaCorp</span>
+  <span class="location">Toronto, ON</span>
+  <span class="date">2026-06-01</span>
+</article></body></html>"""
+
+
+def test_jobbank_success():
+    with (
+        patch("job_hunter_core.sources.jobbank_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.jobbank_source.requests.get", return_value=_mock_html(_JB_HTML)
+        ),
+    ):
+        jobs = fetch_jobbank_jobs(["Product Manager"], _CA, _CONFIG)
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "JobBank Canada"
+    assert jobs[0]["title"] == "Product Manager"
+
+
+def test_jobbank_region_guard_skips_non_ca():
+    with (
+        patch("job_hunter_core.sources.jobbank_source.load_api_config", return_value=_EMPTY_CFG),
+        patch("job_hunter_core.sources.jobbank_source.requests.get") as mock_get,
+    ):
+        fetch_jobbank_jobs(["Product Manager"], _AE, _CONFIG)
+    mock_get.assert_not_called()
+
+
+def test_jobbank_http_error():
+    with (
+        patch("job_hunter_core.sources.jobbank_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.jobbank_source.requests.get",
+            side_effect=requests.exceptions.HTTPError("404"),
+        ),
+    ):
+        assert fetch_jobbank_jobs(["Product Manager"], _CA, _CONFIG) == []
+
+
+def test_jobbank_disabled():
+    with (
+        patch(
+            "job_hunter_core.sources.jobbank_source.load_api_config",
+            return_value=_disabled("jobbank"),
+        ),
+        patch("job_hunter_core.sources.jobbank_source.requests.get") as mock_get,
+    ):
+        fetch_jobbank_jobs(["Product Manager"], _CA, _CONFIG)
+    mock_get.assert_not_called()
+
+
+# ── Welcome to the Jungle ─────────────────────────────────────────────────────
+
+_WTTJ_RESPONSE = {
+    "jobs": [
+        {
+            "id": "wttj-pm-1",
+            "name": "Product Manager",
+            "organization": {"name": "StartupFR", "slug": "startupfr"},
+            "slug": "pm-role",
+            "published_at": "2026-06-01",
+            "office": {"city": "Paris", "country": {"code": "FR"}},
+            "description": "Lead our product team.",
+        }
+    ]
+}
+
+
+def test_wttj_success():
+    with (
+        patch("job_hunter_core.sources.wttj_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.wttj_source.requests.get",
+            return_value=_mock_get(_WTTJ_RESPONSE),
+        ),
+    ):
+        jobs = fetch_wttj_jobs(["Product Manager"], _FR, _CONFIG)
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "Welcome to the Jungle"
+    assert "startupfr" in jobs[0]["url"]
+
+
+def test_wttj_http_error():
+    with (
+        patch("job_hunter_core.sources.wttj_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.wttj_source.requests.get",
+            side_effect=requests.exceptions.ConnectionError("timeout"),
+        ),
+    ):
+        assert fetch_wttj_jobs(["Product Manager"], _FR, _CONFIG) == []
+
+
+def test_wttj_disabled():
+    with (
+        patch(
+            "job_hunter_core.sources.wttj_source.load_api_config", return_value=_disabled("wttj")
+        ),
+        patch("job_hunter_core.sources.wttj_source.requests.get") as mock_get,
+    ):
+        fetch_wttj_jobs(["Product Manager"], _FR, _CONFIG)
+    mock_get.assert_not_called()
+
+
+def test_wttj_deduplicates_across_regions():
+    two_regions = {
+        "fr": {"country": "FR", "location": "Paris"},
+        "remote": {"country": "FR", "location": "Remote"},
+    }
+    with (
+        patch("job_hunter_core.sources.wttj_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.wttj_source.requests.get",
+            return_value=_mock_get(_WTTJ_RESPONSE),
+        ),
+    ):
+        jobs = fetch_wttj_jobs(["Product Manager"], two_regions, _CONFIG)
+    urls = [j["url"] for j in jobs]
+    assert len(urls) == len(set(urls))
+
+
+# ── Glints ───────────────────────────────────────────────────────────────────
+
+_GLINTS_RESPONSE = {
+    "data": {
+        "jobs": {
+            "data": [
+                {
+                    "id": "gl-101",
+                    "title": "Product Manager",
+                    "company": {"name": "GlintsCo"},
+                    "createdAt": "2026-06-01",
+                    "city": {"name": "Singapore"},
+                    "country": {"name": "Singapore"},
+                }
+            ]
+        }
+    }
+}
+
+
+def test_glints_success():
+    with (
+        patch("job_hunter_core.sources.glints_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.glints_source.requests.get",
+            return_value=_mock_get(_GLINTS_RESPONSE),
+        ),
+    ):
+        jobs = fetch_glints_jobs(["Product Manager"], _SG, _CONFIG)
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "Glints"
+    assert "gl-101" in jobs[0]["url"]
+
+
+def test_glints_region_guard_skips_non_sea():
+    with (
+        patch("job_hunter_core.sources.glints_source.load_api_config", return_value=_EMPTY_CFG),
+        patch("job_hunter_core.sources.glints_source.requests.get") as mock_get,
+    ):
+        fetch_glints_jobs(["Product Manager"], _GB, _CONFIG)
+    mock_get.assert_not_called()
+
+
+def test_glints_http_error():
+    with (
+        patch("job_hunter_core.sources.glints_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.glints_source.requests.get",
+            side_effect=requests.exceptions.Timeout("timeout"),
+        ),
+    ):
+        assert fetch_glints_jobs(["Product Manager"], _SG, _CONFIG) == []
+
+
+def test_glints_disabled():
+    with (
+        patch(
+            "job_hunter_core.sources.glints_source.load_api_config",
+            return_value=_disabled("glints"),
+        ),
+        patch("job_hunter_core.sources.glints_source.requests.get") as mock_get,
+    ):
+        fetch_glints_jobs(["Product Manager"], _SG, _CONFIG)
+    mock_get.assert_not_called()
+
+
+# ── IrishJobs ────────────────────────────────────────────────────────────────
+
+_IJ_HTML = """<html><body>
+<div class="jobadvert">
+  <h2><a class="jobTitle" href="/jobs/123">Product Manager</a></h2>
+  <span class="company">IrishTech</span>
+  <span class="location">Dublin</span>
+</div></body></html>"""
+
+
+def test_irishjobs_success():
+    with (
+        patch("job_hunter_core.sources.irishjobs_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.irishjobs_source.requests.get",
+            return_value=_mock_html(_IJ_HTML),
+        ),
+    ):
+        jobs = fetch_irishjobs_jobs(["Product Manager"], _IE, _CONFIG)
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "IrishJobs"
+    assert jobs[0]["title"] == "Product Manager"
+
+
+def test_irishjobs_region_guard_skips_non_ie():
+    with (
+        patch("job_hunter_core.sources.irishjobs_source.load_api_config", return_value=_EMPTY_CFG),
+        patch("job_hunter_core.sources.irishjobs_source.requests.get") as mock_get,
+    ):
+        fetch_irishjobs_jobs(["Product Manager"], _CA, _CONFIG)
+    mock_get.assert_not_called()
+
+
+def test_irishjobs_http_error():
+    with (
+        patch("job_hunter_core.sources.irishjobs_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.irishjobs_source.requests.get",
+            side_effect=requests.exceptions.HTTPError("503"),
+        ),
+    ):
+        assert fetch_irishjobs_jobs(["Product Manager"], _IE, _CONFIG) == []
+
+
+def test_irishjobs_disabled():
+    with (
+        patch(
+            "job_hunter_core.sources.irishjobs_source.load_api_config",
+            return_value=_disabled("irishjobs"),
+        ),
+        patch("job_hunter_core.sources.irishjobs_source.requests.get") as mock_get,
+    ):
+        fetch_irishjobs_jobs(["Product Manager"], _IE, _CONFIG)
+    mock_get.assert_not_called()
+
+
+# ── GulfTalent ───────────────────────────────────────────────────────────────
+
+_GT_HTML = """<html><body>
+<div class="job-listing">
+  <h2><a class="job-title" href="/jobs/456">Product Manager</a></h2>
+  <span class="company-name">GulfCorp</span>
+  <span class="location">Dubai, UAE</span>
+</div></body></html>"""
+
+
+def test_gulftalent_success():
+    with (
+        patch("job_hunter_core.sources.gulftalent_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.gulftalent_source.requests.get",
+            return_value=_mock_html(_GT_HTML),
+        ),
+    ):
+        jobs = fetch_gulftalent_jobs(["Product Manager"], _AE, _CONFIG)
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "GulfTalent"
+
+
+def test_gulftalent_region_guard_skips_non_gulf():
+    with (
+        patch("job_hunter_core.sources.gulftalent_source.load_api_config", return_value=_EMPTY_CFG),
+        patch("job_hunter_core.sources.gulftalent_source.requests.get") as mock_get,
+    ):
+        fetch_gulftalent_jobs(["Product Manager"], _FR, _CONFIG)
+    mock_get.assert_not_called()
+
+
+def test_gulftalent_playwright_fallback_on_blocked():
+    with (
+        patch("job_hunter_core.sources.gulftalent_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.gulftalent_source.requests.get",
+            side_effect=requests.exceptions.ConnectionError("blocked"),
+        ),
+        patch(
+            "job_hunter_core.sources.gulftalent_source._fetch_with_playwright", return_value=""
+        ) as mock_pw,
+    ):
+        jobs = fetch_gulftalent_jobs(["Product Manager"], _AE, _CONFIG)
+    assert jobs == []
+    mock_pw.assert_called_once()
+
+
+def test_gulftalent_disabled():
+    with (
+        patch(
+            "job_hunter_core.sources.gulftalent_source.load_api_config",
+            return_value=_disabled("gulftalent"),
+        ),
+        patch("job_hunter_core.sources.gulftalent_source.requests.get") as mock_get,
+    ):
+        fetch_gulftalent_jobs(["Product Manager"], _AE, _CONFIG)
+    mock_get.assert_not_called()
+
+
+# ── Naukrigulf ───────────────────────────────────────────────────────────────
+
+_NG_HTML = """<html><body>
+<div class="jobTuple">
+  <h3><a class="designation" href="/pm-jobs-in-uae-nj12345">Product Manager</a></h3>
+  <span class="comp-name">NaukriCorp</span>
+  <span class="loc">Dubai</span>
+</div></body></html>"""
+
+
+def test_naukrigulf_success():
+    with (
+        patch("job_hunter_core.sources.naukrigulf_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.naukrigulf_source.requests.get",
+            return_value=_mock_html(_NG_HTML),
+        ),
+    ):
+        jobs = fetch_naukrigulf_jobs(["Product Manager"], _SA, _CONFIG)
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "Naukrigulf"
+
+
+def test_naukrigulf_region_guard_skips_non_gulf():
+    with (
+        patch("job_hunter_core.sources.naukrigulf_source.load_api_config", return_value=_EMPTY_CFG),
+        patch("job_hunter_core.sources.naukrigulf_source.requests.get") as mock_get,
+    ):
+        fetch_naukrigulf_jobs(["Product Manager"], _IE, _CONFIG)
+    mock_get.assert_not_called()
+
+
+def test_naukrigulf_playwright_fallback_on_blocked():
+    with (
+        patch("job_hunter_core.sources.naukrigulf_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.naukrigulf_source.requests.get",
+            side_effect=requests.exceptions.ConnectionError("blocked"),
+        ),
+        patch(
+            "job_hunter_core.sources.naukrigulf_source._fetch_with_playwright", return_value=""
+        ) as mock_pw,
+    ):
+        jobs = fetch_naukrigulf_jobs(["Product Manager"], _SA, _CONFIG)
+    assert jobs == []
+    mock_pw.assert_called_once()
+
+
+def test_naukrigulf_disabled():
+    with (
+        patch(
+            "job_hunter_core.sources.naukrigulf_source.load_api_config",
+            return_value=_disabled("naukrigulf"),
+        ),
+        patch("job_hunter_core.sources.naukrigulf_source.requests.get") as mock_get,
+    ):
+        fetch_naukrigulf_jobs(["Product Manager"], _SA, _CONFIG)
+    mock_get.assert_not_called()
+
+
+# ── JobStreet ────────────────────────────────────────────────────────────────
+
+_JS_RESPONSE = {
+    "data": {
+        "jobs": [
+            {
+                "id": "js-9001",
+                "title": "Product Manager",
+                "advertiser": {"description": "JobStreetCo"},
+                "teaser": "Drive product growth across SEA.",
+                "salary": {"min": 5000, "max": 8000},
+                "listingDate": "2026-06-01",
+            }
+        ]
+    }
+}
+
+
+def test_jobstreet_success():
+    with (
+        patch("job_hunter_core.sources.jobstreet_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.jobstreet_source.requests.get",
+            return_value=_mock_get(_JS_RESPONSE),
+        ),
+    ):
+        jobs = fetch_jobstreet_jobs(["Product Manager"], _MY, _CONFIG)
+    assert len(jobs) == 1
+    assert jobs[0]["source"] == "JobStreet"
+    assert "js-9001" in jobs[0]["url"]
+
+
+def test_jobstreet_region_guard_skips_non_sea():
+    with (
+        patch("job_hunter_core.sources.jobstreet_source.load_api_config", return_value=_EMPTY_CFG),
+        patch("job_hunter_core.sources.jobstreet_source.requests.get") as mock_get,
+    ):
+        fetch_jobstreet_jobs(["Product Manager"], _DE, _CONFIG)
+    mock_get.assert_not_called()
+
+
+def test_jobstreet_http_error():
+    with (
+        patch("job_hunter_core.sources.jobstreet_source.load_api_config", return_value=_EMPTY_CFG),
+        patch(
+            "job_hunter_core.sources.jobstreet_source.requests.get",
+            side_effect=requests.exceptions.HTTPError("500"),
+        ),
+    ):
+        assert fetch_jobstreet_jobs(["Product Manager"], _MY, _CONFIG) == []
+
+
+def test_jobstreet_disabled():
+    with (
+        patch(
+            "job_hunter_core.sources.jobstreet_source.load_api_config",
+            return_value=_disabled("jobstreet"),
+        ),
+        patch("job_hunter_core.sources.jobstreet_source.requests.get") as mock_get,
+    ):
+        fetch_jobstreet_jobs(["Product Manager"], _MY, _CONFIG)
+    mock_get.assert_not_called()
+
+
+def test_jobstreet_403_triggers_playwright_path():
+    resp_403 = MagicMock()
+    resp_403.status_code = 403
+    resp_403.raise_for_status = MagicMock()
+    resp_403.json.return_value = {}
+    with (
+        patch("job_hunter_core.sources.jobstreet_source.load_api_config", return_value=_EMPTY_CFG),
+        patch("job_hunter_core.sources.jobstreet_source.requests.get", return_value=resp_403),
+        patch(
+            "job_hunter_core.sources.jobstreet_source._fetch_page_playwright", return_value=[]
+        ) as mock_pw,
+    ):
+        jobs = fetch_jobstreet_jobs(["Product Manager"], _MY, _CONFIG)
+    assert jobs == []
+    mock_pw.assert_called_once()

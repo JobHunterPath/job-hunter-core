@@ -4,7 +4,7 @@ Open source job hunting automation engine.
 
 ## What it does
 
-job-hunter-core scrapes jobs from 15+ sources (ATS APIs, job boards, AI-assisted search), scores them against your resume using an LLM, then tailors your resume and cover letter for each match. Runs as a Docker image triggered by GitHub Actions — no local Python setup needed.
+job-hunter-core scrapes jobs from 25+ sources (ATS APIs, job boards, AI-assisted search), scores them against your resume using an LLM, then tailors your resume and cover letter for each match. Runs as a Docker image triggered by GitHub Actions — no local Python setup needed.
 
 ## Architecture
 
@@ -59,6 +59,15 @@ job-hunter-core scrapes jobs from 15+ sources (ATS APIs, job boards, AI-assisted
 | Lightpanda | Fast renderer | Used automatically when the binary is present |
 | Firecrawl | Cloud extraction | Used when `FIRECRAWL_API_KEY` and budget are available |
 | AI web search | Search | LLM-assisted breadth source |
+| MyCareersFuture | Job board | Singapore; free REST API; country: SG |
+| EURES | Job board | 27 EU + NO/IS/LI; public REST API; any EU/EEA country |
+| Job Bank Canada | Job board | Canada; HTML scrape; country: CA |
+| Welcome to the Jungle | Job board | Global / EU-heavy; free JSON API |
+| Glints | Job board | SEA (SG, ID, MY, VN, PH); REST JSON; country: SG/ID/MY/VN/PH |
+| IrishJobs | Job board | Ireland; HTML scrape; country: IE |
+| GulfTalent | Job board | Gulf (AE, SA, QA, KW, BH, OM); requests → Playwright fallback |
+| Naukrigulf | Job board | Gulf (AE, SA, QA, KW, BH, OM); requests → Playwright fallback |
+| JobStreet | Job board | SEA (SG, MY, ID, PH, VN); REST API → Playwright fallback |
 
 ## Configuration
 

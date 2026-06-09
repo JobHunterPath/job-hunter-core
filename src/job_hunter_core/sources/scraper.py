@@ -35,12 +35,20 @@ from job_hunter_core.sources.adzuna_source import fetch_adzuna_jobs
 from job_hunter_core.sources.ai_web_search import fetch_ai_web_search_jobs
 from job_hunter_core.sources.arbeitsagentur_source import fetch_arbeitsagentur_jobs
 from job_hunter_core.sources.ats import fetch_ats_jobs
+from job_hunter_core.sources.eures_source import fetch_eures_jobs
+from job_hunter_core.sources.glints_source import fetch_glints_jobs
+from job_hunter_core.sources.gulftalent_source import fetch_gulftalent_jobs
 from job_hunter_core.sources.himalayas_source import fetch_himalayas_jobs
+from job_hunter_core.sources.irishjobs_source import fetch_irishjobs_jobs
 from job_hunter_core.sources.job_boards import fetch_arbeitnow_jobs, fetch_jsearch_jobs
 from job_hunter_core.sources.job_policy import JobPolicy, make_job_filter
+from job_hunter_core.sources.jobbank_source import fetch_jobbank_jobs
 from job_hunter_core.sources.jobicy_source import fetch_jobicy_jobs
 from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
+from job_hunter_core.sources.jobstreet_source import fetch_jobstreet_jobs
 from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
+from job_hunter_core.sources.mycareersfuture_source import fetch_mycareersfuture_jobs
+from job_hunter_core.sources.naukrigulf_source import fetch_naukrigulf_jobs
 from job_hunter_core.sources.reed_source import fetch_reed_jobs
 from job_hunter_core.sources.remoteok_source import fetch_remoteok_jobs
 from job_hunter_core.sources.remotive_source import fetch_remotive_jobs
@@ -57,6 +65,7 @@ from job_hunter_core.sources.search_providers import (
 )
 from job_hunter_core.sources.the_muse_source import fetch_the_muse_jobs
 from job_hunter_core.sources.weworkremotely_source import fetch_weworkremotely_jobs
+from job_hunter_core.sources.wttj_source import fetch_wttj_jobs
 from job_hunter_core.tracking.discovery_cache import (
     load_cached_candidate_urls,
     save_cached_candidate_urls,
@@ -694,6 +703,60 @@ def scrape(region: str | None = None) -> list[dict]:
     except Exception as e:
         stats.record("weworkremotely", failed=1)
         logger.warning("[scraper] WeWorkRemotely failed: %s", e)
+
+    try:
+        for job in fetch_mycareersfuture_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] MyCareersFuture failed: %s", e)
+
+    try:
+        for job in fetch_eures_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] EURES failed: %s", e)
+
+    try:
+        for job in fetch_jobbank_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] JobBank Canada failed: %s", e)
+
+    try:
+        for job in fetch_wttj_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] Welcome to the Jungle failed: %s", e)
+
+    try:
+        for job in fetch_glints_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] Glints failed: %s", e)
+
+    try:
+        for job in fetch_irishjobs_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] IrishJobs failed: %s", e)
+
+    try:
+        for job in fetch_gulftalent_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] GulfTalent failed: %s", e)
+
+    try:
+        for job in fetch_naukrigulf_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] Naukrigulf failed: %s", e)
+
+    try:
+        for job in fetch_jobstreet_jobs(title_filters, enabled_regions, config):
+            add_job(job, cache_candidate=True)
+    except Exception as e:
+        logger.warning("[scraper] JobStreet failed: %s", e)
 
     stats.record("jooble", attempted=1)
     try:

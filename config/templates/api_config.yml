@@ -181,6 +181,24 @@ http:
       enabled: true
     jooble:
       enabled: true
+    mycareersfuture:
+      enabled: true
+    eures:
+      enabled: true
+    jobbank:
+      enabled: true
+    wttj:
+      enabled: true
+    glints:
+      enabled: true
+    irishjobs:
+      enabled: true
+    gulftalent:
+      enabled: true
+    naukrigulf:
+      enabled: true
+    jobstreet:
+      enabled: true
 
 profile:
   # Available resume templates:
