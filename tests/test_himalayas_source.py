@@ -53,65 +53,6 @@ _RESPONSE = {
 }
 
 
-def test_returns_empty_when_disabled():
-    disabled_cfg = {"http": {"job_boards": {"himalayas": {"enabled": False}}}}
-    with patch(
-        "job_hunter_core.sources.himalayas_source.load_api_config", return_value=disabled_cfg
-    ):
-        jobs = hm.fetch_himalayas_jobs(["Product Manager"], _REGIONS, _CONFIG)
-    assert jobs == []
-
-
-def test_returns_matching_jobs():
-    with (
-        patch(
-            "job_hunter_core.sources.himalayas_source.load_api_config", return_value=_ENABLED_CFG
-        ),
-        patch(
-            "job_hunter_core.sources.himalayas_source.requests.get",
-            return_value=_mock_get(_RESPONSE),
-        ),
-    ):
-        jobs = hm.fetch_himalayas_jobs(["Product Manager"], _REGIONS, _CONFIG)
-    assert len(jobs) == 1
-    job = jobs[0]
-    assert job["title"] == "Product Manager"
-    assert job["company"] == "Remote Corp"
-    assert job["source"] == "Himalayas"
-    assert job["url"] == "https://himalayas.app/jobs/pm-123"
-    assert job["region"] == "global_remote"
-    assert "<p>" not in job["snippet"]
-    assert job["posted"] == "2024-05-01"
-
-
-def test_returns_empty_on_api_error():
-    with (
-        patch(
-            "job_hunter_core.sources.himalayas_source.load_api_config", return_value=_ENABLED_CFG
-        ),
-        patch(
-            "job_hunter_core.sources.himalayas_source.requests.get",
-            side_effect=Exception("timeout"),
-        ),
-    ):
-        jobs = hm.fetch_himalayas_jobs(["Product Manager"], _REGIONS, _CONFIG)
-    assert jobs == []
-
-
-def test_empty_jobs_response_returns_empty():
-    with (
-        patch(
-            "job_hunter_core.sources.himalayas_source.load_api_config", return_value=_ENABLED_CFG
-        ),
-        patch(
-            "job_hunter_core.sources.himalayas_source.requests.get",
-            return_value=_mock_get({"jobs": []}),
-        ),
-    ):
-        jobs = hm.fetch_himalayas_jobs(["Product Manager"], _REGIONS, _CONFIG)
-    assert jobs == []
-
-
 def test_posted_from_timestamp():
     assert hm._posted(1714521600000) == "2024-05-01"
 

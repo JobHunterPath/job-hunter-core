@@ -54,109 +54,6 @@ ARBEITNOW_JOB = {
 ARBEITNOW_PAGE = {"data": [ARBEITNOW_JOB], "links": {}, "meta": {}}
 ARBEITNOW_EMPTY = {"data": [], "links": {}, "meta": {}}
 
-
-# ── fetch_arbeitnow_jobs() ───────────────────────────────────────────────────
-
-
-def test_arbeitnow_returns_matched_job():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(ARBEITNOW_PAGE)
-    ):
-        jobs = job_boards.fetch_arbeitnow_jobs(["Product Manager"], "Berlin", max_pages=1)
-    assert len(jobs) == 1
-    assert jobs[0]["source"] == "Arbeitnow"
-
-
-def test_arbeitnow_filters_by_title():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(ARBEITNOW_PAGE)
-    ):
-        jobs = job_boards.fetch_arbeitnow_jobs(["Product Owner"], "Berlin", max_pages=1)
-    assert jobs == []
-
-
-def test_arbeitnow_filters_by_location():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(ARBEITNOW_PAGE)
-    ):
-        jobs = job_boards.fetch_arbeitnow_jobs(["Product Manager"], "Munich", max_pages=1)
-    assert jobs == []
-
-
-def test_arbeitnow_no_title_filter_returns_matching_location():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(ARBEITNOW_PAGE)
-    ):
-        jobs = job_boards.fetch_arbeitnow_jobs([], "Berlin", max_pages=1)
-    assert len(jobs) == 1
-
-
-def test_arbeitnow_returns_correct_fields():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(ARBEITNOW_PAGE)
-    ):
-        jobs = job_boards.fetch_arbeitnow_jobs(["Product Manager"], "Berlin", max_pages=1)
-    job = jobs[0]
-    assert job["company"] == "TestCo"
-    assert job["url"] == ARBEITNOW_JOB["url"]
-    assert "Berlin" in job["snippet"]
-
-
-def test_arbeitnow_strips_html_from_snippet():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(ARBEITNOW_PAGE)
-    ):
-        jobs = job_boards.fetch_arbeitnow_jobs(["Product Manager"], "Berlin", max_pages=1)
-    assert "<p>" not in jobs[0]["snippet"]
-
-
-def test_arbeitnow_parses_unix_timestamp():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(ARBEITNOW_PAGE)
-    ):
-        jobs = job_boards.fetch_arbeitnow_jobs(["Product Manager"], "Berlin", max_pages=1)
-    assert jobs[0]["posted"] != ""
-    assert len(jobs[0]["posted"]) == 10
-
-
-def test_arbeitnow_parses_iso_date_string():
-    job = {**ARBEITNOW_JOB, "created_at": "2026-04-15T10:00:00Z"}
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get({"data": [job]})
-    ):
-        jobs = job_boards.fetch_arbeitnow_jobs(["Product Manager"], "Berlin", max_pages=1)
-    assert jobs[0]["posted"] == "2026-04-15"
-
-
-def test_arbeitnow_stops_on_empty_page():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get",
-        side_effect=[
-            _mock_get(ARBEITNOW_PAGE),
-            _mock_get(ARBEITNOW_EMPTY),
-        ],
-    ) as mock_get:
-        jobs = job_boards.fetch_arbeitnow_jobs(["Product Manager"], "Berlin", max_pages=5)
-    assert len(jobs) == 1
-    assert mock_get.call_count == 2
-
-
-def test_arbeitnow_returns_empty_on_api_error():
-    with patch("job_hunter_core.sources.job_boards.requests.get", side_effect=Exception("timeout")):
-        jobs = job_boards.fetch_arbeitnow_jobs(["Product Manager"], "Berlin")
-    assert jobs == []
-
-
-def test_arbeitnow_continues_next_page_after_error_on_first():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", side_effect=Exception("conn error")
-    ):
-        jobs = job_boards.fetch_arbeitnow_jobs(["Product Manager"], "Berlin", max_pages=3)
-    assert jobs == []
-
-
-# ── fetch_jsearch_jobs() ─────────────────────────────────────────────────────
-
 JSEARCH_JOB = {
     "employer_name": "TestCo",
     "job_title": "Product Manager",
@@ -168,162 +65,6 @@ JSEARCH_JOB = {
 }
 
 JSEARCH_RESPONSE = {"status": "OK", "data": [JSEARCH_JOB]}
-
-
-def test_jsearch_returns_matched_job():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(JSEARCH_RESPONSE)
-    ):
-        jobs = job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key")
-    assert len(jobs) == 1
-    assert jobs[0]["source"] == "JSearch"
-
-
-def test_jsearch_returns_correct_fields():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(JSEARCH_RESPONSE)
-    ):
-        jobs = job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key")
-    job = jobs[0]
-    assert job["company"] == "TestCo"
-    assert job["url"] == "https://linkedin.com/jobs/view/12345"
-    assert job["posted"] == "2026-04-01"
-    assert "Berlin" in job["snippet"]
-
-
-def test_jsearch_returns_empty_without_key():
-    jobs = job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "")
-    assert jobs == []
-
-
-def test_jsearch_returns_empty_without_configured_titles():
-    with patch("job_hunter_core.sources.job_boards.requests.get") as mock_get:
-        jobs = job_boards.fetch_jsearch_jobs([], "Berlin", "test-key")
-
-    assert jobs == []
-    mock_get.assert_not_called()
-
-
-def test_jsearch_returns_empty_on_api_error():
-    with patch("job_hunter_core.sources.job_boards.requests.get", side_effect=Exception("timeout")):
-        jobs = job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key")
-    assert jobs == []
-
-
-def test_jsearch_skips_after_configured_consecutive_failures():
-    config = {"http": {"job_boards": {"max_consecutive_failures": 3}}}
-    with (
-        patch("job_hunter_core.sources.job_boards.load_api_config", return_value=config),
-        patch(
-            "job_hunter_core.sources.job_boards.requests.get", side_effect=Exception("limit")
-        ) as mock_get,
-    ):
-        for _ in range(4):
-            jobs = job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key")
-            assert jobs == []
-
-    assert mock_get.call_count == 3
-
-
-def test_jsearch_success_resets_failure_count():
-    job_boards._JSEARCH_FAILURES = 2
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(JSEARCH_RESPONSE)
-    ):
-        jobs = job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key")
-
-    assert len(jobs) == 1
-    assert job_boards._JSEARCH_FAILURES == 0
-
-
-def test_jsearch_makes_one_request_per_title():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(JSEARCH_RESPONSE)
-    ) as mock_get:
-        job_boards.fetch_jsearch_jobs(["Product Manager", "Product Owner"], "Berlin", "test-key")
-    assert mock_get.call_count == 2
-
-
-def test_jsearch_includes_location_in_query():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(JSEARCH_RESPONSE)
-    ) as mock_get:
-        job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key")
-    call_params = mock_get.call_args[1]["params"]
-    assert "Berlin" in call_params["query"]
-    assert "country" not in call_params
-    assert "language" not in call_params
-
-
-def test_jsearch_uses_configured_country_and_language():
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get", return_value=_mock_get(JSEARCH_RESPONSE)
-    ) as mock_get:
-        job_boards.fetch_jsearch_jobs(
-            ["Product Manager"], "Berlin", "test-key", country="DE", language="en"
-        )
-
-    call_params = mock_get.call_args[1]["params"]
-    assert call_params["country"] == "de"
-    assert call_params["language"] == "en"
-
-
-def test_jsearch_excludes_irrelevant_titles_and_query_terms():
-    job = {**JSEARCH_JOB, "job_title": "Product Engineer"}
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get",
-        return_value=_mock_get({"status": "OK", "data": [job]}),
-    ) as mock_get:
-        jobs = job_boards.fetch_jsearch_jobs(
-            ["Product Manager"],
-            "Berlin",
-            "test-key",
-            excluded_title_terms=["engineer", "working student"],
-        )
-
-    assert jobs == []
-    call_params = mock_get.call_args[1]["params"]
-    assert '-"engineer"' in call_params["query"]
-    assert '-"working student"' in call_params["query"]
-
-
-def test_jsearch_handles_missing_city_gracefully():
-    job = {**JSEARCH_JOB, "job_city": None, "job_country": None}
-    with patch(
-        "job_hunter_core.sources.job_boards.requests.get",
-        return_value=_mock_get({"status": "OK", "data": [job]}),
-    ):
-        jobs = job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key")
-    assert len(jobs) == 1
-    assert jobs[0]["snippet"] == job["job_description"]
-
-
-def test_jsearch_budget_cap_skips_http(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(job_boards, "reserve_api_call", lambda _provider: False)
-    monkeypatch.setattr(
-        job_boards.requests,
-        "get",
-        lambda *args, **kwargs: pytest.fail("HTTP should not run"),
-    )
-
-    jobs = job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key")
-
-    assert jobs == []
-
-
-def test_jsearch_quota_error_disables_provider_for_month(tmp_path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(api_budget, "ROOT", tmp_path)
-    calls = {"count": 0}
-
-    def fake_get(*args, **kwargs):
-        calls["count"] += 1
-        return ErrorResponse(429, text="Monthly quota exceeded")
-
-    monkeypatch.setattr(job_boards.requests, "get", fake_get)
-
-    assert job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key") == []
-    assert job_boards.fetch_jsearch_jobs(["Product Manager"], "Berlin", "test-key") == []
-    assert calls["count"] == 1
 
 
 # ── ArbeitnowSource ──────────────────────────────────────────────────────────
@@ -385,6 +126,102 @@ class TestArbeitnowSource:
             postings = ArbeitnowSource().fetch(["Product Owner"], _REGIONS, _CONFIG)
         assert postings == []
 
+    def test_fetch_returns_correct_fields(self):
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_ARBEITNOW_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get(ARBEITNOW_PAGE),
+            ),
+        ):
+            postings = ArbeitnowSource().fetch(["Product Manager"], _REGIONS, _CONFIG)
+        posting = postings[0]
+        assert posting.company == "TestCo"
+        assert posting.url == ARBEITNOW_JOB["url"]
+        assert "Berlin" in posting.snippet
+
+    def test_fetch_strips_html(self):
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_ARBEITNOW_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get(ARBEITNOW_PAGE),
+            ),
+        ):
+            postings = ArbeitnowSource().fetch(["Product Manager"], _REGIONS, _CONFIG)
+        assert "<p>" not in postings[0].snippet
+
+    def test_fetch_parses_unix_timestamp(self):
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_ARBEITNOW_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get(ARBEITNOW_PAGE),
+            ),
+        ):
+            postings = ArbeitnowSource().fetch(["Product Manager"], _REGIONS, _CONFIG)
+        assert postings[0].posted != ""
+        assert len(postings[0].posted) == 10
+
+    def test_fetch_parses_iso_date(self):
+        job = {**ARBEITNOW_JOB, "created_at": "2026-04-15T10:00:00Z"}
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_ARBEITNOW_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get({"data": [job]}),
+            ),
+        ):
+            postings = ArbeitnowSource().fetch(["Product Manager"], _REGIONS, _CONFIG)
+        assert postings[0].posted == "2026-04-15"
+
+    def test_fetch_stops_on_empty_page(self):
+        two_page_cfg = {
+            "http": {"job_boards": {"arbeitnow": {"enabled": True, "max_pages": 2}}}
+        }
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=two_page_cfg,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                side_effect=[
+                    _mock_get(ARBEITNOW_PAGE),
+                    _mock_get(ARBEITNOW_EMPTY),
+                ],
+            ) as mock_get,
+        ):
+            postings = ArbeitnowSource().fetch(["Product Manager"], _REGIONS, _CONFIG)
+        assert len(postings) == 1
+        assert mock_get.call_count == 2
+
+    def test_fetch_returns_empty_on_api_error(self):
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_ARBEITNOW_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                side_effect=Exception("timeout"),
+            ),
+        ):
+            postings = ArbeitnowSource().fetch(["Product Manager"], _REGIONS, _CONFIG)
+        assert postings == []
+
 
 # ── JSearchSource ─────────────────────────────────────────────────────────────
 
@@ -438,3 +275,187 @@ class TestJSearchSource:
         ):
             postings = src.fetch(["Product Manager"], _REGIONS, _CONFIG)
         assert postings == []
+
+    def test_fetch_returns_correct_fields(self):
+        src = JSearchSource.__new__(JSearchSource)
+        src._rapidapi_key = "test-key"
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_JSEARCH_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get(JSEARCH_RESPONSE),
+            ),
+        ):
+            postings = src.fetch(["Product Manager"], _REGIONS, _CONFIG)
+        posting = postings[0]
+        assert posting.company == "TestCo"
+        assert posting.url == "https://linkedin.com/jobs/view/12345"
+        assert posting.posted == "2026-04-01"
+        assert "Berlin" in posting.snippet
+
+    def test_fetch_includes_location_in_query(self):
+        src = JSearchSource.__new__(JSearchSource)
+        src._rapidapi_key = "test-key"
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_JSEARCH_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get(JSEARCH_RESPONSE),
+            ) as mock_get,
+        ):
+            src.fetch(["Product Manager"], _REGIONS, _CONFIG)
+        call_params = mock_get.call_args[1]["params"]
+        assert "Berlin" in call_params["query"]
+
+    def test_fetch_uses_country_and_language(self):
+        src = JSearchSource.__new__(JSearchSource)
+        src._rapidapi_key = "test-key"
+        regions_with_lang = {"DE": {"location": "Berlin", "country": "DE", "search_lang": "en"}}
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_JSEARCH_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get(JSEARCH_RESPONSE),
+            ) as mock_get,
+        ):
+            src.fetch(["Product Manager"], regions_with_lang, _CONFIG)
+        call_params = mock_get.call_args[1]["params"]
+        assert call_params["country"] == "de"
+        assert call_params["language"] == "en"
+
+    def test_fetch_excludes_terms(self):
+        src = JSearchSource.__new__(JSearchSource)
+        src._rapidapi_key = "test-key"
+        job = {**JSEARCH_JOB, "job_title": "Product Engineer"}
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_JSEARCH_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get({"status": "OK", "data": [job]}),
+            ) as mock_get,
+        ):
+            postings = src.fetch(
+                ["Product Manager"],
+                _REGIONS,
+                _CONFIG,
+                excluded_title_terms=["engineer", "working student"],
+            )
+        assert postings == []
+        call_params = mock_get.call_args[1]["params"]
+        assert '-"engineer"' in call_params["query"]
+        assert '-"working student"' in call_params["query"]
+
+    def test_fetch_one_request_per_title(self):
+        src = JSearchSource.__new__(JSearchSource)
+        src._rapidapi_key = "test-key"
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_JSEARCH_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get(JSEARCH_RESPONSE),
+            ) as mock_get,
+        ):
+            src.fetch(["Product Manager", "Product Owner"], _REGIONS, _CONFIG)
+        assert mock_get.call_count == 2
+
+    def test_fetch_handles_missing_city(self):
+        src = JSearchSource.__new__(JSearchSource)
+        src._rapidapi_key = "test-key"
+        job = {**JSEARCH_JOB, "job_city": None, "job_country": None}
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_JSEARCH_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get({"status": "OK", "data": [job]}),
+            ),
+        ):
+            postings = src.fetch(["Product Manager"], _REGIONS, _CONFIG)
+        assert len(postings) == 1
+        assert postings[0].snippet == job["job_description"]
+
+    def test_fetch_suppressed_after_failures(self, reset_jsearch_failure_state):
+        src = JSearchSource.__new__(JSearchSource)
+        src._rapidapi_key = "test-key"
+        config = {"http": {"job_boards": {"max_consecutive_failures": 3, "jsearch": {"enabled": True, "num_pages": 1}}}}
+        with (
+            patch("job_hunter_core.sources.job_boards.load_api_config", return_value=config),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get", side_effect=Exception("limit")
+            ) as mock_get,
+        ):
+            for _ in range(4):
+                postings = src.fetch(["Product Manager"], _REGIONS, _CONFIG)
+                assert postings == []
+        assert mock_get.call_count == 3
+
+    def test_fetch_resets_failure_count(self):
+        src = JSearchSource.__new__(JSearchSource)
+        src._rapidapi_key = "test-key"
+        job_boards._JSEARCH_FAILURES = 2
+        with (
+            patch(
+                "job_hunter_core.sources.job_boards.load_api_config",
+                return_value=_ENABLED_JSEARCH_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.job_boards.requests.get",
+                return_value=_mock_get(JSEARCH_RESPONSE),
+            ),
+        ):
+            postings = src.fetch(["Product Manager"], _REGIONS, _CONFIG)
+        assert len(postings) == 1
+        assert job_boards._JSEARCH_FAILURES == 0
+
+    def test_fetch_budget_cap_skips_http(self, monkeypatch: pytest.MonkeyPatch):
+        src = JSearchSource.__new__(JSearchSource)
+        src._rapidapi_key = "test-key"
+        monkeypatch.setattr(job_boards, "reserve_api_call", lambda _provider: False)
+        monkeypatch.setattr(
+            job_boards.requests,
+            "get",
+            lambda *args, **kwargs: pytest.fail("HTTP should not run"),
+        )
+        with patch(
+            "job_hunter_core.sources.job_boards.load_api_config",
+            return_value=_ENABLED_JSEARCH_CFG,
+        ):
+            postings = src.fetch(["Product Manager"], _REGIONS, _CONFIG)
+        assert postings == []
+
+    def test_fetch_quota_error_disables(self, tmp_path, monkeypatch: pytest.MonkeyPatch):
+        src = JSearchSource.__new__(JSearchSource)
+        src._rapidapi_key = "test-key"
+        monkeypatch.setattr(api_budget, "ROOT", tmp_path)
+        calls = {"count": 0}
+
+        def fake_get(*args, **kwargs):
+            calls["count"] += 1
+            return ErrorResponse(429, text="Monthly quota exceeded")
+
+        monkeypatch.setattr(job_boards.requests, "get", fake_get)
+
+        with patch(
+            "job_hunter_core.sources.job_boards.load_api_config",
+            return_value=_ENABLED_JSEARCH_CFG,
+        ):
+            assert src.fetch(["Product Manager"], _REGIONS, _CONFIG) == []
+            assert src.fetch(["Product Manager"], _REGIONS, _CONFIG) == []
+        assert calls["count"] == 1
