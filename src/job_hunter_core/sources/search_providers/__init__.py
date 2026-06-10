@@ -6,11 +6,10 @@ existing import sites require no changes.
 from __future__ import annotations
 
 import logging
-import requests  # noqa: F401 — exposed so tests can patch search_providers.requests.get/post
 import shutil  # noqa: F401 — exposed so tests can patch search_providers.shutil.which
 import subprocess  # noqa: F401 — exposed so tests can patch search_providers.subprocess.run
 
-logger = logging.getLogger(__name__)
+import requests  # noqa: F401 — exposed so tests can patch search_providers.requests.get/post
 
 from job_hunter_core.sources.search_providers._constants import (
     BRAVE_SUPPORTED_COUNTRIES,
@@ -106,3 +105,5 @@ __all__ = [
     "all_providers_exhausted",
     "search_web",
 ]
+
+logger = logging.getLogger(__name__)

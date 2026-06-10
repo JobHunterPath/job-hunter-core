@@ -49,6 +49,34 @@ from job_hunter_core.sources.naukrigulf_source import fetch_naukrigulf_jobs
 from job_hunter_core.sources.reed_source import fetch_reed_jobs
 from job_hunter_core.sources.remoteok_source import fetch_remoteok_jobs
 from job_hunter_core.sources.remotive_source import fetch_remotive_jobs
+from job_hunter_core.sources.scraper._config import (
+    build_queries,
+    load_companies,
+    load_search_config,
+)
+from job_hunter_core.sources.scraper._policy import (
+    is_excluded as is_excluded,
+)
+from job_hunter_core.sources.scraper._policy import (
+    is_excluded_language as is_excluded_language,
+)
+from job_hunter_core.sources.scraper._policy import (
+    is_excluded_url as is_excluded_url,
+)
+from job_hunter_core.sources.scraper._policy import (
+    is_german as is_german,
+)
+from job_hunter_core.sources.scraper._policy import (
+    is_stale_posting as is_stale_posting,
+)
+from job_hunter_core.sources.scraper._policy import (
+    is_too_senior as is_too_senior,
+)
+from job_hunter_core.sources.scraper._policy import (
+    is_valid_job_url as is_valid_job_url,
+)
+from job_hunter_core.sources.scraper._stats import ScrapeStats
+from job_hunter_core.sources.scraper._stats import SourceStats as SourceStats
 from job_hunter_core.sources.search_providers import (
     BraveProvider,
     all_providers_exhausted,
@@ -66,17 +94,6 @@ from job_hunter_core.sources.wttj_source import fetch_wttj_jobs
 from job_hunter_core.tracking.discovery_cache import (
     load_cached_candidate_urls,
     save_cached_candidate_urls,
-)
-from job_hunter_core.sources.scraper._stats import SourceStats, ScrapeStats
-from job_hunter_core.sources.scraper._config import load_search_config, load_companies, build_queries
-from job_hunter_core.sources.scraper._policy import (
-    is_valid_job_url,
-    is_excluded_url,
-    is_stale_posting,
-    is_too_senior,
-    is_excluded,
-    is_german,
-    is_excluded_language,
 )
 
 ROOT = str(REPO_ROOT)
@@ -97,7 +114,9 @@ def _url_matches_career_site(career_url: str, result_url: str) -> bool:
         return urlparse(url)
 
     def _etld1(netloc: str) -> str:
-        host = netloc.lower().lstrip("www.")
+        host = netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
         parts = host.split(".")
         return ".".join(parts[-2:]) if len(parts) >= 2 else host
 
