@@ -19,36 +19,31 @@ from urllib.parse import urlparse
 import requests  # noqa: F401
 
 from job_hunter_core.core.api_budget import get_exhausted_providers
+from job_hunter_core.core.config import ROOT as REPO_ROOT
 from job_hunter_core.core.config import (
-    ADZUNA_API_KEY,
-    ADZUNA_APP_ID,
-    JOOBLE_API_KEY,
-    RAPIDAPI_KEY,
-    REED_API_KEY,
     load_api_config,
 )
-from job_hunter_core.core.config import ROOT as REPO_ROOT
-from job_hunter_core.sources.adzuna_source import fetch_adzuna_jobs
+from job_hunter_core.sources.adzuna_source import AdzunaSource
 from job_hunter_core.sources.ai_web_search import fetch_ai_web_search_jobs
-from job_hunter_core.sources.arbeitsagentur_source import fetch_arbeitsagentur_jobs
+from job_hunter_core.sources.arbeitsagentur_source import ArbeitsagenturSource
 from job_hunter_core.sources.ats import fetch_ats_jobs
-from job_hunter_core.sources.eures_source import fetch_eures_jobs
-from job_hunter_core.sources.glints_source import fetch_glints_jobs
-from job_hunter_core.sources.gulftalent_source import fetch_gulftalent_jobs
-from job_hunter_core.sources.himalayas_source import fetch_himalayas_jobs
-from job_hunter_core.sources.irishjobs_source import fetch_irishjobs_jobs
-from job_hunter_core.sources.job_boards import fetch_arbeitnow_jobs, fetch_jsearch_jobs
+from job_hunter_core.sources.eures_source import EURESSource
+from job_hunter_core.sources.glints_source import GlintsSource
+from job_hunter_core.sources.gulftalent_source import GulfTalentSource
+from job_hunter_core.sources.himalayas_source import HimalayasSource
+from job_hunter_core.sources.irishjobs_source import IrishJobsSource
+from job_hunter_core.sources.job_boards import ArbeitnowSource, JSearchSource
 from job_hunter_core.sources.job_policy import JobPolicy, make_job_filter
-from job_hunter_core.sources.jobbank_source import fetch_jobbank_jobs
-from job_hunter_core.sources.jobicy_source import fetch_jobicy_jobs
-from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
-from job_hunter_core.sources.jobstreet_source import fetch_jobstreet_jobs
-from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
-from job_hunter_core.sources.mycareersfuture_source import fetch_mycareersfuture_jobs
-from job_hunter_core.sources.naukrigulf_source import fetch_naukrigulf_jobs
-from job_hunter_core.sources.reed_source import fetch_reed_jobs
-from job_hunter_core.sources.remoteok_source import fetch_remoteok_jobs
-from job_hunter_core.sources.remotive_source import fetch_remotive_jobs
+from job_hunter_core.sources.jobbank_source import JobBankSource
+from job_hunter_core.sources.jobicy_source import JobicySource
+from job_hunter_core.sources.jobspy_source import JobSpySource
+from job_hunter_core.sources.jobstreet_source import JobStreetSource
+from job_hunter_core.sources.jooble_source import JoobleSource
+from job_hunter_core.sources.mycareersfuture_source import MyCareersFutureSource
+from job_hunter_core.sources.naukrigulf_source import NaukriGulfSource
+from job_hunter_core.sources.reed_source import ReedSource
+from job_hunter_core.sources.remoteok_source import RemoteOKSource
+from job_hunter_core.sources.remotive_source import RemotiveSource
 from job_hunter_core.sources.scraper._config import (
     build_queries,
     load_companies,
@@ -88,9 +83,9 @@ from job_hunter_core.sources.search_providers import (
     fetch_static_career_jobs,
     search_web,
 )
-from job_hunter_core.sources.the_muse_source import fetch_the_muse_jobs
-from job_hunter_core.sources.weworkremotely_source import fetch_weworkremotely_jobs
-from job_hunter_core.sources.wttj_source import fetch_wttj_jobs
+from job_hunter_core.sources.the_muse_source import TheMuseSource
+from job_hunter_core.sources.weworkremotely_source import WeWorkRemotelySource
+from job_hunter_core.sources.wttj_source import WTTJSource
 from job_hunter_core.tracking.discovery_cache import (
     load_cached_candidate_urls,
     save_cached_candidate_urls,
@@ -454,65 +449,65 @@ def scrape(region: str | None = None) -> list[dict]:
 
     stats.record("jobspy", attempted=1)
     try:
-        jobspy_jobs = list(fetch_jobspy_jobs(title_filters, enabled_regions, config))
-        stats.record("jobspy", returned=len(jobspy_jobs))
+        jobspy_postings = JobSpySource().fetch(title_filters, enabled_regions, config)
+        stats.record("jobspy", returned=len(jobspy_postings))
         jobspy_accepted = 0
-        for job in jobspy_jobs:
-            if add_job(job, cache_candidate=True):
+        for jp in jobspy_postings:
+            if add_job(jp.to_dict(), cache_candidate=True):
                 jobspy_accepted += 1
-        stats.record("jobspy", accepted=jobspy_accepted, skipped=len(jobspy_jobs) - jobspy_accepted)
+        stats.record("jobspy", accepted=jobspy_accepted, skipped=len(jobspy_postings) - jobspy_accepted)
     except Exception as e:
         stats.record("jobspy", failed=1)
         logger.warning("[scraper] JobSpy failed: %s", e)
 
     stats.record("himalayas", attempted=1)
     try:
-        him_jobs = list(fetch_himalayas_jobs(title_filters, enabled_regions, config))
-        stats.record("himalayas", returned=len(him_jobs))
+        him_postings = HimalayasSource().fetch(title_filters, enabled_regions, config)
+        stats.record("himalayas", returned=len(him_postings))
         him_accepted = 0
-        for job in him_jobs:
-            if add_job(job, cache_candidate=True):
+        for jp in him_postings:
+            if add_job(jp.to_dict(), cache_candidate=True):
                 him_accepted += 1
-        stats.record("himalayas", accepted=him_accepted, skipped=len(him_jobs) - him_accepted)
+        stats.record("himalayas", accepted=him_accepted, skipped=len(him_postings) - him_accepted)
     except Exception as e:
         stats.record("himalayas", failed=1)
         logger.warning("[scraper] Himalayas failed: %s", e)
 
     try:
-        for job in fetch_remotive_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in RemotiveSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] Remotive failed: %s", e)
 
     try:
-        for job in fetch_the_muse_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in TheMuseSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] The Muse failed: %s", e)
 
     stats.record("jobicy", attempted=1)
     try:
-        jobicy_jobs = list(fetch_jobicy_jobs(title_filters, enabled_regions, config))
-        stats.record("jobicy", returned=len(jobicy_jobs))
+        jobicy_postings = JobicySource().fetch(title_filters, enabled_regions, config)
+        stats.record("jobicy", returned=len(jobicy_postings))
         jobicy_accepted = 0
-        for job in jobicy_jobs:
-            if add_job(job, cache_candidate=True):
+        for jp in jobicy_postings:
+            if add_job(jp.to_dict(), cache_candidate=True):
                 jobicy_accepted += 1
-        stats.record("jobicy", accepted=jobicy_accepted, skipped=len(jobicy_jobs) - jobicy_accepted)
+        stats.record("jobicy", accepted=jobicy_accepted, skipped=len(jobicy_postings) - jobicy_accepted)
     except Exception as e:
         stats.record("jobicy", failed=1)
         logger.warning("[scraper] Jobicy failed: %s", e)
 
     stats.record("remoteok", attempted=1)
     try:
-        remoteok_jobs = list(fetch_remoteok_jobs(title_filters, enabled_regions, config))
-        stats.record("remoteok", returned=len(remoteok_jobs))
+        remoteok_postings = RemoteOKSource().fetch(title_filters, enabled_regions, config)
+        stats.record("remoteok", returned=len(remoteok_postings))
         remoteok_accepted = 0
-        for job in remoteok_jobs:
-            if add_job(job, cache_candidate=True):
+        for jp in remoteok_postings:
+            if add_job(jp.to_dict(), cache_candidate=True):
                 remoteok_accepted += 1
         stats.record(
-            "remoteok", accepted=remoteok_accepted, skipped=len(remoteok_jobs) - remoteok_accepted
+            "remoteok", accepted=remoteok_accepted, skipped=len(remoteok_postings) - remoteok_accepted
         )
     except Exception as e:
         stats.record("remoteok", failed=1)
@@ -520,175 +515,147 @@ def scrape(region: str | None = None) -> list[dict]:
 
     stats.record("weworkremotely", attempted=1)
     try:
-        wwr_jobs = list(fetch_weworkremotely_jobs(title_filters, enabled_regions, config))
-        stats.record("weworkremotely", returned=len(wwr_jobs))
+        wwr_postings = WeWorkRemotelySource().fetch(title_filters, enabled_regions, config)
+        stats.record("weworkremotely", returned=len(wwr_postings))
         wwr_accepted = 0
-        for job in wwr_jobs:
-            if add_job(job, cache_candidate=True):
+        for jp in wwr_postings:
+            if add_job(jp.to_dict(), cache_candidate=True):
                 wwr_accepted += 1
-        stats.record("weworkremotely", accepted=wwr_accepted, skipped=len(wwr_jobs) - wwr_accepted)
+        stats.record("weworkremotely", accepted=wwr_accepted, skipped=len(wwr_postings) - wwr_accepted)
     except Exception as e:
         stats.record("weworkremotely", failed=1)
         logger.warning("[scraper] WeWorkRemotely failed: %s", e)
 
     try:
-        for job in fetch_mycareersfuture_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in MyCareersFutureSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] MyCareersFuture failed: %s", e)
 
     try:
-        for job in fetch_eures_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in EURESSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] EURES failed: %s", e)
 
     try:
-        for job in fetch_jobbank_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in JobBankSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] JobBank Canada failed: %s", e)
 
     try:
-        for job in fetch_wttj_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in WTTJSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] Welcome to the Jungle failed: %s", e)
 
     try:
-        for job in fetch_glints_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in GlintsSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] Glints failed: %s", e)
 
     try:
-        for job in fetch_irishjobs_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in IrishJobsSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] IrishJobs failed: %s", e)
 
     try:
-        for job in fetch_gulftalent_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in GulfTalentSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] GulfTalent failed: %s", e)
 
     try:
-        for job in fetch_naukrigulf_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in NaukriGulfSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] Naukrigulf failed: %s", e)
 
     try:
-        for job in fetch_jobstreet_jobs(title_filters, enabled_regions, config):
-            add_job(job, cache_candidate=True)
+        for jp in JobStreetSource().fetch(title_filters, enabled_regions, config):
+            add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] JobStreet failed: %s", e)
 
     stats.record("jooble", attempted=1)
     try:
-        jooble_jobs = list(
-            fetch_jooble_jobs(title_filters, enabled_regions, config, JOOBLE_API_KEY)
-        )
-        stats.record("jooble", returned=len(jooble_jobs))
+        jooble_postings = JoobleSource().fetch(title_filters, enabled_regions, config)
+        stats.record("jooble", returned=len(jooble_postings))
         jooble_accepted = 0
-        for job in jooble_jobs:
-            if add_job(job, cache_candidate=True):
+        for jp in jooble_postings:
+            if add_job(jp.to_dict(), cache_candidate=True):
                 jooble_accepted += 1
-        stats.record("jooble", accepted=jooble_accepted, skipped=len(jooble_jobs) - jooble_accepted)
+        stats.record("jooble", accepted=jooble_accepted, skipped=len(jooble_postings) - jooble_accepted)
     except Exception as e:
         stats.record("jooble", failed=1)
         logger.warning("[scraper] Jooble failed: %s", e)
 
     stats.record("arbeitsagentur", attempted=1)
     try:
-        aa_jobs = list(fetch_arbeitsagentur_jobs(title_filters, enabled_regions, config))
-        stats.record("arbeitsagentur", returned=len(aa_jobs))
+        aa_postings = ArbeitsagenturSource().fetch(title_filters, enabled_regions, config)
+        stats.record("arbeitsagentur", returned=len(aa_postings))
         aa_accepted = 0
-        for job in aa_jobs:
-            if add_job(job, cache_candidate=True):
+        for jp in aa_postings:
+            if add_job(jp.to_dict(), cache_candidate=True):
                 aa_accepted += 1
-        stats.record("arbeitsagentur", accepted=aa_accepted, skipped=len(aa_jobs) - aa_accepted)
+        stats.record("arbeitsagentur", accepted=aa_accepted, skipped=len(aa_postings) - aa_accepted)
     except Exception as e:
         stats.record("arbeitsagentur", failed=1)
         logger.warning("[scraper] Arbeitsagentur failed: %s", e)
 
-    boards_cfg = load_api_config().get("http", {}).get("job_boards", {})
+    stats.record("arbeitnow", attempted=1)
+    try:
+        arbeitnow_postings = ArbeitnowSource().fetch(title_filters, enabled_regions, config)
+        stats.record("arbeitnow", returned=len(arbeitnow_postings))
+        an_accepted = 0
+        for jp in arbeitnow_postings:
+            if add_job(jp.to_dict()):
+                an_accepted += 1
+        stats.record(
+            "arbeitnow", accepted=an_accepted, skipped=len(arbeitnow_postings) - an_accepted
+        )
+    except Exception as e:
+        stats.record("arbeitnow", failed=1)
+        logger.warning("[scraper] Arbeitnow failed: %s", e)
 
-    for region_name, region_config in enabled_regions.items():
-        board_location = region_config.get("location", "")
-        if boards_cfg.get("arbeitnow", {}).get("enabled", False):
-            max_pages = boards_cfg["arbeitnow"].get("max_pages", 3)
-            logger.info(
-                "[scraper] Arbeitnow: region=%r, location=%r, max_pages=%s",
-                region_name,
-                board_location,
-                max_pages,
-            )
-            stats.record("arbeitnow", attempted=1)
-            arbeitnow_jobs = list(
-                fetch_arbeitnow_jobs(title_filters, board_location, max_pages, excluded_title_terms)
-            )
-            stats.record("arbeitnow", returned=len(arbeitnow_jobs))
-            an_accepted = 0
-            for job in arbeitnow_jobs:
-                if add_job(job):
-                    an_accepted += 1
-            stats.record(
-                "arbeitnow", accepted=an_accepted, skipped=len(arbeitnow_jobs) - an_accepted
-            )
-
-        if boards_cfg.get("jsearch", {}).get("enabled", False):
-            num_pages = boards_cfg["jsearch"].get("num_pages", 1)
-            logger.info(
-                "[scraper] JSearch: region=%r, location=%r, titles=%s",
-                region_name,
-                board_location,
-                title_filters,
-            )
-            stats.record("jsearch", attempted=1)
-            jsearch_jobs = list(
-                fetch_jsearch_jobs(
-                    title_filters,
-                    board_location,
-                    RAPIDAPI_KEY,
-                    num_pages,
-                    excluded_title_terms,
-                    region_config.get("country", ""),
-                    region_config.get("search_lang", ""),
-                )
-            )
-            stats.record("jsearch", returned=len(jsearch_jobs))
-            js_accepted = 0
-            for job in jsearch_jobs:
-                if add_job(job):
-                    js_accepted += 1
-            stats.record("jsearch", accepted=js_accepted, skipped=len(jsearch_jobs) - js_accepted)
+    stats.record("jsearch", attempted=1)
+    try:
+        jsearch_postings = JSearchSource().fetch(title_filters, enabled_regions, config)
+        stats.record("jsearch", returned=len(jsearch_postings))
+        js_accepted = 0
+        for jp in jsearch_postings:
+            if add_job(jp.to_dict()):
+                js_accepted += 1
+        stats.record("jsearch", accepted=js_accepted, skipped=len(jsearch_postings) - js_accepted)
+    except Exception as e:
+        stats.record("jsearch", failed=1)
+        logger.warning("[scraper] JSearch failed: %s", e)
 
     stats.record("adzuna", attempted=1)
     try:
-        az_jobs = list(
-            fetch_adzuna_jobs(title_filters, enabled_regions, config, ADZUNA_APP_ID, ADZUNA_API_KEY)
-        )
-        stats.record("adzuna", returned=len(az_jobs))
+        az_postings = AdzunaSource().fetch(title_filters, enabled_regions, config)
+        stats.record("adzuna", returned=len(az_postings))
         az_accepted = 0
-        for job in az_jobs:
-            if add_job(job):
+        for jp in az_postings:
+            if add_job(jp.to_dict()):
                 az_accepted += 1
-        stats.record("adzuna", accepted=az_accepted, skipped=len(az_jobs) - az_accepted)
+        stats.record("adzuna", accepted=az_accepted, skipped=len(az_postings) - az_accepted)
     except Exception as e:
         stats.record("adzuna", failed=1)
         logger.warning("[scraper] Adzuna failed: %s", e)
 
     stats.record("reed", attempted=1)
     try:
-        reed_jobs = list(fetch_reed_jobs(title_filters, enabled_regions, config, REED_API_KEY))
-        stats.record("reed", returned=len(reed_jobs))
+        reed_postings = ReedSource().fetch(title_filters, enabled_regions, config)
+        stats.record("reed", returned=len(reed_postings))
         reed_accepted = 0
-        for job in reed_jobs:
-            if add_job(job):
+        for jp in reed_postings:
+            if add_job(jp.to_dict()):
                 reed_accepted += 1
-        stats.record("reed", accepted=reed_accepted, skipped=len(reed_jobs) - reed_accepted)
+        stats.record("reed", accepted=reed_accepted, skipped=len(reed_postings) - reed_accepted)
     except Exception as e:
         stats.record("reed", failed=1)
         logger.warning("[scraper] Reed failed: %s", e)

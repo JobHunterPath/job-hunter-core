@@ -45,11 +45,11 @@ def _disable_external_scrape_paths():
         patch("job_hunter_core.sources.scraper.fetch_playwright_career_jobs", return_value=[]),
         patch("job_hunter_core.sources.scraper.discover_ats_jobs_by_search", return_value=[]),
         patch("job_hunter_core.sources.scraper.fetch_ai_web_search_jobs", return_value=[]),
-        patch("job_hunter_core.sources.scraper.fetch_jobspy_jobs", return_value=[]),
-        patch("job_hunter_core.sources.scraper.fetch_jobicy_jobs", return_value=[]),
-        patch("job_hunter_core.sources.scraper.fetch_remoteok_jobs", return_value=[]),
-        patch("job_hunter_core.sources.scraper.fetch_weworkremotely_jobs", return_value=[]),
-        patch("job_hunter_core.sources.scraper.fetch_jooble_jobs", return_value=[]),
+        patch("job_hunter_core.sources.jobspy_source.JobSpySource.fetch", return_value=[]),
+        patch("job_hunter_core.sources.jobicy_source.JobicySource.fetch", return_value=[]),
+        patch("job_hunter_core.sources.remoteok_source.RemoteOKSource.fetch", return_value=[]),
+        patch("job_hunter_core.sources.weworkremotely_source.WeWorkRemotelySource.fetch", return_value=[]),
+        patch("job_hunter_core.sources.jooble_source.JoobleSource.fetch", return_value=[]),
         patch("job_hunter_core.sources.scraper.load_cached_candidate_urls", return_value=set()),
         patch("job_hunter_core.sources.scraper.save_cached_candidate_urls"),
     ):
@@ -368,11 +368,14 @@ def test_scrape_skips_adzuna_german_descriptions():
         "source": "Adzuna",
     }
 
+    adzuna_posting = MagicMock()
+    adzuna_posting.to_dict.return_value = adzuna_job
+
     with (
         patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
         patch("job_hunter_core.sources.scraper.load_companies", return_value=[]),
-        patch("job_hunter_core.sources.scraper.fetch_adzuna_jobs", return_value=[adzuna_job]),
-        patch("job_hunter_core.sources.scraper.fetch_reed_jobs", return_value=[]),
+        patch("job_hunter_core.sources.adzuna_source.AdzunaSource.fetch", return_value=[adzuna_posting]),
+        patch("job_hunter_core.sources.reed_source.ReedSource.fetch", return_value=[]),
     ):
         jobs = scraper.scrape()
 
@@ -690,13 +693,13 @@ def test_scrape_diagnostics_one_successful_one_failed_source():
         patch("job_hunter_core.sources.scraper.load_companies", return_value=COMPANIES[:1]),
         patch("job_hunter_core.sources.scraper.fetch_ats_jobs", return_value=[ATS_JOB]),
         patch(
-            "job_hunter_core.sources.scraper.fetch_jobspy_jobs",
+            "job_hunter_core.sources.jobspy_source.JobSpySource.fetch",
             side_effect=RuntimeError("jobspy boom"),
         ),
-        patch("job_hunter_core.sources.scraper.fetch_himalayas_jobs", return_value=[]),
-        patch("job_hunter_core.sources.scraper.fetch_arbeitsagentur_jobs", return_value=[]),
-        patch("job_hunter_core.sources.scraper.fetch_adzuna_jobs", return_value=[]),
-        patch("job_hunter_core.sources.scraper.fetch_reed_jobs", return_value=[]),
+        patch("job_hunter_core.sources.himalayas_source.HimalayasSource.fetch", return_value=[]),
+        patch("job_hunter_core.sources.arbeitsagentur_source.ArbeitsagenturSource.fetch", return_value=[]),
+        patch("job_hunter_core.sources.adzuna_source.AdzunaSource.fetch", return_value=[]),
+        patch("job_hunter_core.sources.reed_source.ReedSource.fetch", return_value=[]),
     ):
         jobs = scraper.scrape()
 
