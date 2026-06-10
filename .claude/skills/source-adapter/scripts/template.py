@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
 
 logger = logging.getLogger(__name__)
@@ -16,11 +17,11 @@ class MyPlatformSource(JobSourceAdapter):
     def fetch(
         self,
         title_filters: list[str],
-        location_filter: str,
+        enabled_regions: dict,
         config: dict,
         *,
         excluded_title_terms: list[str] | None = None,
-    ) -> list[dict]:
+    ) -> list[JobPosting]:
         try:
             # TODO: implement fetch logic
             return []

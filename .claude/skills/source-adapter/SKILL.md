@@ -23,5 +23,5 @@ Run `python .claude/skills/source-adapter/scripts/validate_adapter.py <module.Cl
 ## Contract
 
 - `fetch()` must never raise — catch all exceptions and return `[]`
-- Each returned dict must have: `title`, `company`, `url`, `location`, `snippet`, `source`, `posted`
+- Each returned `JobPosting` must have: `title`, `company`, `url`, `location`, `snippet`, `source`, `posted`
 - `is_enabled(config)` defaults to `True` — override to check config flags

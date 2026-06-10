@@ -16,12 +16,12 @@ def test_concrete_subclass_instantiates():
         def name(self) -> str:
             return "my_source"
 
-        def fetch(self, title_filters, location_filter, config, *, excluded_title_terms=None):
+        def fetch(self, title_filters, enabled_regions, config, *, excluded_title_terms=None):
             return []
 
     src = MySource()
     assert src.name == "my_source"
-    assert src.fetch([], "", {}) == []
+    assert src.fetch([], {}, {}) == []
 
 
 def test_is_enabled_defaults_true():
@@ -30,7 +30,7 @@ def test_is_enabled_defaults_true():
         def name(self) -> str:
             return "another"
 
-        def fetch(self, title_filters, location_filter, config, *, excluded_title_terms=None):
+        def fetch(self, title_filters, enabled_regions, config, *, excluded_title_terms=None):
             return []
 
     src = AnotherSource()
