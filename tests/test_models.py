@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from job_hunter_core.models import Company, JobPosting, JobScore
 
 

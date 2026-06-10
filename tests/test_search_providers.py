@@ -5,8 +5,14 @@ from concurrent.futures import ThreadPoolExecutor
 from job_hunter_core.sources import search_providers
 from job_hunter_core.sources.search_providers import (
     ats_discovery as _ats_mod,
+)
+from job_hunter_core.sources.search_providers import (
     fetchers as _fetchers_mod,
+)
+from job_hunter_core.sources.search_providers import (
     providers as _prov_mod,
+)
+from job_hunter_core.sources.search_providers import (
     router as _router_mod,
 )
 
