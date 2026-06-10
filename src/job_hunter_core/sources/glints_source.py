@@ -164,15 +164,3 @@ class GlintsSource(JobSourceAdapter):
 
         logger.info("[glints] Complete: %d total jobs", len(jobs))
         return jobs
-
-
-def fetch_glints_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch jobs from Glints for SEA regions.
-
-    Only runs for regions whose country code is in SG, ID, MY, VN, PH.
-    """
-    return [j.to_dict() for j in GlintsSource().fetch(title_filters, enabled_regions, config)]

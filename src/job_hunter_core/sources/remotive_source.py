@@ -98,12 +98,3 @@ class RemotiveSource(JobSourceAdapter):
                     )
 
         return jobs
-
-
-def fetch_remotive_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch remote jobs from Remotive's free public API."""
-    return [j.to_dict() for j in RemotiveSource().fetch(title_filters, enabled_regions, config)]

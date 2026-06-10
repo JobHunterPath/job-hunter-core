@@ -143,15 +143,3 @@ class IrishJobsSource(JobSourceAdapter):
 
         logger.info("[irishjobs] Complete: %d total jobs", len(jobs))
         return jobs
-
-
-def fetch_irishjobs_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch jobs from IrishJobs.ie by scraping HTML search results.
-
-    Only runs for Irish regions (country == IE).
-    """
-    return [j.to_dict() for j in IrishJobsSource().fetch(title_filters, enabled_regions, config)]

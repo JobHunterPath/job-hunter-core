@@ -253,23 +253,3 @@ class JobSpySource(JobSourceAdapter):
 
         logger.info("[jobspy] Complete: %d total jobs found", len(jobs))
         return jobs
-
-
-def fetch_jobspy_jobs(
-    title_filters: list[str],
-    enabled_regions: dict[str, Any],
-    config: dict[str, Any],
-) -> list[dict]:
-    """
-    Scrape job boards via python-jobspy for each title × region.
-
-    Sources used per region (derived from region's ISO country code):
-    - Google Jobs: always
-    - Indeed: when the region's country has a known Indeed country name
-    - Bayt: when the region's country is a Middle East ISO code, searched internationally
-    - Glassdoor: when glassdoor_enabled is true in config
-    - LinkedIn: when linkedin_enabled is true (off by default — gets blocked)
-
-    Silently skips if python-jobspy is not installed or disabled in config.
-    """
-    return [j.to_dict() for j in JobSpySource().fetch(title_filters, enabled_regions, config)]

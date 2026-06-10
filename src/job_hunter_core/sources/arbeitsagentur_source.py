@@ -109,12 +109,3 @@ class ArbeitsagenturSource(JobSourceAdapter):
                 )
 
         return jobs
-
-
-def fetch_arbeitsagentur_jobs(
-    title_filters: list[str],
-    enabled_regions: dict[str, Any],
-    config: dict[str, Any],
-) -> list[dict]:
-    """Fetch German public employment-agency jobs for DE regions."""
-    return [j.to_dict() for j in ArbeitsagenturSource().fetch(title_filters, enabled_regions, config)]

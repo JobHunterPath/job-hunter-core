@@ -215,15 +215,3 @@ class NaukriGulfSource(JobSourceAdapter):
 
         logger.info("[naukrigulf] Complete: %d total jobs", len(jobs))
         return jobs
-
-
-def fetch_naukrigulf_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch jobs from Naukrigulf using requests→Playwright fallback.
-
-    Only runs for Gulf regions (AE, SA, QA, KW, BH, OM).
-    """
-    return [j.to_dict() for j in NaukriGulfSource().fetch(title_filters, enabled_regions, config)]

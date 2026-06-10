@@ -108,12 +108,3 @@ class RemoteOKSource(JobSourceAdapter):
 
         logger.info("[remoteok] %d jobs matched after filtering", len(jobs))
         return jobs
-
-
-def fetch_remoteok_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch remote jobs from RemoteOK's public JSON feed."""
-    return [j.to_dict() for j in RemoteOKSource().fetch(title_filters, enabled_regions, config)]

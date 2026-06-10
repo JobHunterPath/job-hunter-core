@@ -145,15 +145,3 @@ class MyCareersFutureSource(JobSourceAdapter):
 
         logger.info("[mycareersfuture] Complete: %d total jobs", len(jobs))
         return jobs
-
-
-def fetch_mycareersfuture_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch jobs from MyCareersFuture.sg official REST API.
-
-    Only runs for Singapore regions (country == SG).
-    """
-    return [j.to_dict() for j in MyCareersFutureSource().fetch(title_filters, enabled_regions, config)]

@@ -163,15 +163,3 @@ class WTTJSource(JobSourceAdapter):
 
         logger.info("[wttj] Complete: %d total jobs", len(jobs))
         return jobs
-
-
-def fetch_wttj_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch jobs from Welcome to the Jungle public API.
-
-    Global board — fires for all enabled regions; uses aroundQuery for location filtering.
-    """
-    return [j.to_dict() for j in WTTJSource().fetch(title_filters, enabled_regions, config)]

@@ -138,15 +138,3 @@ class JoobleSource(JobSourceAdapter):
 
         logger.info("[jooble] Complete: %d total jobs found", len(jobs))
         return jobs
-
-
-def fetch_jooble_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-    api_key: str,
-) -> list[dict]:
-    """Fetch jobs from Jooble for each title × region. Returns [] silently if key is missing."""
-    src = JoobleSource.__new__(JoobleSource)
-    src._api_key = api_key
-    return [j.to_dict() for j in src.fetch(title_filters, enabled_regions, config)]

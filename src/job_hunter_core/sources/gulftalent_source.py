@@ -217,15 +217,3 @@ class GulfTalentSource(JobSourceAdapter):
 
         logger.info("[gulftalent] Complete: %d total jobs", len(jobs))
         return jobs
-
-
-def fetch_gulftalent_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch jobs from GulfTalent using requests→Playwright fallback.
-
-    Only runs for Gulf regions (AE, SA, QA, KW, BH, OM).
-    """
-    return [j.to_dict() for j in GulfTalentSource().fetch(title_filters, enabled_regions, config)]

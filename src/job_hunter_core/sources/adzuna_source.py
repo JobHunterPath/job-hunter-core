@@ -204,20 +204,3 @@ class AdzunaSource(JobSourceAdapter):
 
         logger.info("[adzuna] Complete: %d total jobs found", len(jobs))
         return jobs
-
-
-def fetch_adzuna_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-    app_id: str,
-    api_key: str,
-) -> list[dict]:
-    """
-    Fetch jobs from Adzuna for each enabled region whose ISO country code is supported.
-    Returns [] silently if credentials are missing or adzuna is disabled.
-    """
-    src = AdzunaSource.__new__(AdzunaSource)
-    src._app_id = app_id
-    src._api_key = api_key
-    return [j.to_dict() for j in src.fetch(title_filters, enabled_regions, config)]

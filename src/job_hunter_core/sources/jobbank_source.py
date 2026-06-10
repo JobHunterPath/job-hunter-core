@@ -144,15 +144,3 @@ class JobBankSource(JobSourceAdapter):
 
         logger.info("[jobbank] Complete: %d total jobs", len(jobs))
         return jobs
-
-
-def fetch_jobbank_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch jobs from Job Bank Canada by scraping the HTML search results.
-
-    Only runs for Canadian regions (country == CA).
-    """
-    return [j.to_dict() for j in JobBankSource().fetch(title_filters, enabled_regions, config)]

@@ -135,12 +135,3 @@ class HimalayasSource(JobSourceAdapter):
                     )
 
         return jobs
-
-
-def fetch_himalayas_jobs(
-    title_filters: list[str],
-    enabled_regions: dict[str, Any],
-    config: dict[str, Any],
-) -> list[dict]:
-    """Fetch remote jobs from Himalayas' no-auth public API."""
-    return [j.to_dict() for j in HimalayasSource().fetch(title_filters, enabled_regions, config)]

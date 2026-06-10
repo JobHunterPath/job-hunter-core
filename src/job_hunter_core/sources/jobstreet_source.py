@@ -262,15 +262,3 @@ class JobStreetSource(JobSourceAdapter):
 
         logger.info("[jobstreet] Complete: %d total jobs", len(jobs))
         return jobs
-
-
-def fetch_jobstreet_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch jobs from JobStreet using REST API with Playwright fallback.
-
-    Only runs for SEA regions (SG, MY, ID, PH, VN).
-    """
-    return [j.to_dict() for j in JobStreetSource().fetch(title_filters, enabled_regions, config)]

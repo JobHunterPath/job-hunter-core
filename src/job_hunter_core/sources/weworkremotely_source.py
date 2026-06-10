@@ -110,12 +110,3 @@ class WeWorkRemotelySource(JobSourceAdapter):
 
         logger.info("[weworkremotely] %d jobs matched after filtering", len(jobs))
         return jobs
-
-
-def fetch_weworkremotely_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch remote jobs from We Work Remotely's public RSS feed."""
-    return [j.to_dict() for j in WeWorkRemotelySource().fetch(title_filters, enabled_regions, config)]

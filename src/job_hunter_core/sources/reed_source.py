@@ -171,18 +171,3 @@ class ReedSource(JobSourceAdapter):
 
         logger.info("[reed] Complete: %d total jobs found", len(jobs))
         return jobs
-
-
-def fetch_reed_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-    api_key: str,
-) -> list[dict]:
-    """
-    Fetch jobs from Reed.co.uk for any region with country GB or IE.
-    Returns [] silently if the API key is missing or reed is disabled.
-    """
-    src = ReedSource.__new__(ReedSource)
-    src._api_key = api_key
-    return [j.to_dict() for j in src.fetch(title_filters, enabled_regions, config)]

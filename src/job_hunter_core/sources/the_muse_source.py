@@ -111,12 +111,3 @@ class TheMuseSource(JobSourceAdapter):
                 )
 
         return jobs
-
-
-def fetch_the_muse_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch jobs from The Muse's free public API."""
-    return [j.to_dict() for j in TheMuseSource().fetch(title_filters, enabled_regions, config)]

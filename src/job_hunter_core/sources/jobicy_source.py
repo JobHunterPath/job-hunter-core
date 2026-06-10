@@ -108,12 +108,3 @@ class JobicySource(JobSourceAdapter):
 
         logger.info("[jobicy] Complete: %d total jobs found", len(jobs))
         return jobs
-
-
-def fetch_jobicy_jobs(
-    title_filters: list[str],
-    enabled_regions: dict,
-    config: dict,
-) -> list[dict]:
-    """Fetch remote jobs from Jobicy's free public API."""
-    return [j.to_dict() for j in JobicySource().fetch(title_filters, enabled_regions, config)]
