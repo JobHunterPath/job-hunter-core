@@ -16,14 +16,17 @@ import json
 import logging
 import re
 import threading
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
 from job_hunter_core.core.config import load_api_config
 from job_hunter_core.core.llm_client import get_llm_client
 from job_hunter_core.core.llm_utils import extract_json_object, get_llm_role_settings
 from job_hunter_core.core.metrics import timed_stage
 from job_hunter_core.core.utils import url_is_alive
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
