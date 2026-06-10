@@ -9,17 +9,14 @@ The fallback order is intentionally conservative:
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import logging
-import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 from urllib.parse import urlparse
 
 import requests  # noqa: F401
-import yaml
 
 from job_hunter_core.core.api_budget import get_exhausted_providers
 from job_hunter_core.core.config import (
@@ -70,209 +67,20 @@ from job_hunter_core.tracking.discovery_cache import (
     load_cached_candidate_urls,
     save_cached_candidate_urls,
 )
+from job_hunter_core.sources.scraper._stats import SourceStats, ScrapeStats
+from job_hunter_core.sources.scraper._config import load_search_config, load_companies, build_queries
+from job_hunter_core.sources.scraper._policy import (
+    is_valid_job_url,
+    is_excluded_url,
+    is_stale_posting,
+    is_too_senior,
+    is_excluded,
+    is_german,
+    is_excluded_language,
+)
 
 ROOT = str(REPO_ROOT)
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Per-source yield diagnostics
-# ---------------------------------------------------------------------------
-
-
-@dataclasses.dataclass
-class SourceStats:
-    """Counts for a single named source during one scrape run."""
-
-    attempted: int = 0
-    returned: int = 0
-    accepted: int = 0
-    skipped: int = 0
-    failed: int = 0
-    exhausted: int = 0
-    cached: int = 0
-
-
-class ScrapeStats:
-    """Accumulates per-source statistics during a scrape run.
-
-    Thread-safe: individual source stat objects are created before the
-    parallel phase and are only written by their owning thread (company
-    processing is per-company) or under the main thread for global sources.
-    """
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._sources: dict[str, SourceStats] = {}
-
-    def source(self, name: str) -> SourceStats:
-        with self._lock:
-            if name not in self._sources:
-                self._sources[name] = SourceStats()
-            return self._sources[name]
-
-    def record(
-        self,
-        name: str,
-        *,
-        attempted: int = 0,
-        returned: int = 0,
-        accepted: int = 0,
-        skipped: int = 0,
-        failed: int = 0,
-        exhausted: int = 0,
-        cached: int = 0,
-    ) -> None:
-        s = self.source(name)
-        with self._lock:
-            s.attempted += attempted
-            s.returned += returned
-            s.accepted += accepted
-            s.skipped += skipped
-            s.failed += failed
-            s.exhausted += exhausted
-            s.cached += cached
-
-    def log_summary(self, *, ats_only: bool = False) -> None:
-        """Log a compact per-source summary at INFO level."""
-        with self._lock:
-            sources = dict(self._sources)
-        if not sources:
-            logger.info("[scraper][diag] no sources recorded")
-            return
-        header = "[scraper][diag] source yield summary:"
-        if ats_only:
-            header += " mode=ats-only"
-        lines = [header]
-        for name, s in sorted(sources.items()):
-            parts = [f"attempted={s.attempted}", f"returned={s.returned}", f"accepted={s.accepted}"]
-            if s.skipped:
-                parts.append(f"skipped={s.skipped}")
-            if s.failed:
-                parts.append(f"failed={s.failed}")
-            if s.exhausted:
-                parts.append(f"exhausted={s.exhausted}")
-            if s.cached:
-                parts.append(f"cached={s.cached}")
-            lines.append(f"  {name}: {', '.join(parts)}")
-        logger.info("\n".join(lines))
-
-    def to_dict(self) -> dict[str, dict]:
-        with self._lock:
-            return {name: dataclasses.asdict(s) for name, s in self._sources.items()}
-
-
-def load_search_config() -> dict:
-    config_file = os.path.join(ROOT, "config", "search_config.yml")
-    with open(config_file, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-    logger.info("[scraper] Loaded search configuration from %s", config_file)
-    return config
-
-
-def load_companies(region: str | None = None) -> list[dict]:
-    """Load enabled companies from search_config.yml, optionally scoped by region."""
-    config = load_search_config()
-    excluded = {name.lower() for name in config.get("excluded_companies", [])}
-    companies = []
-
-    regions_to_load = [region] if region else config.get("regions", {}).keys()
-
-    for reg in regions_to_load:
-        if reg not in config.get("regions", {}):
-            logger.warning("[scraper] Region %r not found in search_config.yml", reg)
-            continue
-
-        region_config = config["regions"][reg]
-        if not region_config.get("enabled", True):
-            logger.info("[scraper] Region %r is disabled. Skipping.", reg)
-            continue
-
-        location = region_config.get("location", "")
-        loaded = 0
-        for company in region_config.get("companies", []):
-            if company["name"].lower() in excluded:
-                logger.info("[scraper] Skipping excluded company: %s", company["name"])
-                continue
-            companies.append(
-                {
-                    **company,
-                    "region": reg,
-                    "location": location,
-                    "country": region_config.get("country", ""),
-                    "search_lang": region_config.get("search_lang", ""),
-                    "_region_config": region_config,
-                }
-            )
-            loaded += 1
-
-        logger.info(
-            "[scraper] Loaded %s companies from region %r (location=%r)",
-            loaded,
-            reg,
-            location,
-        )
-
-    logger.info("[scraper] Total: %s companies", len(companies))
-    return companies
-
-
-def build_queries(companies: list[dict], config: dict) -> list[tuple[str, str, str]]:
-    """Build search queries. Returns (query, company_name, location)."""
-    queries = []
-    job_titles = config.get("global_search", {}).get("job_titles", [])
-    excluded_title_terms = config.get("exclusion_rules", {}).get("excluded_title_terms", [])
-    exclusions = " ".join(f'-"{term}"' for term in excluded_title_terms)
-
-    if not job_titles:
-        logger.warning("[scraper] global_search.job_titles is empty; no search queries built")
-        return queries
-
-    for company in companies:
-        url = company["career_url"]
-        name = company["name"]
-        location = company.get("location", "")
-
-        for title in job_titles:
-            query = f'"{title}" site:{url}'
-            if location:
-                query += f' "{location}"'
-            if exclusions:
-                query += f" {exclusions}"
-            queries.append((query, name, location or "global"))
-
-    logger.info("[scraper] Built %s search queries for %s companies", len(queries), len(companies))
-    return queries
-
-
-def is_valid_job_url(url: str) -> bool:
-    """Return False for root/listing pages that are not individual job postings."""
-    return JobPolicy({}).is_valid_job_url(url)
-
-
-def is_excluded_url(url: str, config: dict) -> bool:
-    """Return True when caller-configured URL patterns identify non-posting pages."""
-    return JobPolicy(config).is_excluded_url(url)
-
-
-def is_stale_posting(title: str, snippet: str, config: dict) -> bool:
-    return JobPolicy(config).is_stale_posting(title, snippet)
-
-
-def is_too_senior(title: str, snippet: str, config: dict) -> bool:
-    return JobPolicy(config).is_too_senior(title, snippet)
-
-
-def is_excluded(snippet: str, config: dict) -> bool:
-    return JobPolicy(config).is_excluded_industry(snippet)
-
-
-def is_german(title: str, snippet: str, config: dict) -> bool:
-    return JobPolicy(config).is_german(title, snippet)
-
-
-def is_excluded_language(title: str, snippet: str, config: dict) -> bool:
-    return JobPolicy(config).is_excluded_language(title, snippet)
 
 
 def _url_matches_career_site(career_url: str, result_url: str) -> bool:
