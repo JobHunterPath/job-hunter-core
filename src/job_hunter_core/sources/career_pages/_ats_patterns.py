@@ -9,6 +9,8 @@ import requests
 from job_hunter_core.core.config import get_timeout
 from job_hunter_core.sources.search_providers import USER_AGENT
 
+_SNIPPET_CHARS = 400  # initial snippet length for ATS pattern-matched jobs before enrichment
+
 # Maps a compiled URL pattern to (ats_name, public_api_url_template).
 # The template receives {slug} and optionally {job_id} via .format().
 _ATS_URL_PATTERNS: list[tuple[re.Pattern, str, str]] = [
@@ -114,7 +116,7 @@ def _normalise_ats_job(raw: dict, ats_name: str, slug: str, base_url: str) -> di
         "url": str(url).strip(),
         "location": location.strip(),
         "posted": str(raw.get("updated_at") or raw.get("createdAt") or "").strip(),
-        "snippet": str(raw.get("content") or raw.get("description") or "")[:400].strip(),
+        "snippet": str(raw.get("content") or raw.get("description") or "")[:_SNIPPET_CHARS].strip(),
         "source": f"career_page:ats_api:{ats_name}",
         "extraction_method": "ats_api",
         "detected_ats": ats_name,

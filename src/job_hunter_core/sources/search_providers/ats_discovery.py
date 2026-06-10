@@ -19,6 +19,8 @@ from job_hunter_core.sources.search_providers.router import (
 
 logger = logging.getLogger(__name__)
 
+_ATS_API_TIMEOUT = 8  # seconds: per-request HTTP timeout for ATS public API location checks
+
 _ATS_DISCOVERY_SITES = {
     "greenhouse": (
         "site:boards.greenhouse.io OR site:job-boards.greenhouse.io",
@@ -142,7 +144,7 @@ def _verify_ats_location(url: str, source: str, location_filter: str) -> bool:
             if len(parts) < 2:
                 return True
             slug, job_id = parts[0], parts[1]
-            resp = requests.get(f"https://api.lever.co/v0/postings/{slug}/{job_id}", timeout=8)
+            resp = requests.get(f"https://api.lever.co/v0/postings/{slug}/{job_id}", timeout=_ATS_API_TIMEOUT)
             if not resp.ok:
                 return True
             categories = resp.json().get("categories", {})
@@ -158,7 +160,7 @@ def _verify_ats_location(url: str, source: str, location_filter: str) -> bool:
             slug, job_id = parts[0], parts[2]
             resp = requests.get(
                 f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs/{job_id}",
-                timeout=8,
+                timeout=_ATS_API_TIMEOUT,
             )
             if not resp.ok:
                 return True
@@ -171,7 +173,7 @@ def _verify_ats_location(url: str, source: str, location_filter: str) -> bool:
             slug, job_id = parts[0], parts[1]
             resp = requests.get(
                 f"https://api.ashbyhq.com/posting-api/job-board/{slug}/job-posting/{job_id}",
-                timeout=8,
+                timeout=_ATS_API_TIMEOUT,
             )
             if not resp.ok:
                 return True
@@ -184,7 +186,7 @@ def _verify_ats_location(url: str, source: str, location_filter: str) -> bool:
             slug, posting_id = parts[0], parts[1]
             resp = requests.get(
                 f"https://api.smartrecruiters.com/v1/companies/{slug}/postings/{posting_id}",
-                timeout=8,
+                timeout=_ATS_API_TIMEOUT,
             )
             if not resp.ok:
                 return True
@@ -204,7 +206,7 @@ def _verify_ats_location(url: str, source: str, location_filter: str) -> bool:
             slug, shortcode = parts[0], parts[2]
             resp = requests.get(
                 f"https://apply.workable.com/api/v3/accounts/{slug}/jobs/{shortcode}",
-                timeout=8,
+                timeout=_ATS_API_TIMEOUT,
             )
             if not resp.ok:
                 return True
@@ -219,7 +221,7 @@ def _verify_ats_location(url: str, source: str, location_filter: str) -> bool:
                 return True
             resp = requests.get(
                 f"https://{subdomain}.recruitee.com/api/offers/{slug}",
-                timeout=8,
+                timeout=_ATS_API_TIMEOUT,
             )
             if not resp.ok:
                 return True

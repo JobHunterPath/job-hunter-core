@@ -8,6 +8,8 @@ from bs4 import BeautifulSoup
 
 from job_hunter_core.sources.search_providers import canonicalize_url
 
+_SNIPPET_CHARS = 400  # initial snippet length for JSON-LD job entries before enrichment
+
 
 def extract_jsonld_jobs(
     html: str,
@@ -90,7 +92,7 @@ def extract_jsonld_jobs(
                 employer = company_name
 
             description_raw = item.get("description") or ""
-            snippet = str(description_raw)[:400].strip()
+            snippet = str(description_raw)[:_SNIPPET_CHARS].strip()
 
             jobs.append(
                 {
