@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "job-hunter-core"
+version = "1.3.7"
+description = "Job Hunting Automation Engine."
+license = {text = "MIT"}
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.11"
+dependencies = [
+  "anthropic>=0.50.0",
+  "openai>=1.68.0",
+  "google-genai>=1.0.0",
+  "requests>=2.31.0",
+  "beautifulsoup4>=4.12.0",
+  "keyring>=24.0.0",
+  "pyyaml>=6.0",
+  "reportlab>=4.0.0",
+  "playwright>=1.40.0",
+  "python-jobspy>=0.20.0",
+  "jsonschema>=4.0",
+]
+
+[project.scripts]
+job-hunter = "job_hunter_core.core.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["job_hunter_core*"]
+
+[tool.setuptools.package-data]
+"job_hunter_core.linkedin" = ["defaults.yml"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "W", "B", "TCH"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
