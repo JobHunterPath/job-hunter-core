@@ -9,9 +9,8 @@ from bs4 import BeautifulSoup
 
 from job_hunter_core.core.config import get_timeout
 from job_hunter_core.core.utils import title_matches
-from job_hunter_core.sources.search_providers import USER_AGENT, canonicalize_url
-
 from job_hunter_core.sources.career_pages._ats_patterns import _CAREER_PATHS
+from job_hunter_core.sources.search_providers import USER_AGENT, canonicalize_url
 
 
 def _probe_sitemap(base_url: str, timeout: int) -> list[str]:

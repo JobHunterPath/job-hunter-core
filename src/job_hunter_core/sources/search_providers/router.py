@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import TYPE_CHECKING
 
 from job_hunter_core.core.api_budget import (
     _budget_cfg,
@@ -12,8 +13,6 @@ from job_hunter_core.core.api_budget import (
     is_api_quota_exhausted,
     mark_api_exhausted,
 )
-from job_hunter_core.core.config import load_api_config
-from job_hunter_core.sources.search_providers._result import SearchResult
 from job_hunter_core.sources.search_providers.providers import (
     BraveProvider,
     ExaProvider,
@@ -22,6 +21,9 @@ from job_hunter_core.sources.search_providers.providers import (
     TavilyProvider,
     _search_cfg,
 )
+
+if TYPE_CHECKING:
+    from job_hunter_core.sources.search_providers._result import SearchResult
 
 logger = logging.getLogger(__name__)
 

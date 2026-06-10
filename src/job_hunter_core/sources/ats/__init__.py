@@ -8,7 +8,6 @@ continues to work in tests.
 
 import requests  # noqa: F401 — required for test patch compatibility
 
-from job_hunter_core.sources.ats_urls import detect_ats
 from job_hunter_core.sources.ats.ashby import fetch_ashby_jobs
 from job_hunter_core.sources.ats.breezy import fetch_breezy_jobs
 from job_hunter_core.sources.ats.dispatch import _FETCHERS, fetch_ats_jobs
@@ -21,6 +20,7 @@ from job_hunter_core.sources.ats.smartrecruiters import fetch_smartrecruiters_jo
 from job_hunter_core.sources.ats.teamtailor import fetch_teamtailor_jobs
 from job_hunter_core.sources.ats.workable import fetch_workable_jobs
 from job_hunter_core.sources.ats.workday import fetch_workday_jobs
+from job_hunter_core.sources.ats_urls import detect_ats
 
 __all__ = [
     "detect_ats",

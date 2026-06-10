@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import dataclasses
 
 
@@ -20,7 +21,7 @@ class JobPosting:
         return dataclasses.asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict[str, object]) -> "JobPosting":
+    def from_dict(cls, d: dict[str, object]) -> JobPosting:
         known = {f.name for f in dataclasses.fields(cls)}
         return cls(**{k: v for k, v in d.items() if k in known})
 

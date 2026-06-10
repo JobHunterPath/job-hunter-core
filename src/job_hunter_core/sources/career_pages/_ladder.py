@@ -7,18 +7,18 @@ import logging
 import requests
 
 from job_hunter_core.core.config import get_timeout
-from job_hunter_core.sources.search_providers import USER_AGENT, extract_jobs_from_html
 from job_hunter_core.sources.career_pages._ats_patterns import (
-    detect_ats,
     _fetch_ats_endpoint_jobs,
+    detect_ats,
 )
 from job_hunter_core.sources.career_pages._jsonld import extract_jsonld_jobs
-from job_hunter_core.sources.career_pages._sitemap import discover_via_sitemap
 from job_hunter_core.sources.career_pages._rendering import (
+    extract_from_firecrawl,
     extract_from_lightpanda,
     extract_from_rendered_html,
-    extract_from_firecrawl,
 )
+from job_hunter_core.sources.career_pages._sitemap import discover_via_sitemap
+from job_hunter_core.sources.search_providers import USER_AGENT, extract_jobs_from_html
 
 logger = logging.getLogger(__name__)
 

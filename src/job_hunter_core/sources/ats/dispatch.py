@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 
-from job_hunter_core.sources.ats_urls import detect_ats
 from job_hunter_core.sources.ats.ashby import fetch_ashby_jobs
 from job_hunter_core.sources.ats.breezy import fetch_breezy_jobs
 from job_hunter_core.sources.ats.greenhouse import fetch_greenhouse_jobs
@@ -14,6 +13,7 @@ from job_hunter_core.sources.ats.smartrecruiters import fetch_smartrecruiters_jo
 from job_hunter_core.sources.ats.teamtailor import fetch_teamtailor_jobs
 from job_hunter_core.sources.ats.workable import fetch_workable_jobs
 from job_hunter_core.sources.ats.workday import fetch_workday_jobs
+from job_hunter_core.sources.ats_urls import detect_ats
 
 logger = logging.getLogger(__name__)
 

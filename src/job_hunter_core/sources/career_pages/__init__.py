@@ -26,23 +26,23 @@ import requests  # noqa: F401 — exposed so tests can patch career_pages.reques
 from job_hunter_core.sources.career_pages._ats_patterns import (
     _ATS_URL_PATTERNS,
     _CAREER_PATHS,
-    detect_ats,
-    _normalise_ats_job,
     _fetch_ats_endpoint_jobs,
+    _normalise_ats_job,
+    detect_ats,
 )
 from job_hunter_core.sources.career_pages._jsonld import extract_jsonld_jobs
+from job_hunter_core.sources.career_pages._ladder import extract_career_page_jobs
+from job_hunter_core.sources.career_pages._rendering import (
+    extract_from_firecrawl,
+    extract_from_lightpanda,
+    extract_from_rendered_html,
+    extract_from_static_html,
+)
 from job_hunter_core.sources.career_pages._sitemap import (
-    _probe_sitemap,
     _probe_career_paths,
+    _probe_sitemap,
     discover_via_sitemap,
 )
-from job_hunter_core.sources.career_pages._rendering import (
-    extract_from_static_html,
-    extract_from_rendered_html,
-    extract_from_lightpanda,
-    extract_from_firecrawl,
-)
-from job_hunter_core.sources.career_pages._ladder import extract_career_page_jobs
 
 logger = logging.getLogger(__name__)
 

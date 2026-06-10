@@ -4,8 +4,6 @@ from __future__ import annotations
 import requests
 
 from job_hunter_core.core.api_budget import (
-    is_api_quota_exhausted,
-    mark_api_exhausted,
     reserve_api_call,
 )
 from job_hunter_core.core.config import (
