@@ -16,23 +16,16 @@ from urllib.parse import urlparse
 
 import yaml
 
-from job_hunter_core.core.config import (
-    ADZUNA_API_KEY,
-    ADZUNA_APP_ID,
-    JOOBLE_API_KEY,
-    RAPIDAPI_KEY,
-    load_api_config,
-)
 from job_hunter_core.core.config import ROOT as REPO_ROOT
 from job_hunter_core.core.llm_client import get_llm_client
 from job_hunter_core.core.llm_utils import get_llm_role_settings
-from job_hunter_core.sources.adzuna_source import fetch_adzuna_jobs
-from job_hunter_core.sources.arbeitsagentur_source import fetch_arbeitsagentur_jobs
+from job_hunter_core.sources.adzuna_source import AdzunaSource
+from job_hunter_core.sources.arbeitsagentur_source import ArbeitsagenturSource
 from job_hunter_core.sources.ats_urls import extract_career_url
-from job_hunter_core.sources.himalayas_source import fetch_himalayas_jobs
-from job_hunter_core.sources.job_boards import fetch_arbeitnow_jobs, fetch_jsearch_jobs
-from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
-from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
+from job_hunter_core.sources.himalayas_source import HimalayasSource
+from job_hunter_core.sources.job_boards import ArbeitnowSource, JSearchSource
+from job_hunter_core.sources.jobspy_source import JobSpySource
+from job_hunter_core.sources.jooble_source import JoobleSource
 from job_hunter_core.sources.search_providers import (
     discover_ats_jobs_by_search,
     search_career_urls,
@@ -435,9 +428,6 @@ def discover_company_names_from_job_sources(
     if not title_filters:
         return []
 
-    api_cfg = load_api_config()
-    boards_cfg = api_cfg.get("http", {}).get("job_boards", {}) or {}
-    location = region_config.get("location") or region_name
     names: list[str] = []
     seen: set[str] = set()
 
@@ -449,39 +439,28 @@ def discover_company_names_from_job_sources(
             seen.add(name.lower())
             names.append(name)
 
-    if boards_cfg.get("arbeitnow", {}).get("enabled", False):
-        max_pages = int(boards_cfg["arbeitnow"].get("max_pages", 3))
-        _add_jobs(fetch_arbeitnow_jobs(title_filters, location, max_pages, excluded_title_terms))
-
-    if boards_cfg.get("jsearch", {}).get("enabled", False):
-        num_pages = int(boards_cfg["jsearch"].get("num_pages", 1))
-        _add_jobs(
-            fetch_jsearch_jobs(
-                title_filters,
-                location,
-                RAPIDAPI_KEY,
-                num_pages,
-                excluded_title_terms,
-                region_config.get("country", ""),
-                region_config.get("search_lang", ""),
-            )
-        )
-
     enabled_region = {region_name: region_config}
-
-    if boards_cfg.get("adzuna", {}).get("enabled", False):
-        _add_jobs(
-            fetch_adzuna_jobs(
-                title_filters, enabled_region, search_config, ADZUNA_APP_ID, ADZUNA_API_KEY
-            )
-        )
-
-    if boards_cfg.get("jooble", {}).get("enabled", False):
-        _add_jobs(fetch_jooble_jobs(title_filters, enabled_region, search_config, JOOBLE_API_KEY))
-
-    _add_jobs(fetch_jobspy_jobs(title_filters, enabled_region, search_config))
-    _add_jobs(fetch_arbeitsagentur_jobs(title_filters, enabled_region, search_config))
-    _add_jobs(fetch_himalayas_jobs(title_filters, enabled_region, search_config))
+    _add_jobs([jp.to_dict() for jp in ArbeitnowSource().fetch(
+        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
+    )])
+    _add_jobs([jp.to_dict() for jp in JSearchSource().fetch(
+        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
+    )])
+    _add_jobs([jp.to_dict() for jp in AdzunaSource().fetch(
+        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
+    )])
+    _add_jobs([jp.to_dict() for jp in JoobleSource().fetch(
+        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
+    )])
+    _add_jobs([jp.to_dict() for jp in JobSpySource().fetch(
+        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
+    )])
+    _add_jobs([jp.to_dict() for jp in ArbeitsagenturSource().fetch(
+        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
+    )])
+    _add_jobs([jp.to_dict() for jp in HimalayasSource().fetch(
+        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
+    )])
 
     return names
 
