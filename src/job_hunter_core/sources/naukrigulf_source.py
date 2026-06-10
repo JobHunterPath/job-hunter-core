@@ -14,6 +14,8 @@ from bs4 import BeautifulSoup
 
 from job_hunter_core.core.config import get_timeout, load_api_config
 from job_hunter_core.core.utils import strip_html, title_matches
+from job_hunter_core.models import JobPosting
+from job_hunter_core.sources.base import JobSourceAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +131,92 @@ def _fetch_with_playwright(url: str, timeout_ms: int, user_agent: str) -> str:
         return ""
 
 
+class NaukriGulfSource(JobSourceAdapter):
+    @property
+    def name(self) -> str:
+        return "naukrigulf"
+
+    def is_enabled(self, config: dict) -> bool:  # noqa: ARG002
+        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("naukrigulf", {}) or {}
+        return bool(source_cfg.get("enabled", True))
+
+    def fetch(
+        self,
+        title_filters: list[str],
+        enabled_regions: dict,
+        config: dict,
+        *,
+        excluded_title_terms: list[str] | None = None,
+    ) -> list[JobPosting]:
+        """Fetch jobs from Naukrigulf using requests→Playwright fallback.
+
+        Only runs for Gulf regions (AE, SA, QA, KW, BH, OM).
+        """
+        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("naukrigulf", {}) or {}
+        if not source_cfg.get("enabled", True):
+            return []
+
+        timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))
+        timeout_ms = timeout * 1000
+        _excluded = (
+            excluded_title_terms
+            if excluded_title_terms is not None
+            else config.get("exclusion_rules", {}).get("excluded_title_terms", []) or []
+        )
+        jobs: list[JobPosting] = []
+
+        for region_name, region_config in enabled_regions.items():
+            iso = region_config.get("country", "").upper()
+            if iso not in _GULF_CODES:
+                continue
+            country_slug = _COUNTRY_SLUGS.get(iso, iso.lower())
+
+            for title in title_filters:
+                url = _build_url(title, country_slug)
+                html = ""
+                try:
+                    resp = requests.get(url, headers=_HEADERS, timeout=timeout)
+                    if resp.status_code == 200 and len(resp.text) > 200:
+                        html = resp.text
+                except Exception as exc:
+                    logger.debug(
+                        "[naukrigulf] requests failed for %r in %s: %s", title, region_name, exc
+                    )
+
+                if not html:
+                    logger.debug(
+                        "[naukrigulf] falling back to Playwright for %r in %s", title, region_name
+                    )
+                    html = _fetch_with_playwright(url, timeout_ms, _HEADERS["User-Agent"])
+
+                if not html:
+                    logger.warning("[naukrigulf] no HTML for %r in %s", title, region_name)
+                    continue
+
+                before = len(jobs)
+                raw_jobs = _parse_cards(html, title_filters, _excluded, region_name, title)
+                for j in raw_jobs:
+                    jobs.append(
+                        JobPosting(
+                            title=j["title"],
+                            company=j["company"],
+                            url=j["url"],
+                            posted=j["posted"],
+                            location=j["location"],
+                            snippet=j["snippet"],
+                            source=j["source"],
+                            query=j["query"],
+                            region=j["region"],
+                        )
+                    )
+                logger.info(
+                    "[naukrigulf] +%d jobs for %r in %s", len(jobs) - before, title, region_name
+                )
+
+        logger.info("[naukrigulf] Complete: %d total jobs", len(jobs))
+        return jobs
+
+
 def fetch_naukrigulf_jobs(
     title_filters: list[str],
     enabled_regions: dict,
@@ -138,49 +226,4 @@ def fetch_naukrigulf_jobs(
 
     Only runs for Gulf regions (AE, SA, QA, KW, BH, OM).
     """
-    source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("naukrigulf", {}) or {}
-    if not source_cfg.get("enabled", True):
-        return []
-
-    timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))
-    timeout_ms = timeout * 1000
-    excluded_title_terms = config.get("exclusion_rules", {}).get("excluded_title_terms", []) or []
-    jobs: list[dict] = []
-
-    for region_name, region_config in enabled_regions.items():
-        iso = region_config.get("country", "").upper()
-        if iso not in _GULF_CODES:
-            continue
-        country_slug = _COUNTRY_SLUGS.get(iso, iso.lower())
-
-        for title in title_filters:
-            url = _build_url(title, country_slug)
-            html = ""
-            try:
-                resp = requests.get(url, headers=_HEADERS, timeout=timeout)
-                if resp.status_code == 200 and len(resp.text) > 200:
-                    html = resp.text
-            except Exception as exc:
-                logger.debug(
-                    "[naukrigulf] requests failed for %r in %s: %s", title, region_name, exc
-                )
-
-            if not html:
-                logger.debug(
-                    "[naukrigulf] falling back to Playwright for %r in %s", title, region_name
-                )
-                html = _fetch_with_playwright(url, timeout_ms, _HEADERS["User-Agent"])
-
-            if not html:
-                logger.warning("[naukrigulf] no HTML for %r in %s", title, region_name)
-                continue
-
-            before = len(jobs)
-            new_jobs = _parse_cards(html, title_filters, excluded_title_terms, region_name, title)
-            jobs.extend(new_jobs)
-            logger.info(
-                "[naukrigulf] +%d jobs for %r in %s", len(jobs) - before, title, region_name
-            )
-
-    logger.info("[naukrigulf] Complete: %d total jobs", len(jobs))
-    return jobs
+    return [j.to_dict() for j in NaukriGulfSource().fetch(title_filters, enabled_regions, config)]

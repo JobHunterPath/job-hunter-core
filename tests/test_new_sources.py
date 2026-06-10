@@ -6,22 +6,29 @@ from unittest.mock import MagicMock, patch
 
 import requests.exceptions
 
-from job_hunter_core.sources.adzuna_source import fetch_adzuna_jobs
-from job_hunter_core.sources.eures_source import fetch_eures_jobs
-from job_hunter_core.sources.glints_source import fetch_glints_jobs
-from job_hunter_core.sources.gulftalent_source import fetch_gulftalent_jobs
-from job_hunter_core.sources.irishjobs_source import fetch_irishjobs_jobs
-from job_hunter_core.sources.jobbank_source import fetch_jobbank_jobs
-from job_hunter_core.sources.jobicy_source import fetch_jobicy_jobs
+from job_hunter_core.models import JobPosting
+from job_hunter_core.sources.adzuna_source import AdzunaSource, fetch_adzuna_jobs
+from job_hunter_core.sources.eures_source import EURESSource, fetch_eures_jobs
+from job_hunter_core.sources.glints_source import GlintsSource, fetch_glints_jobs
+from job_hunter_core.sources.gulftalent_source import GulfTalentSource, fetch_gulftalent_jobs
+from job_hunter_core.sources.irishjobs_source import IrishJobsSource, fetch_irishjobs_jobs
+from job_hunter_core.sources.jobbank_source import JobBankSource, fetch_jobbank_jobs
+from job_hunter_core.sources.jobicy_source import JobicySource, fetch_jobicy_jobs
 from job_hunter_core.sources.jobspy_source import fetch_jobspy_jobs
-from job_hunter_core.sources.jobstreet_source import fetch_jobstreet_jobs
-from job_hunter_core.sources.jooble_source import fetch_jooble_jobs
-from job_hunter_core.sources.mycareersfuture_source import fetch_mycareersfuture_jobs
-from job_hunter_core.sources.naukrigulf_source import fetch_naukrigulf_jobs
-from job_hunter_core.sources.reed_source import fetch_reed_jobs
-from job_hunter_core.sources.remoteok_source import fetch_remoteok_jobs
-from job_hunter_core.sources.weworkremotely_source import fetch_weworkremotely_jobs
-from job_hunter_core.sources.wttj_source import fetch_wttj_jobs
+from job_hunter_core.sources.jobstreet_source import JobStreetSource, fetch_jobstreet_jobs
+from job_hunter_core.sources.jooble_source import JoobleSource, fetch_jooble_jobs
+from job_hunter_core.sources.mycareersfuture_source import (
+    MyCareersFutureSource,
+    fetch_mycareersfuture_jobs,
+)
+from job_hunter_core.sources.naukrigulf_source import NaukriGulfSource, fetch_naukrigulf_jobs
+from job_hunter_core.sources.reed_source import ReedSource, fetch_reed_jobs
+from job_hunter_core.sources.remoteok_source import RemoteOKSource, fetch_remoteok_jobs
+from job_hunter_core.sources.weworkremotely_source import (
+    WeWorkRemotelySource,
+    fetch_weworkremotely_jobs,
+)
+from job_hunter_core.sources.wttj_source import WTTJSource, fetch_wttj_jobs
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -137,6 +144,44 @@ def test_jobicy_disabled():
     mock_get.assert_not_called()
 
 
+class TestJobicySource:
+    def test_name(self):
+        assert JobicySource().name == "jobicy"
+
+    def test_is_enabled_respects_config(self):
+        disabled = {"http": {"job_boards": {"jobicy": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.jobicy_source.load_api_config", return_value=disabled
+        ):
+            assert JobicySource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.jobicy_source.load_api_config",
+                return_value=_JOBICY_CFG,
+            ),
+            patch("job_hunter_core.sources.jobicy_source.reserve_api_call", return_value=True),
+            patch(
+                "job_hunter_core.sources.jobicy_source.requests.get",
+                return_value=_mock_get({"jobs": [_JOBICY_JOB]}),
+            ),
+        ):
+            jobs = JobicySource().fetch(["Software Engineer"], _REGIONS, _EXCL)
+        assert len(jobs) == 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].title == "Software Engineer"
+        assert jobs[0].source == "Jobicy"
+
+    def test_fetch_returns_empty_when_disabled(self):
+        disabled = {"http": {"job_boards": {"jobicy": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.jobicy_source.load_api_config", return_value=disabled
+        ):
+            jobs = JobicySource().fetch(["Software Engineer"], _REGIONS, _EXCL)
+        assert jobs == []
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # RemoteOK
 # ═══════════════════════════════════════════════════════════════════════════
@@ -248,6 +293,44 @@ def test_remoteok_disabled():
 
     assert jobs == []
     mock_get.assert_not_called()
+
+
+class TestRemoteOKSource:
+    def test_name(self):
+        assert RemoteOKSource().name == "remoteok"
+
+    def test_is_enabled_respects_config(self):
+        disabled = {"http": {"job_boards": {"remoteok": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.remoteok_source.load_api_config", return_value=disabled
+        ):
+            assert RemoteOKSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        feed = [_REMOTEOK_METADATA, _REMOTEOK_JOB]
+        with (
+            patch(
+                "job_hunter_core.sources.remoteok_source.load_api_config",
+                return_value=_REMOTEOK_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.remoteok_source.requests.get",
+                return_value=_mock_get(feed),
+            ),
+        ):
+            jobs = RemoteOKSource().fetch(["Software Engineer"], _REGIONS, _EXCL)
+        assert len(jobs) == 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].title == "Software Engineer"
+        assert jobs[0].source == "RemoteOK"
+
+    def test_fetch_returns_empty_when_disabled(self):
+        disabled = {"http": {"job_boards": {"remoteok": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.remoteok_source.load_api_config", return_value=disabled
+        ):
+            jobs = RemoteOKSource().fetch(["Software Engineer"], _REGIONS, _EXCL)
+        assert jobs == []
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1301,3 +1384,391 @@ def test_jobstreet_403_triggers_playwright_path():
         jobs = fetch_jobstreet_jobs(["Product Manager"], _MY, _CONFIG)
     assert jobs == []
     mock_pw.assert_called_once()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Class-level JobSourceAdapter tests
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestEURESSource:
+    def test_name(self):
+        assert EURESSource().name == "eures"
+
+    def test_is_enabled_false_when_disabled(self):
+        disabled = {"http": {"job_boards": {"eures": {"enabled": False}}}}
+        with patch("job_hunter_core.sources.eures_source.load_api_config", return_value=disabled):
+            assert EURESSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.eures_source.load_api_config", return_value=_EMPTY_CFG
+            ),
+            patch(
+                "job_hunter_core.sources.eures_source.requests.post",
+                return_value=_mock_post(_EURES_RESPONSE),
+            ),
+        ):
+            jobs = EURESSource().fetch(["Product Manager"], _NL, _CONFIG)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "EURES"
+
+
+class TestGlintsSource:
+    def test_name(self):
+        assert GlintsSource().name == "glints"
+
+    def test_is_enabled_false_when_disabled(self):
+        disabled = {"http": {"job_boards": {"glints": {"enabled": False}}}}
+        with patch("job_hunter_core.sources.glints_source.load_api_config", return_value=disabled):
+            assert GlintsSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.glints_source.load_api_config", return_value=_EMPTY_CFG
+            ),
+            patch(
+                "job_hunter_core.sources.glints_source.requests.get",
+                return_value=_mock_get(_GLINTS_RESPONSE),
+            ),
+        ):
+            jobs = GlintsSource().fetch(["Product Manager"], _SG, _CONFIG)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "Glints"
+
+
+class TestGulfTalentSource:
+    def test_name(self):
+        assert GulfTalentSource().name == "gulftalent"
+
+    def test_is_enabled_false_when_disabled(self):
+        disabled = {"http": {"job_boards": {"gulftalent": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.gulftalent_source.load_api_config", return_value=disabled
+        ):
+            assert GulfTalentSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.gulftalent_source.load_api_config",
+                return_value=_EMPTY_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.gulftalent_source.requests.get",
+                return_value=_mock_html(_GT_HTML),
+            ),
+        ):
+            jobs = GulfTalentSource().fetch(["Product Manager"], _AE, _CONFIG)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "GulfTalent"
+
+
+class TestIrishJobsSource:
+    def test_name(self):
+        assert IrishJobsSource().name == "irishjobs"
+
+    def test_is_enabled_false_when_disabled(self):
+        disabled = {"http": {"job_boards": {"irishjobs": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.irishjobs_source.load_api_config", return_value=disabled
+        ):
+            assert IrishJobsSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.irishjobs_source.load_api_config",
+                return_value=_EMPTY_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.irishjobs_source.requests.get",
+                return_value=_mock_html(_IJ_HTML),
+            ),
+        ):
+            jobs = IrishJobsSource().fetch(["Product Manager"], _IE, _CONFIG)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "IrishJobs"
+
+
+class TestJobBankSource:
+    def test_name(self):
+        assert JobBankSource().name == "jobbank"
+
+    def test_is_enabled_false_when_disabled(self):
+        disabled = {"http": {"job_boards": {"jobbank": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.jobbank_source.load_api_config", return_value=disabled
+        ):
+            assert JobBankSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.jobbank_source.load_api_config", return_value=_EMPTY_CFG
+            ),
+            patch(
+                "job_hunter_core.sources.jobbank_source.requests.get",
+                return_value=_mock_html(_JB_HTML),
+            ),
+        ):
+            jobs = JobBankSource().fetch(["Product Manager"], _CA, _CONFIG)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "JobBank Canada"
+
+
+class TestJobStreetSource:
+    def test_name(self):
+        assert JobStreetSource().name == "jobstreet"
+
+    def test_is_enabled_false_when_disabled(self):
+        disabled = {"http": {"job_boards": {"jobstreet": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.jobstreet_source.load_api_config", return_value=disabled
+        ):
+            assert JobStreetSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.jobstreet_source.load_api_config",
+                return_value=_EMPTY_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.jobstreet_source.requests.get",
+                return_value=_mock_get(_JS_RESPONSE),
+            ),
+        ):
+            jobs = JobStreetSource().fetch(["Product Manager"], _MY, _CONFIG)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "JobStreet"
+
+
+class TestMyCareersFutureSource:
+    def test_name(self):
+        assert MyCareersFutureSource().name == "mycareersfuture"
+
+    def test_is_enabled_false_when_disabled(self):
+        disabled = {"http": {"job_boards": {"mycareersfuture": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.mycareersfuture_source.load_api_config",
+            return_value=disabled,
+        ):
+            assert MyCareersFutureSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.mycareersfuture_source.load_api_config",
+                return_value=_EMPTY_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.mycareersfuture_source.requests.get",
+                return_value=_mock_get(_MCF_RESPONSE),
+            ),
+        ):
+            jobs = MyCareersFutureSource().fetch(["Product Manager"], _SG, _CONFIG)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "MyCareersFuture"
+
+
+class TestNaukriGulfSource:
+    def test_name(self):
+        assert NaukriGulfSource().name == "naukrigulf"
+
+    def test_is_enabled_false_when_disabled(self):
+        disabled = {"http": {"job_boards": {"naukrigulf": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.naukrigulf_source.load_api_config", return_value=disabled
+        ):
+            assert NaukriGulfSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.naukrigulf_source.load_api_config",
+                return_value=_EMPTY_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.naukrigulf_source.requests.get",
+                return_value=_mock_html(_NG_HTML),
+            ),
+        ):
+            jobs = NaukriGulfSource().fetch(["Product Manager"], _SA, _CONFIG)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "Naukrigulf"
+
+
+class TestWeWorkRemotelySource:
+    def test_name(self):
+        assert WeWorkRemotelySource().name == "weworkremotely"
+
+    def test_is_enabled_false_when_disabled(self):
+        disabled = {"http": {"job_boards": {"weworkremotely": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.weworkremotely_source.load_api_config", return_value=disabled
+        ):
+            assert WeWorkRemotelySource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.weworkremotely_source.load_api_config",
+                return_value=_WWR_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.weworkremotely_source.requests.get",
+                return_value=_mock_get_bytes(_WWR_RSS_MATCHING),
+            ),
+        ):
+            jobs = WeWorkRemotelySource().fetch(["Software Engineer"], _REGIONS, _EXCL)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "WeWorkRemotely"
+
+
+class TestWTTJSource:
+    def test_name(self):
+        assert WTTJSource().name == "wttj"
+
+    def test_is_enabled_false_when_disabled(self):
+        disabled = {"http": {"job_boards": {"wttj": {"enabled": False}}}}
+        with patch("job_hunter_core.sources.wttj_source.load_api_config", return_value=disabled):
+            assert WTTJSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.wttj_source.load_api_config", return_value=_EMPTY_CFG
+            ),
+            patch(
+                "job_hunter_core.sources.wttj_source.requests.get",
+                return_value=_mock_get(_WTTJ_RESPONSE),
+            ),
+        ):
+            jobs = WTTJSource().fetch(["Product Manager"], _FR, _CONFIG)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "Welcome to the Jungle"
+
+
+class TestReedSource:
+    def test_name(self):
+        src = ReedSource.__new__(ReedSource)
+        src._api_key = "test-key"
+        assert src.name == "reed"
+
+    def test_is_enabled_false_when_disabled(self):
+        src = ReedSource.__new__(ReedSource)
+        src._api_key = "test-key"
+        disabled = {"http": {"job_boards": {"reed": {"enabled": False}}}}
+        with patch("job_hunter_core.sources.reed_source.load_api_config", return_value=disabled):
+            assert src.is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        src = ReedSource.__new__(ReedSource)
+        src._api_key = "test-key"
+        cfg = {
+            "http": {
+                "job_boards": {
+                    "reed": {"enabled": True, "results_wanted": 1, "max_pages_per_query": 1}
+                }
+            }
+        }
+        page_data = {"results": [_REED_JOB(1)]}
+        with (
+            patch("job_hunter_core.sources.reed_source.load_api_config", return_value=cfg),
+            patch("job_hunter_core.sources.reed_source.reserve_api_call", return_value=True),
+            patch(
+                "job_hunter_core.sources.reed_source.requests.get",
+                return_value=_mock_get(page_data),
+            ),
+        ):
+            jobs = src.fetch(["Software Engineer"], _GB_REGIONS, _EXCL)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "Reed"
+
+
+class TestAdzunaSource:
+    def test_name(self):
+        src = AdzunaSource.__new__(AdzunaSource)
+        src._app_id = "app123"
+        src._api_key = "key123"
+        assert src.name == "adzuna"
+
+    def test_is_enabled_false_when_disabled(self):
+        src = AdzunaSource.__new__(AdzunaSource)
+        src._app_id = "app123"
+        src._api_key = "key123"
+        disabled = {"http": {"job_boards": {"adzuna": {"enabled": False}}}}
+        with patch("job_hunter_core.sources.adzuna_source.load_api_config", return_value=disabled):
+            assert src.is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        src = AdzunaSource.__new__(AdzunaSource)
+        src._app_id = "app123"
+        src._api_key = "key123"
+        cfg = {
+            "http": {
+                "job_boards": {
+                    "adzuna": {"enabled": True, "results_per_page": 1, "max_pages_per_query": 1}
+                }
+            }
+        }
+        page_data = {"results": [_ADZUNA_JOB(1)]}
+        with (
+            patch("job_hunter_core.sources.adzuna_source.load_api_config", return_value=cfg),
+            patch("job_hunter_core.sources.adzuna_source.reserve_api_call", return_value=True),
+            patch(
+                "job_hunter_core.sources.adzuna_source.requests.get",
+                return_value=_mock_get(page_data),
+            ),
+        ):
+            jobs = src.fetch(["Software Engineer"], _ADZUNA_GB_REGIONS, _EXCL)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "Adzuna"
+
+
+class TestJoobleSource:
+    def test_name(self):
+        src = JoobleSource.__new__(JoobleSource)
+        src._api_key = "test-key"
+        assert src.name == "jooble"
+
+    def test_is_enabled_false_when_disabled(self):
+        src = JoobleSource.__new__(JoobleSource)
+        src._api_key = "test-key"
+        disabled = {"http": {"job_boards": {"jooble": {"enabled": False}}}}
+        with patch("job_hunter_core.sources.jooble_source.load_api_config", return_value=disabled):
+            assert src.is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        src = JoobleSource.__new__(JoobleSource)
+        src._api_key = "test-key"
+        with (
+            patch(
+                "job_hunter_core.sources.jooble_source.load_api_config",
+                return_value=_JOOBLE_CFG,
+            ),
+            patch("job_hunter_core.sources.jooble_source.reserve_api_call", return_value=True),
+            patch(
+                "job_hunter_core.sources.jooble_source.requests.post",
+                return_value=_mock_post({"jobs": [_JOOBLE_JOB]}),
+            ),
+        ):
+            jobs = src.fetch(["Software Engineer"], _REGIONS, _EXCL)
+        assert len(jobs) >= 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "Jooble"

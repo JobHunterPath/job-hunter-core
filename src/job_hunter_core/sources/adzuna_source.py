@@ -1,0 +1,223 @@
+"""Adzuna job board source — free official API with global coverage.
+
+Supports: AU, AT, BE, BR, CA, DE, ES, FR, GB, IT, MX, NL, NZ, PL, SG, US, ZA, CH, IN.
+Register for a free API key at https://developer.adzuna.com/
+
+The Adzuna country is derived automatically from each region's ISO country code
+(the `country` field in search_config.yml regions). No mapping config needed.
+
+Required env vars (both optional — source skips silently if absent):
+  ADZUNA_APP_ID   — application ID from developer.adzuna.com
+  ADZUNA_API_KEY  — API key from developer.adzuna.com
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from datetime import datetime
+
+import requests
+
+from job_hunter_core.core.api_budget import (
+    is_api_quota_exhausted,
+    mark_api_exhausted,
+    reserve_api_call,
+)
+from job_hunter_core.core.config import get_timeout, load_api_config
+from job_hunter_core.core.utils import location_matches, title_matches
+from job_hunter_core.models import JobPosting
+from job_hunter_core.sources.base import JobSourceAdapter
+
+logger = logging.getLogger(__name__)
+
+_TIMEOUT = get_timeout("job_boards")
+_BASE_URL = "https://api.adzuna.com/v1/api/jobs/{country}/search/{page}"
+
+# ISO 3166-1 alpha-2 → Adzuna country code (only supported countries listed)
+_ISO_TO_ADZUNA: dict[str, str] = {
+    "AU": "au",
+    "AT": "at",
+    "BE": "be",
+    "BR": "br",
+    "CA": "ca",
+    "DE": "de",
+    "ES": "es",
+    "FR": "fr",
+    "GB": "gb",
+    "IE": "gb",  # Adzuna gb covers Ireland
+    "IN": "in",
+    "IT": "it",
+    "MX": "mx",
+    "NL": "nl",
+    "NZ": "nz",
+    "PL": "pl",
+    "SG": "sg",
+    "CH": "ch",
+    "US": "us",
+    "ZA": "za",
+}
+
+
+def _parse_date(value: str | None) -> str:
+    if not value:
+        return ""
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return dt.strftime("%Y-%m-%d")
+    except Exception:
+        return str(value)[:10]
+
+
+class AdzunaSource(JobSourceAdapter):
+    def __init__(self) -> None:
+        self._app_id: str = os.environ.get("ADZUNA_APP_ID", "")
+        self._api_key: str = os.environ.get("ADZUNA_API_KEY", "")
+
+    @property
+    def name(self) -> str:
+        return "adzuna"
+
+    def is_enabled(self, config: dict) -> bool:  # noqa: ARG002
+        if not self._app_id or not self._api_key:
+            return False
+        cfg = load_api_config().get("http", {}).get("job_boards", {}).get("adzuna", {}) or {}
+        return bool(cfg.get("enabled", False))
+
+    def fetch(
+        self,
+        title_filters: list[str],
+        enabled_regions: dict,
+        config: dict,
+        *,
+        excluded_title_terms: list[str] | None = None,
+    ) -> list[JobPosting]:
+        """
+        Fetch jobs from Adzuna for each enabled region whose ISO country code is supported.
+        Returns [] silently if credentials are missing or adzuna is disabled.
+        """
+        if not self._app_id or not self._api_key:
+            logger.warning("[adzuna] ADZUNA_APP_ID or ADZUNA_API_KEY not set — skipping")
+            return []
+
+        adzuna_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("adzuna", {}) or {}
+        )
+        if not adzuna_cfg.get("enabled", False):
+            return []
+
+        results_per_page = int(adzuna_cfg.get("results_per_page", 50))
+        max_pages = int(adzuna_cfg.get("max_pages_per_query", 1))
+        _excluded = (
+            excluded_title_terms
+            if excluded_title_terms is not None
+            else config.get("exclusion_rules", {}).get("excluded_title_terms", []) or []
+        )
+
+        jobs: list[JobPosting] = []
+
+        for region_name, region_config in enabled_regions.items():
+            iso = region_config.get("country", "").upper()
+            country = _ISO_TO_ADZUNA.get(iso, "")
+            if not country:
+                continue
+
+            location = region_config.get("location", "")
+
+            for title in title_filters:
+                logger.info(
+                    "[adzuna] [%s] Searching country=%r for %r", region_name, country, title
+                )
+                params: dict = {
+                    "app_id": self._app_id,
+                    "app_key": self._api_key,
+                    "what": title,
+                    "results_per_page": results_per_page,
+                    "content-type": "application/json",
+                }
+                if location:
+                    params["where"] = location
+
+                for page in range(1, max_pages + 1):
+                    if not reserve_api_call("adzuna"):
+                        break
+
+                    url = _BASE_URL.format(country=country, page=page)
+                    try:
+                        resp = requests.get(url, params=params, timeout=_TIMEOUT)
+                        resp.raise_for_status()
+                        data = resp.json().get("results", [])
+                    except Exception as exc:
+                        if is_api_quota_exhausted(exc):
+                            mark_api_exhausted("adzuna", exc=exc)
+                            return jobs
+                        logger.warning(
+                            "[adzuna] request failed for %r in %r page %s: %s",
+                            title,
+                            region_name,
+                            page,
+                            exc,
+                        )
+                        break
+
+                    if not data:
+                        break
+
+                    before = len(jobs)
+                    for item in data:
+                        job_title = item.get("title", "")
+                        if not title_matches(job_title, title_filters, _excluded):
+                            continue
+
+                        location_str = item.get("location", {}).get("display_name", "")
+                        if location_str and "remote" not in location_str.lower():
+                            if location and not location_matches(location_str, location):
+                                continue
+                        description = (item.get("description") or "")[:1000]
+                        snippet = (
+                            f"{location_str} — {description}" if location_str else description
+                        )
+
+                        jobs.append(
+                            JobPosting(
+                                title=job_title,
+                                company=item.get("company", {}).get("display_name", ""),
+                                url=item.get("redirect_url", ""),
+                                posted=_parse_date(item.get("created")),
+                                location=location_str,
+                                snippet=snippet,
+                                source="Adzuna",
+                                query=f"{title} @ {region_name}",
+                                region=region_name,
+                            )
+                        )
+
+                    logger.info(
+                        "[adzuna] +%d jobs for %r in %r page %s",
+                        len(jobs) - before,
+                        title,
+                        region_name,
+                        page,
+                    )
+                    if len(data) < results_per_page:
+                        break
+
+        logger.info("[adzuna] Complete: %d total jobs found", len(jobs))
+        return jobs
+
+
+def fetch_adzuna_jobs(
+    title_filters: list[str],
+    enabled_regions: dict,
+    config: dict,
+    app_id: str,
+    api_key: str,
+) -> list[dict]:
+    """
+    Fetch jobs from Adzuna for each enabled region whose ISO country code is supported.
+    Returns [] silently if credentials are missing or adzuna is disabled.
+    """
+    src = AdzunaSource.__new__(AdzunaSource)
+    src._app_id = app_id
+    src._api_key = api_key
+    return [j.to_dict() for j in src.fetch(title_filters, enabled_regions, config)]
