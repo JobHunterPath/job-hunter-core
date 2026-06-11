@@ -42,6 +42,8 @@ You are working on the automation engine that powers the job search pipeline.
 
 ```bash
 job-hunter hunt [--region <key>] [--skip-score] [--skip-validate]   # scrape + score + tailor
+job-hunter hunt --scrape-only [--region <key>]      # scrape + enrich snapshot only
+job-hunter hunt --from-snapshot <path>              # score + tailor from scrape snapshot
 job-hunter tailor-links --links <comma-separated-urls> [--skip-score] [--force]
 job-hunter tailor-raw --jd <text> [--title] [--company] [--skip-score] [--force]
 job-hunter discover                    # weekly company discovery

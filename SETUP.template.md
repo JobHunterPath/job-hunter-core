@@ -488,9 +488,10 @@ them**.
 
 Available workflows:
 
-- **Job Hunt** — searches configured regions and generates tailored resume and
-  cover letter files. By default it runs once per weekday for your primary
-  region on the schedule in `job_hunt.yml`.
+- **Job Hunt** — searches configured regions, writes a scrape snapshot, and
+  generates tailored resume and cover letter files only when candidates are
+  found. By default it runs once per weekday for your primary region on the
+  schedule in `job_hunt.yml`.
 - **Company Discovery** — discovers new company career pages and prepares them
   for review. Run manually when you want fresh leads.
 - **Tailor From Links** — tailors your resume and cover letter for specific job
@@ -509,6 +510,11 @@ jobs/YYYY-MM-DD_company_role/
 
 Always review the tailored resume and cover letter before submitting an
 application.
+
+If the scrape phase finds candidates but the tailoring phase is skipped or
+times out, the workflow still keeps the scrape log and any committed outputs it
+managed to create. Company order is shuffled on each run so large company lists
+do not always skip the same companies near the end.
 
 ## 12. Pull Future Template Updates
 
@@ -657,9 +663,10 @@ for a password.
 
 ## Thin-Result Troubleshooting
 
-Run a hunt and check the `job_hunt.log` artifact. The per-source yield line
-(`[scrape] sources: ...`) shows how many jobs each source contributed. Use the
-table below to diagnose thin results without adding more API keys.
+Run a hunt and check the `job_hunt.log` artifact. The scraper logs a
+per-source yield summary with attempted, returned, accepted, skipped, and failed
+counts. Use the table below to diagnose thin results without adding more API
+keys.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -670,7 +677,7 @@ table below to diagnose thin results without adding more API keys.
 | ATS discovery returns zero | No live postings on any of the 11 ATS platforms for your titles and region | The region or title combination may be thin on those platforms. Add more companies manually to `config/search_config.yml`. Run Company Discovery to find more. |
 | Discovery cache suppressing too many URLs | Broad discovery cache contains URLs that are now stale | Clear outdated entries from `config/discovery_cache.yml` manually, or delete the file entirely to start fresh — it will be rebuilt on the next run. |
 | Jobs found but all filtered out | Title or industry exclusion rules dropped all candidates | Check `exclusion_rules.excluded_title_terms` and `excluded_industries` in `config/search_config.yml`. A term match in the job title causes the whole posting to be skipped. |
-| You found a job manually that the scraper missed | The job URL was not in any source the pipeline reached | Use the browser-capture import workflow: place a JSON file with the `url` field in a `captures/` folder and run `job-hunter import-captures --captures-dir captures/` locally or trigger it via Docker. The job is then scored and tailored like any other. |
+| You found a job manually that the scraper missed | The job URL was not in any source the pipeline reached | Run **Tailor From Links** from the Actions tab and paste the URL, or run `job-hunter tailor-links --links "<url>"` through the Docker image. |
 
 **Deterministic sources found very few jobs and you want more breadth without adding paid keys:**
 

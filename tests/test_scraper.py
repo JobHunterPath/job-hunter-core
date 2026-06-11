@@ -1,5 +1,6 @@
 """Tests for sources/scraper.py — all HTTP calls are mocked."""
 
+import inspect
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -47,6 +48,15 @@ CONFIG = {
 }
 
 COMPANIES = CONFIG["regions"]["berlin"]["companies"]
+
+
+def test_scrape_shuffles_companies_after_loading_before_thread_pool():
+    source = inspect.getsource(scraper.scrape)
+
+    assert source.index("companies = list(load_companies(region))") < source.index(
+        "random.shuffle(companies)"
+    )
+    assert source.index("random.shuffle(companies)") < source.index("with ThreadPoolExecutor")
 
 
 @pytest.fixture(autouse=True)

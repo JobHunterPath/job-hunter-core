@@ -184,11 +184,7 @@ http:
       enabled: true
     glints:
       enabled: true
-    irishjobs:
-      enabled: true
     gulftalent:
-      enabled: true
-    naukrigulf:
       enabled: true
     jobstreet:
       enabled: true

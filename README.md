@@ -1,85 +1,74 @@
 # Job Hunter Core
 
-Open source job hunting automation engine.
+Open-source engine behind the job-hunt template. It scrapes jobs, deduplicates URLs, enriches job descriptions, validates fit, scores with an LLM, tailors resumes and cover letters, compiles PDFs, updates the README job table, and tracks processed URLs.
 
-## What it does
+## User View
 
-job-hunter-core scrapes jobs from 25+ sources (ATS APIs, job boards, AI-assisted search), scores them against your resume using an LLM, then tailors your resume and cover letter for each match. Runs as a Docker image triggered by GitHub Actions — no local Python setup needed.
+Most users should start from [job-hunter-template](https://github.com/JobHunterPath/job-hunter-template), not this repo. The template keeps personal config and outputs; this repo publishes the Docker image and maintained template files.
 
-## Architecture
+The template workflow runs:
 
-    job-hunter-template (your fork)
-        config/    search rules, scoring, LLM provider
-        context/   your resume (.tex) and STAR story bank
-             │
-             ▼  GitHub Actions
-    ghcr.io/jobhunterpath/job-hunter-core
-        scrape → deduplicate → score (LLM) → tailor → PDF
-             │
-             ▼
-        outputs/   tailored resume + cover letter
+1. Resolve the active region.
+2. Start SearXNG.
+3. Run `job-hunter hunt --scrape-only` to scrape, URL-check, enrich, and write `outputs/state/hunt_scrape_<date>_<region>.json`.
+4. Run `job-hunter hunt --from-snapshot <path>` only when candidates exist.
+5. Commit generated job outputs.
 
-## Quick start
+Company order is shuffled on every scrape so long lists get fair coverage across timed GitHub Actions runs.
 
-1. Click "Use this template" on [job-hunter-template](https://github.com/JobHunterPath/job-hunter-template)
-2. Add your LLM API key as a GitHub secret (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY`)
-3. Edit `config/search_config.yml` — set your regions, target companies, job titles
-4. Edit `context/resume_*.tex` with your resume and `context/story_bank.md` with your STAR stories
-5. Run the `job_hunt` workflow from the Actions tab
+## Developer View
 
-## Supported sources
+Important package areas:
 
-| Source | Type | Notes |
-|---|---|---|
-| Greenhouse | ATS API | Public jobs API |
-| Lever | ATS API | Public jobs API |
-| SmartRecruiters | ATS API | |
-| Workable | ATS API | |
-| Ashby | ATS API | |
-| HiBob | ATS API | |
-| Personio | ATS API | XML feed |
-| Recruitee | ATS API | |
-| Breezy | ATS API | |
-| Teamtailor | ATS API | |
-| Workday | ATS API | |
-| Indeed | Job board | Via python-jobspy; no API key |
-| Google Jobs | Job board | Via python-jobspy; no API key |
-| Adzuna | Job board API | Requires API key |
-| Reed | Job board API | Requires API key |
-| JSearch | Job board API | Optional RapidAPI source; requires `RAPIDAPI_KEY` |
-| Himalayas | Job board | Remote-focused |
-| Remotive | Job board API | Free, no API key required |
-| The Muse | Job board API | Free, no API key required |
-| Bundesagentur für Arbeit | Job board | German market |
-| Arbeitnow | Job board | |
-| SearXNG | Search | Free local metasearch in GitHub Actions; uses simple per-site queries |
-| Brave / Tavily / Exa | Search APIs | Optional keyed fallbacks with monthly budgets |
-| Playwright | Browser renderer | Automatic JS-rendering fallback in the core image |
-| Lightpanda | Fast renderer | Used automatically when the binary is present |
-| Firecrawl | Cloud extraction | Used when `FIRECRAWL_API_KEY` and budget are available |
-| AI web search | Search | LLM-assisted breadth source |
-| MyCareersFuture | Job board | Singapore; free REST API; country: SG |
-| EURES | Job board | 27 EU + NO/IS/LI; public REST API; any EU/EEA country |
-| Job Bank Canada | Job board | Canada; HTML scrape; country: CA |
-| Welcome to the Jungle | Job board | Global / EU-heavy; free JSON API |
-| Glints | Job board | SEA (SG, ID, MY, VN, PH); REST JSON; country: SG/ID/MY/VN/PH |
-| IrishJobs | Job board | Ireland; HTML scrape; country: IE |
-| GulfTalent | Job board | Gulf (AE, SA, QA, KW, BH, OM); requests → Playwright fallback |
-| Naukrigulf | Job board | Gulf (AE, SA, QA, KW, BH, OM); requests → Playwright fallback |
-| JobStreet | Job board | SEA (SG, MY, ID, PH, VN); REST API → Playwright fallback |
+| Path | Purpose |
+|---|---|
+| `src/job_hunter_core/sources/` | ATS, career-page, job-board, search-provider, and JD fetchers |
+| `src/job_hunter_core/pipeline/` | Hunt orchestration, scoring, tailoring, validation, PDF, README, tracker flow |
+| `src/job_hunter_core/core/` | Config, schema checks, LLM client, metrics, URL liveness |
+| `config/templates/` | Template defaults copied into user repos |
+| `.github/template-workflows/` | Workflows copied into the public template |
+| `README.template.md`, `SETUP.template.md` | User-facing template docs |
 
-## Configuration
+Template generation:
 
-All configuration lives in `config/`. See `config/templates/` for commented examples and [SETUP.template.md](SETUP.template.md) for full setup instructions.
+```bash
+python .github/scripts/build_template_repo.py ../job-hunter-template
+```
 
-## Terms of Service notice
+Do not hand-edit `job-hunter-template/` for maintained files; update the source here and rebuild/sync.
 
-> **ToS Notice**: ATS APIs (Greenhouse, Lever, etc.) are publicly documented and safe to use. Other sources (Indeed, Google Jobs) are accessed via [python-jobspy](https://github.com/speedyapply/JobSpy) — a widely used open source library. Users are solely responsible for compliance with applicable terms of service, laws, and regulations. The authors provide no warranty and accept no liability.
+## CLI
 
-## Contributing
+```bash
+job-hunter hunt [--region primary]
+job-hunter hunt --scrape-only [--region primary]
+job-hunter hunt --from-snapshot outputs/state/hunt_scrape_YYYY-MM-DD_primary.json
+job-hunter tailor-links --links "https://example.com/job"
+job-hunter tailor-raw --jd "..." --title "Product Manager" --company "Acme"
+job-hunter discover [--region primary]
+job-hunter config check
+```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+`--scrape-only` and `--from-snapshot` are mutually exclusive. Empty scrape results are successful runs and emit `candidate_count=0`.
 
-## License
+## Sources
 
-MIT — see [LICENSE](LICENSE).
+The engine combines public ATS APIs, configured company career pages, static HTML, Lightpanda/Playwright rendering, SearXNG, JobSpy, free job boards, optional keyed APIs, and optional AI web search. Paid search APIs are reserved for global ATS discovery, not per-company fallback.
+
+Removed sources should be deleted from code, schemas, config templates, docs, and tests together.
+
+## Checks
+
+```bash
+python -m pytest tests/ -q --tb=short
+python -m ruff check src/ tests/
+python -c "import yaml, pathlib; [yaml.safe_load(p.read_text(encoding='utf-8')) for p in pathlib.Path('.github/template-workflows').glob('*.yml')]; print('workflow yaml ok')"
+```
+
+## Safety
+
+- Never hardcode personal data in `src/`.
+- Never fabricate resume facts, metrics, dates, credentials, employers, or outcomes.
+- Keep external actions draft-only; this project does not submit applications or send messages.
+
+MIT license. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution details.

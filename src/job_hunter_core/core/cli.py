@@ -86,6 +86,9 @@ def build_parser() -> argparse.ArgumentParser:
     hunt.add_argument("--region", help="Optional search_config.yml region key.")
     hunt.add_argument("--skip-score", action="store_true")
     hunt.add_argument("--skip-validate", action="store_true")
+    hunt_split = hunt.add_mutually_exclusive_group()
+    hunt_split.add_argument("--scrape-only", action="store_true")
+    hunt_split.add_argument("--from-snapshot", metavar="PATH")
     hunt.set_defaults(func=lambda ns: _run_pipeline(_namespace_to_args(ns)))
 
     tailor_links = subparsers.add_parser("tailor-links", help="Tailor from job URLs.")

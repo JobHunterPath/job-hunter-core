@@ -7,13 +7,11 @@ from job_hunter_core.sources.adzuna_source import AdzunaSource
 from job_hunter_core.sources.eures_source import EURESSource
 from job_hunter_core.sources.glints_source import GlintsSource
 from job_hunter_core.sources.gulftalent_source import GulfTalentSource
-from job_hunter_core.sources.irishjobs_source import IrishJobsSource
 from job_hunter_core.sources.jobbank_source import JobBankSource
 from job_hunter_core.sources.jobicy_source import JobicySource
 from job_hunter_core.sources.jobstreet_source import JobStreetSource
 from job_hunter_core.sources.jooble_source import JoobleSource
 from job_hunter_core.sources.mycareersfuture_source import MyCareersFutureSource
-from job_hunter_core.sources.naukrigulf_source import NaukriGulfSource
 from job_hunter_core.sources.reed_source import ReedSource
 from job_hunter_core.sources.remoteok_source import RemoteOKSource
 from job_hunter_core.sources.weworkremotely_source import WeWorkRemotelySource
@@ -243,7 +241,7 @@ _REED_JOB = lambda n: {  # noqa: E731
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Regional sources — MyCareersFuture / EURES / JobBank / WTTJ / Glints /
-#                   IrishJobs / GulfTalent / Naukrigulf / JobStreet
+#                   GulfTalent / JobStreet
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -348,25 +346,11 @@ _GLINTS_RESPONSE = {
     }
 }
 
-_IJ_HTML = """<html><body>
-<div class="jobadvert">
-  <h2><a class="jobTitle" href="/jobs/123">Product Manager</a></h2>
-  <span class="company">IrishTech</span>
-  <span class="location">Dublin</span>
-</div></body></html>"""
-
 _GT_HTML = """<html><body>
 <div class="job-listing">
   <h2><a class="job-title" href="/jobs/456">Product Manager</a></h2>
   <span class="company-name">GulfCorp</span>
   <span class="location">Dubai, UAE</span>
-</div></body></html>"""
-
-_NG_HTML = """<html><body>
-<div class="jobTuple">
-  <h3><a class="designation" href="/pm-jobs-in-uae-nj12345">Product Manager</a></h3>
-  <span class="comp-name">NaukriCorp</span>
-  <span class="loc">Dubai</span>
 </div></body></html>"""
 
 _JS_RESPONSE = {
@@ -464,34 +448,6 @@ class TestGulfTalentSource:
         assert jobs[0].source == "GulfTalent"
 
 
-class TestIrishJobsSource:
-    def test_name(self):
-        assert IrishJobsSource().name == "irishjobs"
-
-    def test_is_enabled_false_when_disabled(self):
-        disabled = {"http": {"job_boards": {"irishjobs": {"enabled": False}}}}
-        with patch(
-            "job_hunter_core.sources.irishjobs_source.load_api_config", return_value=disabled
-        ):
-            assert IrishJobsSource().is_enabled({}) is False
-
-    def test_fetch_returns_job_postings(self):
-        with (
-            patch(
-                "job_hunter_core.sources.irishjobs_source.load_api_config",
-                return_value=_EMPTY_CFG,
-            ),
-            patch(
-                "job_hunter_core.sources.irishjobs_source.requests.get",
-                return_value=_mock_html(_IJ_HTML),
-            ),
-        ):
-            jobs = IrishJobsSource().fetch(["Product Manager"], _IE, _CONFIG)
-        assert len(jobs) >= 1
-        assert isinstance(jobs[0], JobPosting)
-        assert jobs[0].source == "IrishJobs"
-
-
 class TestJobBankSource:
     def test_name(self):
         assert JobBankSource().name == "jobbank"
@@ -572,34 +528,6 @@ class TestMyCareersFutureSource:
         assert len(jobs) >= 1
         assert isinstance(jobs[0], JobPosting)
         assert jobs[0].source == "MyCareersFuture"
-
-
-class TestNaukriGulfSource:
-    def test_name(self):
-        assert NaukriGulfSource().name == "naukrigulf"
-
-    def test_is_enabled_false_when_disabled(self):
-        disabled = {"http": {"job_boards": {"naukrigulf": {"enabled": False}}}}
-        with patch(
-            "job_hunter_core.sources.naukrigulf_source.load_api_config", return_value=disabled
-        ):
-            assert NaukriGulfSource().is_enabled({}) is False
-
-    def test_fetch_returns_job_postings(self):
-        with (
-            patch(
-                "job_hunter_core.sources.naukrigulf_source.load_api_config",
-                return_value=_EMPTY_CFG,
-            ),
-            patch(
-                "job_hunter_core.sources.naukrigulf_source.requests.get",
-                return_value=_mock_html(_NG_HTML),
-            ),
-        ):
-            jobs = NaukriGulfSource().fetch(["Product Manager"], _SA, _CONFIG)
-        assert len(jobs) >= 1
-        assert isinstance(jobs[0], JobPosting)
-        assert jobs[0].source == "Naukrigulf"
 
 
 class TestWeWorkRemotelySource:

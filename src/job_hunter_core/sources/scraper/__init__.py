@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -30,7 +31,6 @@ from job_hunter_core.sources.eures_source import EURESSource
 from job_hunter_core.sources.glints_source import GlintsSource
 from job_hunter_core.sources.gulftalent_source import GulfTalentSource
 from job_hunter_core.sources.himalayas_source import HimalayasSource
-from job_hunter_core.sources.irishjobs_source import IrishJobsSource
 from job_hunter_core.sources.job_boards import ArbeitnowSource, JSearchSource
 from job_hunter_core.sources.job_policy import JobPolicy, make_job_filter
 from job_hunter_core.sources.jobbank_source import JobBankSource
@@ -39,7 +39,6 @@ from job_hunter_core.sources.jobspy_source import JobSpySource
 from job_hunter_core.sources.jobstreet_source import JobStreetSource
 from job_hunter_core.sources.jooble_source import JoobleSource
 from job_hunter_core.sources.mycareersfuture_source import MyCareersFutureSource
-from job_hunter_core.sources.naukrigulf_source import NaukriGulfSource
 from job_hunter_core.sources.reed_source import ReedSource
 from job_hunter_core.sources.remoteok_source import RemoteOKSource
 from job_hunter_core.sources.remotive_source import RemotiveSource
@@ -172,7 +171,8 @@ def _make_filter(
 def scrape(region: str | None = None) -> list[dict]:
     """Scrape jobs for configured companies and global boards."""
     config = load_search_config()
-    companies = load_companies(region)
+    companies = list(load_companies(region))
+    random.shuffle(companies)
     stats = ScrapeStats()
 
     # Probe all search providers once at run start. Dead or quota-exhausted providers
@@ -567,22 +567,10 @@ def scrape(region: str | None = None) -> list[dict]:
         logger.warning("[scraper] Glints failed: %s", e)
 
     try:
-        for jp in IrishJobsSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] IrishJobs failed: %s", e)
-
-    try:
         for jp in GulfTalentSource().fetch(title_filters, enabled_regions, config):
             add_job(jp.to_dict(), cache_candidate=True)
     except Exception as e:
         logger.warning("[scraper] GulfTalent failed: %s", e)
-
-    try:
-        for jp in NaukriGulfSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] Naukrigulf failed: %s", e)
 
     try:
         for jp in JobStreetSource().fetch(title_filters, enabled_regions, config):

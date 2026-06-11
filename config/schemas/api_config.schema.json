@@ -128,9 +128,7 @@
             "jobbank": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "wttj": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "glints": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
-            "irishjobs": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "gulftalent": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
-            "naukrigulf": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "jobstreet": { "type": "object", "properties": { "enabled": { "type": "boolean" } } }
           }
         }

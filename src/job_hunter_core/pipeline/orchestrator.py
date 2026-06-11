@@ -29,7 +29,12 @@ from job_hunter_core.core.config import load_api_config, profile_path, setup_log
 from job_hunter_core.core.url_liveness import UrlLivenessCache
 from job_hunter_core.pipeline.cover_writer import write_cover
 from job_hunter_core.pipeline.enrichment import drop_dead_urls_before_enrichment  # noqa: F401
-from job_hunter_core.pipeline.hunt_pipeline import _jobs_from_hunt, run_hunt  # noqa: F401
+from job_hunter_core.pipeline.hunt_pipeline import (  # noqa: F401
+    _jobs_from_hunt,
+    load_hunt_snapshot,
+    run_hunt,
+    run_hunt_scrape_only,
+)
 from job_hunter_core.pipeline.pdf_compiler import compile_tex
 from job_hunter_core.pipeline.readme_writer import slugify
 from job_hunter_core.pipeline.readme_writer import update_readme as write_readme_table
@@ -292,6 +297,17 @@ Examples:
         "--region",
         help="Optional search_config.yml region key for hunt mode, e.g. primary. Omit for all enabled regions.",
     )
+    hunt_split = parser.add_mutually_exclusive_group()
+    hunt_split.add_argument(
+        "--scrape-only",
+        action="store_true",
+        help="Run scrape, URL-check, and enrichment only; write snapshot and exit.",
+    )
+    hunt_split.add_argument(
+        "--from-snapshot",
+        metavar="PATH",
+        help="Skip scraping; load enriched jobs from a scrape snapshot.",
+    )
     parser.add_argument("--skip-score", action="store_true", help="Bypass scoring threshold")
     parser.add_argument("--skip-validate", action="store_true", help="Bypass validation checks")
     parser.add_argument("--force", action="store_true", help="Re-process already-tracked jobs")
@@ -312,7 +328,27 @@ def run(args: argparse.Namespace) -> int:
     max_years = scoring_cfg.get("scoring", {}).get("max_years_experience_required", 4)
 
     if args.mode == "hunt":
-        jobs, existing_urls, existing_titles = run_hunt(args, api_cfg, scoring_cfg, url_liveness)
+        if args.scrape_only:
+            snapshot_path, count = run_hunt_scrape_only(
+                args.region,
+                REPO_ROOT,
+                api_cfg,
+                url_liveness.is_alive,
+            )
+            print(f"snapshot_path={snapshot_path.as_posix()}")
+            print(f"candidate_count={count}")
+            print(f"has_candidates={str(count > 0).lower()}")
+            return 0
+
+        if args.from_snapshot:
+            jobs, existing_urls, existing_titles = load_hunt_snapshot(args.from_snapshot)
+            if not jobs:
+                logger.warning("[pipeline] Snapshot has no jobs. Exiting.")
+                return 0
+        else:
+            jobs, existing_urls, existing_titles = run_hunt(
+                args, api_cfg, scoring_cfg, url_liveness
+            )
         if not jobs:
             return 0
 

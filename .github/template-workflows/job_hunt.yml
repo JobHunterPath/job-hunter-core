@@ -32,7 +32,7 @@ concurrency:
 jobs:
   hunt:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repo
@@ -126,9 +126,59 @@ jobs:
           echo "SearXNG did not become ready; continuing with other providers"
           docker logs searxng || true
 
-      - name: Run job hunt
+      - name: Scrape jobs
+        id: scrape
         if: steps.hunt_region.outputs.should_run == 'true'
-        timeout-minutes: 35
+        timeout-minutes: 40
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          SEARXNG_BASE_URL: http://127.0.0.1:8080
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_API_KEY: ${{ secrets.ADZUNA_API_KEY }}
+          REED_API_KEY: ${{ secrets.REED_API_KEY }}
+          LOG_LEVEL: INFO
+          RUNNER_IMAGE: ${{ steps.runner_image.outputs.image }}
+        run: |
+          set -euo pipefail
+          output=$(docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e ANTHROPIC_API_KEY \
+            -e OPENAI_API_KEY \
+            -e GOOGLE_API_KEY \
+            -e BRAVE_API_KEY \
+            -e TAVILY_API_KEY \
+            -e EXA_API_KEY \
+            -e FIRECRAWL_API_KEY \
+            -e SEARXNG_BASE_URL \
+            -e RAPIDAPI_KEY \
+            -e ADZUNA_APP_ID \
+            -e ADZUNA_API_KEY \
+            -e REED_API_KEY \
+            -e LOG_LEVEL \
+            -e JOB_HUNTER_ROOT=/workspace \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$RUNNER_IMAGE" \
+            job-hunter hunt ${{ steps.hunt_region.outputs.arg }} --scrape-only)
+          echo "$output"
+
+          snapshot_path=$(echo "$output" | grep '^snapshot_path=' | cut -d= -f2- || true)
+          candidate_count=$(echo "$output" | grep '^candidate_count=' | cut -d= -f2 || true)
+          candidate_count="${candidate_count:-0}"
+          echo "snapshot_path=$snapshot_path" >> "$GITHUB_OUTPUT"
+          echo "candidate_count=$candidate_count" >> "$GITHUB_OUTPUT"
+          echo "has_candidates=$([ "$candidate_count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Tailor jobs
+        if: steps.hunt_region.outputs.should_run == 'true' && steps.scrape.outputs.has_candidates == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -165,7 +215,7 @@ jobs:
             -v "$GITHUB_WORKSPACE:/workspace" \
             -w /workspace \
             "$RUNNER_IMAGE" \
-            job-hunter hunt ${{ steps.hunt_region.outputs.arg }}
+            job-hunter hunt --from-snapshot "${{ steps.scrape.outputs.snapshot_path }}"
 
       - name: Upload logs as artifact
         if: always() && steps.hunt_region.outputs.should_run == 'true'

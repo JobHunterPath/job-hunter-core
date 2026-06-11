@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from job_hunter_core.core.config import ROOT as REPO_ROOT
 from job_hunter_core.core.url_liveness import UrlLivenessCache
 from job_hunter_core.pipeline.enrichment import drop_dead_urls_before_enrichment, enrich_snippets
 from job_hunter_core.sources.jd_fetcher import fetch_jd
 from job_hunter_core.sources.scraper import scrape
 from job_hunter_core.sources.search_providers import canonicalize_url
-from job_hunter_core.tracking.tracker import filter_new_jobs
+from job_hunter_core.tracking.tracker import filter_new_jobs, load_processed
 
 if TYPE_CHECKING:
     import argparse
@@ -81,4 +85,53 @@ def run_hunt(
 
     logger.info("[pipeline] Step 1b: Enriching sparse job descriptions...")
     jobs = _enrich(jobs, api_cfg)
+    return jobs, existing_urls, existing_titles
+
+
+def _snapshot_path(root: str | Path, date: str, region: str | None) -> Path:
+    state_dir = Path(root) / "outputs" / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    return state_dir / f"hunt_scrape_{date}_{region or 'all'}.json"
+
+
+def run_hunt_scrape_only(
+    region: str | None = None,
+    root: str | Path = REPO_ROOT,
+    api_cfg: dict[str, Any] | None = None,
+    url_checker: Any = None,
+) -> tuple[Path, int]:
+    """Run scrape, dedup, URL check, and enrichment, then write a handoff snapshot."""
+    today = datetime.today().strftime("%Y-%m-%d")
+    jobs, existing_urls, existing_titles = _jobs_from_hunt(region)
+
+    if jobs:
+        jobs = _drop_dead_urls(jobs, api_cfg or {}, url_checker)
+    if jobs:
+        jobs = _enrich(jobs, api_cfg or {})
+
+    payload = {
+        "date": today,
+        "region": region or "all",
+        "count": len(jobs),
+        "jobs": jobs,
+        "existing_urls": sorted(existing_urls),
+        "existing_titles": sorted(existing_titles),
+    }
+    path = _snapshot_path(root, today, region)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    logger.info("[pipeline] Scrape snapshot written: %s", path)
+    return path, len(jobs)
+
+
+def load_hunt_snapshot(path: str | Path) -> tuple[list[dict[str, Any]], set[str], set[str]]:
+    """Load a scrape handoff snapshot for downstream hunt processing."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    jobs = data.get("jobs") or []
+    existing_urls_raw = data.get("existing_urls")
+    existing_titles_raw = data.get("existing_titles")
+    if existing_urls_raw is None:
+        existing_urls, existing_titles = load_processed()
+    else:
+        existing_urls = set(existing_urls_raw or [])
+        existing_titles = set(existing_titles_raw or [])
     return jobs, existing_urls, existing_titles

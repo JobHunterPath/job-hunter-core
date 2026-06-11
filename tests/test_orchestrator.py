@@ -3,6 +3,8 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
 from job_hunter_core.pipeline import orchestrator
 
 
@@ -114,6 +116,8 @@ def test_hunt_no_new_jobs_is_successful_empty_run():
     args = SimpleNamespace(
         mode="hunt",
         region="magdeburg",
+        scrape_only=False,
+        from_snapshot=None,
         skip_validate=False,
         skip_score=False,
         force=False,
@@ -128,6 +132,80 @@ def test_hunt_no_new_jobs_is_successful_empty_run():
         code = orchestrator.run(args)
 
     assert code == 0
+
+
+def test_internal_hunt_split_flags_are_mutually_exclusive():
+    parser = orchestrator._build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--scrape-only", "--from-snapshot", "snapshot.json"])
+
+
+def test_hunt_scrape_only_emits_github_action_output_lines(tmp_path, capsys):
+    args = SimpleNamespace(
+        mode="hunt",
+        region="primary",
+        scrape_only=True,
+        from_snapshot=None,
+        skip_validate=False,
+        skip_score=False,
+        force=False,
+    )
+    snapshot = tmp_path / "hunt_scrape_2026-06-11_primary.json"
+
+    with (
+        patch("job_hunter_core.pipeline.orchestrator.load_api_config", return_value={}),
+        patch("job_hunter_core.pipeline.orchestrator.yaml.safe_load", return_value={"scoring": {}}),
+        patch("builtins.open"),
+        patch(
+            "job_hunter_core.pipeline.orchestrator.run_hunt_scrape_only",
+            return_value=(snapshot, 2),
+        ),
+    ):
+        code = orchestrator.run(args)
+
+    assert code == 0
+    output = capsys.readouterr().out
+    assert f"snapshot_path={snapshot.as_posix()}" in output
+    assert "candidate_count=2" in output
+    assert "has_candidates=true" in output
+
+
+def test_hunt_from_snapshot_preserves_tracker_context():
+    args = SimpleNamespace(
+        mode="hunt",
+        region=None,
+        scrape_only=False,
+        from_snapshot="snapshot.json",
+        skip_validate=True,
+        skip_score=True,
+        force=False,
+    )
+    job = {
+        "title": "Product Manager",
+        "company": "Acme",
+        "url": "https://example.com/new",
+        "snippet": "Role.",
+    }
+    processed = [{"job": job, "score": 0}]
+    existing_urls = {"https://example.com/old"}
+
+    with (
+        patch("job_hunter_core.pipeline.orchestrator.load_api_config", return_value={}),
+        patch("job_hunter_core.pipeline.orchestrator.yaml.safe_load", return_value={"scoring": {}}),
+        patch("builtins.open"),
+        patch(
+            "job_hunter_core.pipeline.orchestrator.load_hunt_snapshot",
+            return_value=([job], existing_urls, set()),
+        ),
+        patch("job_hunter_core.pipeline.orchestrator._process_jobs", return_value=processed),
+        patch("job_hunter_core.pipeline.orchestrator.update_readme"),
+        patch("job_hunter_core.pipeline.orchestrator.mark_processed") as mark_processed,
+    ):
+        code = orchestrator.run(args)
+
+    assert code == 0
+    mark_processed.assert_called_once_with([job], existing_urls, set())
 
 
 def test_update_readme_includes_location_and_migrates_existing_rows(tmp_path):
