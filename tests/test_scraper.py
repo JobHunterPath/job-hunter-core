@@ -7,6 +7,15 @@ import pytest
 from job_hunter_core.core.utils import title_matches
 from job_hunter_core.sources import scraper
 
+
+@pytest.fixture(autouse=True)
+def _no_preflight(monkeypatch):
+    """Prevent probe_search_providers from making live HTTP calls in scraper tests."""
+    monkeypatch.setattr(
+        "job_hunter_core.sources.scraper.probe_search_providers",
+        lambda: set(),
+    )
+
 CONFIG = {
     "exclusion_rules": {
         "senior_flags": ["director", "vp ", "head of product"],

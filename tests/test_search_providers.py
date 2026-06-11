@@ -92,6 +92,8 @@ def test_canonicalize_url_strips_tracking_for_dedupe():
 
 
 def test_discover_ats_jobs_by_search_extracts_expanded_ats_shapes(monkeypatch):
+    monkeypatch.setattr(_router_mod, "_RUN_DISABLED", set())
+
     class FakeRouter:
         def __init__(self, provider_order, **kwargs):
             self.provider_order = provider_order
@@ -127,6 +129,7 @@ def test_discover_ats_jobs_by_search_extracts_expanded_ats_shapes(monkeypatch):
 
 
 def test_discover_ats_jobs_respects_query_caps(monkeypatch):
+    monkeypatch.setattr(_router_mod, "_RUN_DISABLED", set())
     queries = []
 
     class FakeRouter:
@@ -278,7 +281,6 @@ def test_router_quota_exhaustion_exception_does_not_suppress_next_provider(monke
         "is_api_quota_exhausted",
         lambda exc: getattr(getattr(exc, "response", None), "status_code", None) == 402,
     )
-    monkeypatch.setattr(_router_mod, "mark_api_exhausted", lambda *a, **kw: None)
     monkeypatch.setattr(
         search_providers.SearchRouter,
         "_is_exhausted",
@@ -329,17 +331,13 @@ def _reset_exhaustion_state():
     with _router_mod._SEARXNG_ZERO_LOCK:
         _router_mod._searxng_consecutive_zeros = 0
         _router_mod._ats_only_logged = False
+    _router_mod._RUN_DISABLED.clear()
 
 
 def test_all_providers_exhausted_returns_false_with_budget(monkeypatch):
-    """Returns False when no paid providers are exhausted."""
+    """Returns False when no paid providers are in _RUN_DISABLED."""
     _reset_exhaustion_state()
-
-    # Patch _is_exhausted to always return False (none exhausted)
-    monkeypatch.setattr(_router_mod, "_is_exhausted", lambda provider, state: False)
-    monkeypatch.setattr(_router_mod, "_read_state", lambda path: {})
-    monkeypatch.setattr(_router_mod, "_budget_cfg", lambda api_cfg=None: {})
-    monkeypatch.setattr(_router_mod, "_state_path", lambda cfg: "dummy_path")
+    monkeypatch.setattr(_router_mod, "_RUN_DISABLED", set())
 
     result = search_providers.all_providers_exhausted()
     assert result is False
@@ -348,14 +346,9 @@ def test_all_providers_exhausted_returns_false_with_budget(monkeypatch):
 
 
 def test_all_providers_exhausted_returns_true_when_all_exhausted(monkeypatch):
-    """Returns True when all paid providers exhausted and SearXNG unavailable."""
+    """Returns True when all paid providers are in _RUN_DISABLED and SearXNG unavailable."""
     _reset_exhaustion_state()
-
-    monkeypatch.setattr(_router_mod, "_is_exhausted", lambda provider, state: True)
-    monkeypatch.setattr(_router_mod, "_read_state", lambda path: {})
-    monkeypatch.setattr(_router_mod, "_budget_cfg", lambda api_cfg=None: {})
-    monkeypatch.setattr(_router_mod, "_state_path", lambda cfg: "dummy_path")
-    # SearXNG not configured
+    monkeypatch.setattr(_router_mod, "_RUN_DISABLED", {"brave", "tavily", "exa"})
     monkeypatch.setattr(search_providers.SearxngProvider, "enabled", lambda self: False)
 
     result = search_providers.all_providers_exhausted()
@@ -450,6 +443,8 @@ def test_ats_search_queries_split_grouped_site_queries():
 
 
 def test_discover_ats_jobs_enriches_generic_search_title(monkeypatch):
+    monkeypatch.setattr(_router_mod, "_RUN_DISABLED", set())
+
     class FakeRouter:
         def __init__(self, provider_order, **kwargs):
             self.provider_order = provider_order

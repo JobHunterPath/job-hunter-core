@@ -6,14 +6,7 @@ import logging
 import threading
 from typing import TYPE_CHECKING
 
-from job_hunter_core.core.api_budget import (
-    _budget_cfg,
-    _is_exhausted,
-    _read_state,
-    _state_path,
-    is_api_quota_exhausted,
-    mark_api_exhausted,
-)
+from job_hunter_core.core.api_budget import is_api_quota_exhausted
 from job_hunter_core.sources.search_providers.providers import (
     BraveProvider,
     ExaProvider,
@@ -38,6 +31,22 @@ _SEARXNG_ZERO_THRESHOLD: int = 5
 _searxng_consecutive_zeros: int = 0
 _SEARXNG_ZERO_LOCK = threading.Lock()
 _ats_only_logged: bool = False
+
+# Providers confirmed unavailable at run-start via probe_search_providers().
+# Replaced entirely each run — never accumulates across runs.
+_RUN_DISABLED: set[str] = set()
+
+
+def set_run_disabled(disabled: set[str]) -> None:
+    """Replace the run-level disabled set (called once at pipeline start)."""
+    global _RUN_DISABLED
+    _RUN_DISABLED = {p.lower() for p in disabled}
+
+
+def _add_run_disabled(provider_name: str) -> None:
+    """Disable one provider for the rest of this run (quota hit mid-run)."""
+    with _PROVIDER_FAILURES_LOCK:
+        _RUN_DISABLED.add(provider_name.lower())
 
 
 def _provider_failure_count(name: str) -> int:
@@ -75,19 +84,12 @@ def _providers_from_order(provider_names: list[str]) -> list[SearchProvider]:
     return [available[name] for name in provider_names if name in available]
 
 
-def all_providers_exhausted(api_cfg: dict | None = None) -> bool:
-    """Return True when all search providers are effectively unavailable."""
+def all_providers_exhausted(api_cfg: dict | None = None) -> bool:  # noqa: ARG001
+    """Return True when all search providers are effectively unavailable this run."""
     global _ats_only_logged
 
-    cfg = _budget_cfg(api_cfg)
-    state = _read_state(_state_path(cfg))
-    brave_out = _is_exhausted("brave", state)
-    tavily_out = _is_exhausted("tavily", state)
-    exa_out = _is_exhausted("exa", state)
-    paid_exhausted = brave_out and tavily_out and exa_out
-
-    searxng_unavailable = not SearxngProvider().enabled()
-
+    paid_exhausted = all(name in _RUN_DISABLED for name in ("brave", "tavily", "exa"))
+    searxng_unavailable = not SearxngProvider().enabled() or "searxng" in _RUN_DISABLED
     result = paid_exhausted and searxng_unavailable
 
     if result:
@@ -134,15 +136,8 @@ class SearchRouter:
 
     @staticmethod
     def _is_exhausted(provider: SearchProvider) -> bool:
-        """Return True when the provider's monthly quota is already marked exhausted."""
-        from job_hunter_core.core.api_budget import _budget_cfg, _read_state, _state_path
-
-        cfg = _budget_cfg()
-        if not cfg.get("enabled", True):
-            return False
-        state = _read_state(_state_path(cfg))
-        exhausted = state.get("exhausted", {})
-        return provider.name.lower() in exhausted
+        """Return True when the provider was disabled by the pre-flight probe or failed mid-run."""
+        return provider.name.lower() in _RUN_DISABLED
 
     def search(self, query: str, region_config: dict, count: int = 10) -> list[SearchResult]:
         all_results: list[SearchResult] = []
@@ -181,10 +176,10 @@ class SearchRouter:
                     break
             except Exception as exc:
                 if is_api_quota_exhausted(exc):
-                    mark_api_exhausted(provider.name, exc=exc)
+                    _add_run_disabled(provider.name)
                     _reset_provider_failure(provider.name)
                     logger.warning(
-                        "[search] %s quota exhausted; continuing to next provider",
+                        "[search] %s quota exhausted mid-run; disabling for this run",
                         provider.name,
                     )
                     continue

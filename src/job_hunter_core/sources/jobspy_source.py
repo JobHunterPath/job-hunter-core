@@ -11,6 +11,7 @@ is needed.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from job_hunter_core.core.config import load_api_config
@@ -19,6 +20,23 @@ from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
 
 logger = logging.getLogger(__name__)
+
+# Sites that returned HTTP 403 this run — never called again until process restarts.
+_DISABLED_SITES: set[str] = set()
+_DISABLED_SITES_LOCK = threading.Lock()
+
+
+def _is_403_block(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "403" in msg or "forbidden" in msg
+
+
+def _disable_site(site: str) -> None:
+    with _DISABLED_SITES_LOCK:
+        if site not in _DISABLED_SITES:
+            _DISABLED_SITES.add(site)
+            logger.warning("[jobspy] %s disabled for this run (HTTP 403 block)", site)
+
 
 # ISO 3166-1 alpha-2 → jobspy Indeed country name
 _ISO_TO_INDEED: dict[str, str] = {
@@ -187,71 +205,86 @@ class JobSpySource(JobSourceAdapter):
                     search_batches.append((["bayt"], ""))
 
                 for batch_sources, scrape_location in search_batches:
-                    logger.info(
-                        "[jobspy] [%s] Searching %s for %r", region_name, batch_sources, title
-                    )
-                    try:
-                        df = scrape_jobs(
-                            site_name=batch_sources,
-                            search_term=title,
-                            location=scrape_location,
-                            results_wanted=results_per_query,
-                            hours_old=hours_old,
-                            country_indeed=country_indeed or "usa",
-                            description_format="markdown",
-                            linkedin_fetch_description=linkedin_fetch_description,
-                            verbose=0,
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "[jobspy] scrape_jobs failed for %r in %r via %s: %s",
-                            title,
-                            scrape_location or "international",
-                            batch_sources,
-                            exc,
-                        )
+                    with _DISABLED_SITES_LOCK:
+                        active_sites = [s for s in batch_sources if s not in _DISABLED_SITES]
+
+                    if not active_sites:
+                        logger.debug("[jobspy] all sites in batch disabled; skipping")
                         continue
 
-                    if df is None or df.empty:
-                        logger.info(
-                            "[jobspy] No results for %r in %r via %s",
-                            title,
-                            scrape_location or "international",
-                            batch_sources,
-                        )
-                        continue
-
-                    before = len(jobs)
-                    for _, row in df.iterrows():
-                        row_title = _str(row.get("title"))
-                        if not title_matches(row_title, title_filters, _excluded):
-                            continue
-                        if location:
-                            row_location = _str(row.get("location"))
-                            if row_location and not location_matches(row_location, location):
+                    for site in active_sites:
+                        with _DISABLED_SITES_LOCK:
+                            if site in _DISABLED_SITES:
                                 continue
-                        job_dict = _row_to_job(row, region_name)
-                        if job_dict:
-                            jobs.append(
-                                JobPosting(
-                                    title=job_dict["title"],
-                                    company=job_dict["company"],
-                                    url=job_dict["url"],
-                                    posted=job_dict["posted"],
-                                    location="",
-                                    snippet=job_dict["snippet"],
-                                    source=job_dict["source"],
-                                    query=job_dict["query"],
-                                    region=region_name,
-                                )
+
+                        logger.info(
+                            "[jobspy] [%s] Searching [%s] for %r", region_name, site, title
+                        )
+                        try:
+                            df = scrape_jobs(
+                                site_name=[site],
+                                search_term=title,
+                                location=scrape_location,
+                                results_wanted=results_per_query,
+                                hours_old=hours_old,
+                                country_indeed=country_indeed or "usa",
+                                description_format="markdown",
+                                linkedin_fetch_description=linkedin_fetch_description,
+                                verbose=0,
                             )
-                    logger.info(
-                        "[jobspy] +%d jobs for %r in %r via %s",
-                        len(jobs) - before,
-                        title,
-                        location,
-                        batch_sources,
-                    )
+                        except Exception as exc:
+                            if _is_403_block(exc):
+                                _disable_site(site)
+                            else:
+                                logger.warning(
+                                    "[jobspy] scrape_jobs failed for %r in %r via [%s]: %s",
+                                    title,
+                                    scrape_location or "international",
+                                    site,
+                                    exc,
+                                )
+                            continue
+
+                        if df is None or df.empty:
+                            logger.info(
+                                "[jobspy] No results for %r in %r via [%s]",
+                                title,
+                                scrape_location or "international",
+                                site,
+                            )
+                            continue
+
+                        before = len(jobs)
+                        for _, row in df.iterrows():
+                            row_title = _str(row.get("title"))
+                            if not title_matches(row_title, title_filters, _excluded):
+                                continue
+                            if location:
+                                row_location = _str(row.get("location"))
+                                if row_location and not location_matches(row_location, location):
+                                    continue
+                            job_dict = _row_to_job(row, region_name)
+                            if job_dict:
+                                jobs.append(
+                                    JobPosting(
+                                        title=job_dict["title"],
+                                        company=job_dict["company"],
+                                        url=job_dict["url"],
+                                        posted=job_dict["posted"],
+                                        location="",
+                                        snippet=job_dict["snippet"],
+                                        source=job_dict["source"],
+                                        query=job_dict["query"],
+                                        region=region_name,
+                                    )
+                                )
+                        logger.info(
+                            "[jobspy] +%d jobs for %r in %r via [%s]",
+                            len(jobs) - before,
+                            title,
+                            location,
+                            site,
+                        )
 
         logger.info("[jobspy] Complete: %d total jobs found", len(jobs))
         return jobs

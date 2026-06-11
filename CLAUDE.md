@@ -28,7 +28,7 @@ You are working on the automation engine that powers the job search pipeline.
 
 ## Search Provider Architecture
 
-- **Pre-flight gate**: `_run_disabled = get_exhausted_providers()` at the top of `scrape()`. Pass into all search calls for the entire run — never read `api_usage.json` inside per-company loops.
+- **Pre-flight gate**: `_run_disabled = probe_search_providers()` at the top of `scrape()`. Fires a live test query against each enabled provider; any provider that fails or returns 0 results is disabled for this run only. Calls `set_run_disabled(_run_disabled)` so all `SearchRouter` instances created during the run inherit it automatically — no file state read.
 - **Per-company fallback**: `search_web(..., allowed={"searxng"}, disabled=_run_disabled)`. Paid APIs (Brave/Tavily/Exa) are restricted to the global ATS discovery phase only.
 - **ATS discovery** (once per run, global): `discover_ats_jobs_by_search(..., disabled=_run_disabled)`. No `allowed` restriction here — paid providers are appropriate.
 

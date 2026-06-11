@@ -4,9 +4,6 @@ from __future__ import annotations
 
 import requests
 
-from job_hunter_core.core.api_budget import (
-    reserve_api_call,
-)
 from job_hunter_core.core.config import (
     BRAVE_API_KEY,
     EXA_API_KEY,
@@ -89,8 +86,6 @@ class BraveProvider(SearchProvider):
         return bool(BRAVE_API_KEY)
 
     def search(self, query: str, region_config: dict, count: int = 10) -> list[SearchResult]:
-        if not reserve_api_call(self.name):
-            return []
         params = {
             "q": query,
             "count": count,
@@ -123,8 +118,6 @@ class TavilyProvider(SearchProvider):
         return bool(TAVILY_API_KEY)
 
     def search(self, query: str, region_config: dict, count: int = 10) -> list[SearchResult]:
-        if not reserve_api_call(self.name):
-            return []
         resp = requests.post(
             TAVILY_URL,
             json={"query": query, "max_results": count},
@@ -145,8 +138,6 @@ class ExaProvider(SearchProvider):
         return bool(EXA_API_KEY)
 
     def search(self, query: str, region_config: dict, count: int = 10) -> list[SearchResult]:
-        if not reserve_api_call(self.name):
-            return []
         resp = requests.post(
             EXA_URL,
             json={"query": query, "numResults": count, "contents": {"text": True}},

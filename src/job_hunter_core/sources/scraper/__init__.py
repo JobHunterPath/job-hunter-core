@@ -18,7 +18,8 @@ from urllib.parse import urlparse
 
 import requests  # noqa: F401
 
-from job_hunter_core.core.api_budget import get_exhausted_providers
+from job_hunter_core.sources.search_providers.preflight import probe_search_providers
+from job_hunter_core.sources.search_providers.router import set_run_disabled
 from job_hunter_core.core.config import ROOT as REPO_ROOT
 from job_hunter_core.core.config import (
     load_api_config,
@@ -174,9 +175,10 @@ def scrape(region: str | None = None) -> list[dict]:
     companies = load_companies(region)
     stats = ScrapeStats()
 
-    # Read API budget state once at the start of the run. Exhausted paid providers
-    # are skipped for the entire pipeline without repeated file reads per company.
-    _run_disabled = get_exhausted_providers()
+    # Probe all search providers once at run start. Dead or quota-exhausted providers
+    # are disabled for the entire run without repeated file reads per company.
+    _run_disabled = probe_search_providers()
+    set_run_disabled(_run_disabled)
 
     global_cfg = config.get("global_search", {})
     title_filters = global_cfg.get("job_titles", [])
