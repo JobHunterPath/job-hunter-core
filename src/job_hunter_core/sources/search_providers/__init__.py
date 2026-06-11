@@ -1,8 +1,9 @@
-﻿"""Search and career-page provider strategies.
+"""Search and career-page provider strategies.
 
 Re-exports all public symbols from the search_providers package so that
 existing import sites require no changes.
 """
+
 from __future__ import annotations
 
 import logging

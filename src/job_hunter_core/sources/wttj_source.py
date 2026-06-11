@@ -120,7 +120,9 @@ class WTTJSource(JobSourceAdapter):
                         org_slug = str(org.get("slug") or "")
                         job_slug = str(item.get("slug") or job_id)
                         job_url = (
-                            f"{_JOB_BASE}/{org_slug}/jobs/{job_slug}" if org_slug and job_slug else ""
+                            f"{_JOB_BASE}/{org_slug}/jobs/{job_slug}"
+                            if org_slug and job_slug
+                            else ""
                         )
 
                         office = item.get("office") or {}

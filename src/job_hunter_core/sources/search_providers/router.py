@@ -1,4 +1,5 @@
 """SearchRouter, search_web, provider registry, and all mutable module-level state."""
+
 from __future__ import annotations
 
 import logging

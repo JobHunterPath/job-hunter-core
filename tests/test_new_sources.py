@@ -73,9 +73,7 @@ class TestJobicySource:
 
     def test_is_enabled_respects_config(self):
         disabled = {"http": {"job_boards": {"jobicy": {"enabled": False}}}}
-        with patch(
-            "job_hunter_core.sources.jobicy_source.load_api_config", return_value=disabled
-        ):
+        with patch("job_hunter_core.sources.jobicy_source.load_api_config", return_value=disabled):
             assert JobicySource().is_enabled({}) is False
 
     def test_fetch_returns_job_postings(self):
@@ -98,9 +96,7 @@ class TestJobicySource:
 
     def test_fetch_returns_empty_when_disabled(self):
         disabled = {"http": {"job_boards": {"jobicy": {"enabled": False}}}}
-        with patch(
-            "job_hunter_core.sources.jobicy_source.load_api_config", return_value=disabled
-        ):
+        with patch("job_hunter_core.sources.jobicy_source.load_api_config", return_value=disabled):
             jobs = JobicySource().fetch(["Software Engineer"], _REGIONS, _EXCL)
         assert jobs == []
 
@@ -405,9 +401,7 @@ class TestEURESSource:
 
     def test_fetch_returns_job_postings(self):
         with (
-            patch(
-                "job_hunter_core.sources.eures_source.load_api_config", return_value=_EMPTY_CFG
-            ),
+            patch("job_hunter_core.sources.eures_source.load_api_config", return_value=_EMPTY_CFG),
             patch(
                 "job_hunter_core.sources.eures_source.requests.post",
                 return_value=_mock_post(_EURES_RESPONSE),
@@ -430,9 +424,7 @@ class TestGlintsSource:
 
     def test_fetch_returns_job_postings(self):
         with (
-            patch(
-                "job_hunter_core.sources.glints_source.load_api_config", return_value=_EMPTY_CFG
-            ),
+            patch("job_hunter_core.sources.glints_source.load_api_config", return_value=_EMPTY_CFG),
             patch(
                 "job_hunter_core.sources.glints_source.requests.get",
                 return_value=_mock_get(_GLINTS_RESPONSE),
@@ -506,9 +498,7 @@ class TestJobBankSource:
 
     def test_is_enabled_false_when_disabled(self):
         disabled = {"http": {"job_boards": {"jobbank": {"enabled": False}}}}
-        with patch(
-            "job_hunter_core.sources.jobbank_source.load_api_config", return_value=disabled
-        ):
+        with patch("job_hunter_core.sources.jobbank_source.load_api_config", return_value=disabled):
             assert JobBankSource().is_enabled({}) is False
 
     def test_fetch_returns_job_postings(self):
@@ -651,9 +641,7 @@ class TestWTTJSource:
 
     def test_fetch_returns_job_postings(self):
         with (
-            patch(
-                "job_hunter_core.sources.wttj_source.load_api_config", return_value=_EMPTY_CFG
-            ),
+            patch("job_hunter_core.sources.wttj_source.load_api_config", return_value=_EMPTY_CFG),
             patch(
                 "job_hunter_core.sources.wttj_source.requests.get",
                 return_value=_mock_get(_WTTJ_RESPONSE),

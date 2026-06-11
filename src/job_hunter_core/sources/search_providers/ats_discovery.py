@@ -1,4 +1,5 @@
 """ATS discovery via search: _ATS_DISCOVERY_SITES, discover_ats_jobs_by_search, location helpers."""
+
 from __future__ import annotations
 
 import logging
@@ -144,7 +145,9 @@ def _verify_ats_location(url: str, source: str, location_filter: str) -> bool:
             if len(parts) < 2:
                 return True
             slug, job_id = parts[0], parts[1]
-            resp = requests.get(f"https://api.lever.co/v0/postings/{slug}/{job_id}", timeout=_ATS_API_TIMEOUT)
+            resp = requests.get(
+                f"https://api.lever.co/v0/postings/{slug}/{job_id}", timeout=_ATS_API_TIMEOUT
+            )
             if not resp.ok:
                 return True
             categories = resp.json().get("categories", {})

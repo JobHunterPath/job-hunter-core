@@ -29,8 +29,8 @@ from job_hunter_core.sources.base import JobSourceAdapter
 
 _TIMEOUT = get_timeout("job_boards")
 _JSEARCH_FAILURES = 0
-_ARBEITNOW_TIMEOUT = 15   # seconds: per-page HTTP timeout for Arbeitnow API calls
-_SNIPPET_CHARS = 1000     # description chars kept as snippet for Arbeitnow / JSearch results
+_ARBEITNOW_TIMEOUT = 15  # seconds: per-page HTTP timeout for Arbeitnow API calls
+_SNIPPET_CHARS = 1000  # description chars kept as snippet for Arbeitnow / JSearch results
 
 logger = logging.getLogger(__name__)
 
@@ -266,9 +266,9 @@ class JSearchSource(JobSourceAdapter):
                         location_str = f"{city}, {job_country}".strip(", ")
 
                         if location_filter and (city or job_country):
-                            if not location_matches(
-                                city, location_filter
-                            ) and not location_matches(location_str, location_filter):
+                            if not location_matches(city, location_filter) and not location_matches(
+                                location_str, location_filter
+                            ):
                                 continue
 
                         description = (job.get("job_description") or "")[:_SNIPPET_CHARS]
@@ -290,5 +290,3 @@ class JSearchSource(JobSourceAdapter):
 
         logger.info(f"[jsearch] {len(jobs)} jobs returned")
         return jobs
-
-

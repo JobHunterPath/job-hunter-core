@@ -19,7 +19,7 @@ _TEXLIVE_IMAGE = "texlive/texlive:latest"
 _DOCKER_PULL_LOCK = threading.Lock()
 _docker_image_pulled = False
 
-_PDFLATEX_TIMEOUT = 120   # seconds: native pdflatex compile limit
+_PDFLATEX_TIMEOUT = 120  # seconds: native pdflatex compile limit
 _DOCKER_COMPILE_TIMEOUT = 300  # seconds: Docker-based pdflatex compile limit
 _DOCKER_PULL_TIMEOUT = 600  # seconds: Docker image pull on first run
 

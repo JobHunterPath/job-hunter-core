@@ -1,4 +1,5 @@
 """URL canonicalization and matching helpers."""
+
 from __future__ import annotations
 
 from html import unescape

@@ -55,7 +55,9 @@ class HimalayasSource(JobSourceAdapter):
         return "himalayas"
 
     def is_enabled(self, config: dict) -> bool:  # noqa: ARG002
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("himalayas", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("himalayas", {}) or {}
+        )
         return bool(source_cfg.get("enabled", False))
 
     def fetch(
@@ -67,7 +69,9 @@ class HimalayasSource(JobSourceAdapter):
         excluded_title_terms: list[str] | None = None,
     ) -> list[JobPosting]:
         """Fetch remote jobs from Himalayas' no-auth public API."""
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("himalayas", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("himalayas", {}) or {}
+        )
         if not source_cfg.get("enabled", False):
             return []
 
@@ -95,7 +99,11 @@ class HimalayasSource(JobSourceAdapter):
                         raw_jobs = resp.json().get("jobs", [])
                     except Exception as exc:
                         logger.warning(
-                            "[himalayas] failed for %r in %s page %s: %s", title, region_name, page, exc
+                            "[himalayas] failed for %r in %s page %s: %s",
+                            title,
+                            region_name,
+                            page,
+                            exc,
                         )
                         break
 
@@ -116,7 +124,9 @@ class HimalayasSource(JobSourceAdapter):
                             and not location_matches(job_location, location)
                         ):
                             continue
-                        description = strip_html(item.get("description") or item.get("excerpt") or "")
+                        description = strip_html(
+                            item.get("description") or item.get("excerpt") or ""
+                        )
                         jobs.append(
                             JobPosting(
                                 title=job_title,

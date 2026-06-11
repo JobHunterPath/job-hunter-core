@@ -106,7 +106,9 @@ class JobStreetSource(JobSourceAdapter):
         return "jobstreet"
 
     def is_enabled(self, config: dict) -> bool:  # noqa: ARG002
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("jobstreet", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("jobstreet", {}) or {}
+        )
         return bool(source_cfg.get("enabled", True))
 
     def fetch(
@@ -121,7 +123,9 @@ class JobStreetSource(JobSourceAdapter):
 
         Only runs for SEA regions (SG, MY, ID, PH, VN).
         """
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("jobstreet", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("jobstreet", {}) or {}
+        )
         if not source_cfg.get("enabled", True):
             return []
 
@@ -230,7 +234,9 @@ class JobStreetSource(JobSourceAdapter):
                         salary_min = salary_obj.get("min") or salary_obj.get("minimum")
                         salary_max = salary_obj.get("max") or salary_obj.get("maximum")
                         posted = str(item.get("listingDate") or item.get("postedDate") or "")[:10]
-                        teaser = strip_html(str(item.get("teaser") or item.get("description") or ""))
+                        teaser = strip_html(
+                            str(item.get("teaser") or item.get("description") or "")
+                        )
                         snippet = teaser
                         if salary_min and salary_max:
                             snippet = f"Salary: {salary_min}–{salary_max}. " + snippet

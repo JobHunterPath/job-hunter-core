@@ -38,7 +38,9 @@ class JobBankSource(JobSourceAdapter):
         return "jobbank"
 
     def is_enabled(self, config: dict) -> bool:  # noqa: ARG002
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("jobbank", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("jobbank", {}) or {}
+        )
         return bool(source_cfg.get("enabled", True))
 
     def fetch(
@@ -53,7 +55,9 @@ class JobBankSource(JobSourceAdapter):
 
         Only runs for Canadian regions (country == CA).
         """
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("jobbank", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("jobbank", {}) or {}
+        )
         if not source_cfg.get("enabled", True):
             return []
 
@@ -140,7 +144,9 @@ class JobBankSource(JobSourceAdapter):
                             region=region_name,
                         )
                     )
-                logger.info("[jobbank] +%d jobs for %r in %s", len(jobs) - before, title, region_name)
+                logger.info(
+                    "[jobbank] +%d jobs for %r in %s", len(jobs) - before, title, region_name
+                )
 
         logger.info("[jobbank] Complete: %d total jobs", len(jobs))
         return jobs

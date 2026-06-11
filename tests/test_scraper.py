@@ -48,7 +48,10 @@ def _disable_external_scrape_paths():
         patch("job_hunter_core.sources.jobspy_source.JobSpySource.fetch", return_value=[]),
         patch("job_hunter_core.sources.jobicy_source.JobicySource.fetch", return_value=[]),
         patch("job_hunter_core.sources.remoteok_source.RemoteOKSource.fetch", return_value=[]),
-        patch("job_hunter_core.sources.weworkremotely_source.WeWorkRemotelySource.fetch", return_value=[]),
+        patch(
+            "job_hunter_core.sources.weworkremotely_source.WeWorkRemotelySource.fetch",
+            return_value=[],
+        ),
         patch("job_hunter_core.sources.jooble_source.JoobleSource.fetch", return_value=[]),
         patch("job_hunter_core.sources.scraper.load_cached_candidate_urls", return_value=set()),
         patch("job_hunter_core.sources.scraper.save_cached_candidate_urls"),
@@ -374,7 +377,10 @@ def test_scrape_skips_adzuna_german_descriptions():
     with (
         patch("job_hunter_core.sources.scraper.load_search_config", return_value=CONFIG),
         patch("job_hunter_core.sources.scraper.load_companies", return_value=[]),
-        patch("job_hunter_core.sources.adzuna_source.AdzunaSource.fetch", return_value=[adzuna_posting]),
+        patch(
+            "job_hunter_core.sources.adzuna_source.AdzunaSource.fetch",
+            return_value=[adzuna_posting],
+        ),
         patch("job_hunter_core.sources.reed_source.ReedSource.fetch", return_value=[]),
     ):
         jobs = scraper.scrape()
@@ -697,7 +703,10 @@ def test_scrape_diagnostics_one_successful_one_failed_source():
             side_effect=RuntimeError("jobspy boom"),
         ),
         patch("job_hunter_core.sources.himalayas_source.HimalayasSource.fetch", return_value=[]),
-        patch("job_hunter_core.sources.arbeitsagentur_source.ArbeitsagenturSource.fetch", return_value=[]),
+        patch(
+            "job_hunter_core.sources.arbeitsagentur_source.ArbeitsagenturSource.fetch",
+            return_value=[],
+        ),
         patch("job_hunter_core.sources.adzuna_source.AdzunaSource.fetch", return_value=[]),
         patch("job_hunter_core.sources.reed_source.ReedSource.fetch", return_value=[]),
     ):

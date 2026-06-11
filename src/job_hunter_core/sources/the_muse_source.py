@@ -22,7 +22,9 @@ class TheMuseSource(JobSourceAdapter):
         return "the_muse"
 
     def is_enabled(self, config: dict) -> bool:  # noqa: ARG002
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("the_muse", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("the_muse", {}) or {}
+        )
         return bool(source_cfg.get("enabled", True))
 
     def fetch(
@@ -34,7 +36,9 @@ class TheMuseSource(JobSourceAdapter):
         excluded_title_terms: list[str] | None = None,
     ) -> list[JobPosting]:
         """Fetch jobs from The Muse's free public API."""
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("the_muse", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("the_muse", {}) or {}
+        )
         if not source_cfg.get("enabled", True):
             return []
 

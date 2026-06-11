@@ -440,27 +440,83 @@ def discover_company_names_from_job_sources(
             names.append(name)
 
     enabled_region = {region_name: region_config}
-    _add_jobs([jp.to_dict() for jp in ArbeitnowSource().fetch(
-        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
-    )])
-    _add_jobs([jp.to_dict() for jp in JSearchSource().fetch(
-        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
-    )])
-    _add_jobs([jp.to_dict() for jp in AdzunaSource().fetch(
-        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
-    )])
-    _add_jobs([jp.to_dict() for jp in JoobleSource().fetch(
-        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
-    )])
-    _add_jobs([jp.to_dict() for jp in JobSpySource().fetch(
-        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
-    )])
-    _add_jobs([jp.to_dict() for jp in ArbeitsagenturSource().fetch(
-        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
-    )])
-    _add_jobs([jp.to_dict() for jp in HimalayasSource().fetch(
-        title_filters, enabled_region, search_config, excluded_title_terms=excluded_title_terms
-    )])
+    _add_jobs(
+        [
+            jp.to_dict()
+            for jp in ArbeitnowSource().fetch(
+                title_filters,
+                enabled_region,
+                search_config,
+                excluded_title_terms=excluded_title_terms,
+            )
+        ]
+    )
+    _add_jobs(
+        [
+            jp.to_dict()
+            for jp in JSearchSource().fetch(
+                title_filters,
+                enabled_region,
+                search_config,
+                excluded_title_terms=excluded_title_terms,
+            )
+        ]
+    )
+    _add_jobs(
+        [
+            jp.to_dict()
+            for jp in AdzunaSource().fetch(
+                title_filters,
+                enabled_region,
+                search_config,
+                excluded_title_terms=excluded_title_terms,
+            )
+        ]
+    )
+    _add_jobs(
+        [
+            jp.to_dict()
+            for jp in JoobleSource().fetch(
+                title_filters,
+                enabled_region,
+                search_config,
+                excluded_title_terms=excluded_title_terms,
+            )
+        ]
+    )
+    _add_jobs(
+        [
+            jp.to_dict()
+            for jp in JobSpySource().fetch(
+                title_filters,
+                enabled_region,
+                search_config,
+                excluded_title_terms=excluded_title_terms,
+            )
+        ]
+    )
+    _add_jobs(
+        [
+            jp.to_dict()
+            for jp in ArbeitsagenturSource().fetch(
+                title_filters,
+                enabled_region,
+                search_config,
+                excluded_title_terms=excluded_title_terms,
+            )
+        ]
+    )
+    _add_jobs(
+        [
+            jp.to_dict()
+            for jp in HimalayasSource().fetch(
+                title_filters,
+                enabled_region,
+                search_config,
+                excluded_title_terms=excluded_title_terms,
+            )
+        ]
+    )
 
     return names
 
@@ -644,7 +700,9 @@ def run(region: str | None = None) -> None:
         new_entries = []
         existing_urls_snapshot = set(existing_urls)
 
-        def _lookup_name(name: str, _urls=existing_urls_snapshot, _cfg=region_config) -> dict | None:
+        def _lookup_name(
+            name: str, _urls=existing_urls_snapshot, _cfg=region_config
+        ) -> dict | None:
             print(f"[discover] Looking up: {name}")
             return find_career_url(name, _urls, _cfg)
 

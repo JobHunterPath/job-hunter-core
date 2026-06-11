@@ -100,9 +100,7 @@ class AdzunaSource(JobSourceAdapter):
             logger.warning("[adzuna] ADZUNA_APP_ID or ADZUNA_API_KEY not set — skipping")
             return []
 
-        adzuna_cfg = (
-            load_api_config().get("http", {}).get("job_boards", {}).get("adzuna", {}) or {}
-        )
+        adzuna_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("adzuna", {}) or {}
         if not adzuna_cfg.get("enabled", False):
             return []
 
@@ -174,9 +172,7 @@ class AdzunaSource(JobSourceAdapter):
                             if location and not location_matches(location_str, location):
                                 continue
                         description = (item.get("description") or "")[:1000]
-                        snippet = (
-                            f"{location_str} — {description}" if location_str else description
-                        )
+                        snippet = f"{location_str} — {description}" if location_str else description
 
                         jobs.append(
                             JobPosting(

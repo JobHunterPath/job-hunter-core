@@ -140,7 +140,9 @@ class EURESSource(JobSourceAdapter):
 
                         employer = str(header.get("employerName") or "")
                         place = str((header.get("placeOfWork") or {}).get("city") or "")
-                        country_label = str((header.get("placeOfWork") or {}).get("countryCode") or iso)
+                        country_label = str(
+                            (header.get("placeOfWork") or {}).get("countryCode") or iso
+                        )
                         location = ", ".join(filter(None, [place, country_label]))
                         posted = str(header.get("startDate") or "")[:10]
 

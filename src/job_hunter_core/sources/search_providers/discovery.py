@@ -1,4 +1,5 @@
-﻿"""Company homepage and career URL discovery helpers."""
+"""Company homepage and career URL discovery helpers."""
+
 from __future__ import annotations
 
 from urllib.parse import urlparse

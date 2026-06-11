@@ -187,7 +187,9 @@ class JobSpySource(JobSourceAdapter):
                     search_batches.append((["bayt"], ""))
 
                 for batch_sources, scrape_location in search_batches:
-                    logger.info("[jobspy] [%s] Searching %s for %r", region_name, batch_sources, title)
+                    logger.info(
+                        "[jobspy] [%s] Searching %s for %r", region_name, batch_sources, title
+                    )
                     try:
                         df = scrape_jobs(
                             site_name=batch_sources,

@@ -314,8 +314,13 @@ def test_extract_career_page_jobs_uses_firecrawl_after_local_fallbacks():
     with (
         patch("job_hunter_core.sources.career_pages.requests.get", return_value=mock_resp),
         patch("job_hunter_core.sources.career_pages._ladder.discover_via_sitemap", return_value=[]),
-        patch("job_hunter_core.sources.career_pages._ladder.extract_from_lightpanda", return_value=[]),
-        patch("job_hunter_core.sources.career_pages._ladder.extract_from_rendered_html", return_value=[]),
+        patch(
+            "job_hunter_core.sources.career_pages._ladder.extract_from_lightpanda", return_value=[]
+        ),
+        patch(
+            "job_hunter_core.sources.career_pages._ladder.extract_from_rendered_html",
+            return_value=[],
+        ),
         patch(
             "job_hunter_core.sources.career_pages._ladder.extract_from_firecrawl",
             return_value=[{"title": "Product Owner", "url": "https://example.com/jobs/2"}],

@@ -1,4 +1,5 @@
 """SearchProvider ABC and concrete provider implementations."""
+
 from __future__ import annotations
 
 import requests

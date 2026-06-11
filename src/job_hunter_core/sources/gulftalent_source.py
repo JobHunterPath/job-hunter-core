@@ -134,7 +134,9 @@ class GulfTalentSource(JobSourceAdapter):
         return "gulftalent"
 
     def is_enabled(self, config: dict) -> bool:  # noqa: ARG002
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("gulftalent", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("gulftalent", {}) or {}
+        )
         return bool(source_cfg.get("enabled", True))
 
     def fetch(
@@ -149,7 +151,9 @@ class GulfTalentSource(JobSourceAdapter):
 
         Only runs for Gulf regions (AE, SA, QA, KW, BH, OM).
         """
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("gulftalent", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("gulftalent", {}) or {}
+        )
         if not source_cfg.get("enabled", True):
             return []
 

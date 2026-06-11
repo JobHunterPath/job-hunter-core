@@ -77,7 +77,9 @@ class ArbeitsagenturSource(JobSourceAdapter):
                     resp.raise_for_status()
                     postings = resp.json().get("stellenangebote", [])
                 except Exception as exc:
-                    logger.warning("[arbeitsagentur] failed for %r in %s: %s", title, region_name, exc)
+                    logger.warning(
+                        "[arbeitsagentur] failed for %r in %s: %s", title, region_name, exc
+                    )
                     continue
 
                 before = len(jobs)

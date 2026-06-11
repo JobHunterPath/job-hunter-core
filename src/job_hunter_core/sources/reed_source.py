@@ -74,9 +74,7 @@ class ReedSource(JobSourceAdapter):
             logger.warning("[reed] REED_API_KEY not set — skipping")
             return []
 
-        reed_cfg = (
-            load_api_config().get("http", {}).get("job_boards", {}).get("reed", {}) or {}
-        )
+        reed_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("reed", {}) or {}
         if not reed_cfg.get("enabled", False):
             return []
 
@@ -141,9 +139,7 @@ class ReedSource(JobSourceAdapter):
 
                         location_str = item.get("locationName", "")
                         description = (item.get("jobDescription") or "")[:1000]
-                        snippet = (
-                            f"{location_str} — {description}" if location_str else description
-                        )
+                        snippet = f"{location_str} — {description}" if location_str else description
 
                         jobs.append(
                             JobPosting(

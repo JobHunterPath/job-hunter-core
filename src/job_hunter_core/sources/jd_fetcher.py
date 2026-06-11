@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Minimum body-text length before we consider the static extraction sufficient.
 _MIN_TEXT_LENGTH = 300
-_LLM_INPUT_MAX_CHARS = 8000    # page text chars passed to the LLM extraction prompt
+_LLM_INPUT_MAX_CHARS = 8000  # page text chars passed to the LLM extraction prompt
 _FALLBACK_DESC_MAX_CHARS = 4000  # fallback plain-text chars used when LLM extraction yields nothing
 
 # Map ATS/career URL patterns → company name extractor

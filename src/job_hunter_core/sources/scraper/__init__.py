@@ -455,7 +455,9 @@ def scrape(region: str | None = None) -> list[dict]:
         for jp in jobspy_postings:
             if add_job(jp.to_dict(), cache_candidate=True):
                 jobspy_accepted += 1
-        stats.record("jobspy", accepted=jobspy_accepted, skipped=len(jobspy_postings) - jobspy_accepted)
+        stats.record(
+            "jobspy", accepted=jobspy_accepted, skipped=len(jobspy_postings) - jobspy_accepted
+        )
     except Exception as e:
         stats.record("jobspy", failed=1)
         logger.warning("[scraper] JobSpy failed: %s", e)
@@ -493,7 +495,9 @@ def scrape(region: str | None = None) -> list[dict]:
         for jp in jobicy_postings:
             if add_job(jp.to_dict(), cache_candidate=True):
                 jobicy_accepted += 1
-        stats.record("jobicy", accepted=jobicy_accepted, skipped=len(jobicy_postings) - jobicy_accepted)
+        stats.record(
+            "jobicy", accepted=jobicy_accepted, skipped=len(jobicy_postings) - jobicy_accepted
+        )
     except Exception as e:
         stats.record("jobicy", failed=1)
         logger.warning("[scraper] Jobicy failed: %s", e)
@@ -507,7 +511,9 @@ def scrape(region: str | None = None) -> list[dict]:
             if add_job(jp.to_dict(), cache_candidate=True):
                 remoteok_accepted += 1
         stats.record(
-            "remoteok", accepted=remoteok_accepted, skipped=len(remoteok_postings) - remoteok_accepted
+            "remoteok",
+            accepted=remoteok_accepted,
+            skipped=len(remoteok_postings) - remoteok_accepted,
         )
     except Exception as e:
         stats.record("remoteok", failed=1)
@@ -521,7 +527,9 @@ def scrape(region: str | None = None) -> list[dict]:
         for jp in wwr_postings:
             if add_job(jp.to_dict(), cache_candidate=True):
                 wwr_accepted += 1
-        stats.record("weworkremotely", accepted=wwr_accepted, skipped=len(wwr_postings) - wwr_accepted)
+        stats.record(
+            "weworkremotely", accepted=wwr_accepted, skipped=len(wwr_postings) - wwr_accepted
+        )
     except Exception as e:
         stats.record("weworkremotely", failed=1)
         logger.warning("[scraper] WeWorkRemotely failed: %s", e)
@@ -588,7 +596,9 @@ def scrape(region: str | None = None) -> list[dict]:
         for jp in jooble_postings:
             if add_job(jp.to_dict(), cache_candidate=True):
                 jooble_accepted += 1
-        stats.record("jooble", accepted=jooble_accepted, skipped=len(jooble_postings) - jooble_accepted)
+        stats.record(
+            "jooble", accepted=jooble_accepted, skipped=len(jooble_postings) - jooble_accepted
+        )
     except Exception as e:
         stats.record("jooble", failed=1)
         logger.warning("[scraper] Jooble failed: %s", e)

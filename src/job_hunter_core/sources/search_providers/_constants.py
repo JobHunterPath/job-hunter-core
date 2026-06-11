@@ -1,4 +1,5 @@
 """Module-level constants for search_providers package."""
+
 from __future__ import annotations
 
 USER_AGENT = (

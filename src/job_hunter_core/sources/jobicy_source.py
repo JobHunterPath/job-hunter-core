@@ -39,9 +39,7 @@ class JobicySource(JobSourceAdapter):
         excluded_title_terms: list[str] | None = None,
     ) -> list[JobPosting]:
         """Fetch remote jobs from Jobicy's free public API."""
-        source_cfg = (
-            load_api_config().get("http", {}).get("job_boards", {}).get("jobicy", {}) or {}
-        )
+        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("jobicy", {}) or {}
         if not source_cfg.get("enabled", True):
             return []
 

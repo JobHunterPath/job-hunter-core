@@ -56,9 +56,7 @@ class JoobleSource(JobSourceAdapter):
             logger.warning("[jooble] JOOBLE_API_KEY not set — skipping")
             return []
 
-        source_cfg = (
-            load_api_config().get("http", {}).get("job_boards", {}).get("jooble", {}) or {}
-        )
+        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("jooble", {}) or {}
         if not source_cfg.get("enabled", True):
             return []
 

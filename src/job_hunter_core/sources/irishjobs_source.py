@@ -38,7 +38,9 @@ class IrishJobsSource(JobSourceAdapter):
         return "irishjobs"
 
     def is_enabled(self, config: dict) -> bool:  # noqa: ARG002
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("irishjobs", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("irishjobs", {}) or {}
+        )
         return bool(source_cfg.get("enabled", True))
 
     def fetch(
@@ -53,7 +55,9 @@ class IrishJobsSource(JobSourceAdapter):
 
         Only runs for Irish regions (country == IE).
         """
-        source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("irishjobs", {}) or {}
+        source_cfg = (
+            load_api_config().get("http", {}).get("job_boards", {}).get("irishjobs", {}) or {}
+        )
         if not source_cfg.get("enabled", True):
             return []
 
@@ -87,7 +91,9 @@ class IrishJobsSource(JobSourceAdapter):
 
                 # IrishJobs uses divs/articles with class patterns for job ads
                 cards = (
-                    soup.find_all("div", {"class": re.compile(r"jobadvert|job-ad|job_result", re.I)})
+                    soup.find_all(
+                        "div", {"class": re.compile(r"jobadvert|job-ad|job_result", re.I)}
+                    )
                     or soup.find_all("article", {"class": re.compile(r"job", re.I)})
                     or soup.select("div.job-listing, li.job-item, div[data-jobid]")
                 )
@@ -117,7 +123,9 @@ class IrishJobsSource(JobSourceAdapter):
                     if href and not href.startswith("http"):
                         href = _BASE_URL + href
 
-                    location_tag = card.find(class_=re.compile(r"location|city|region|county", re.I))
+                    location_tag = card.find(
+                        class_=re.compile(r"location|city|region|county", re.I)
+                    )
                     job_location = location_tag.get_text(strip=True) if location_tag else "Ireland"
 
                     date_tag = card.find(class_=re.compile(r"date|posted|updated", re.I))
@@ -139,7 +147,9 @@ class IrishJobsSource(JobSourceAdapter):
                             region=region_name,
                         )
                     )
-                logger.info("[irishjobs] +%d jobs for %r in %s", len(jobs) - before, title, region_name)
+                logger.info(
+                    "[irishjobs] +%d jobs for %r in %s", len(jobs) - before, title, region_name
+                )
 
         logger.info("[irishjobs] Complete: %d total jobs", len(jobs))
         return jobs

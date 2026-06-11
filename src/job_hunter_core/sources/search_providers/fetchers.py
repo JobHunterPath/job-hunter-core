@@ -1,4 +1,5 @@
-﻿"""Career-page fetchers: static HTTP, Lightpanda, Firecrawl, Playwright."""
+"""Career-page fetchers: static HTTP, Lightpanda, Firecrawl, Playwright."""
+
 from __future__ import annotations
 
 import logging
@@ -160,9 +161,21 @@ def fetch_lightpanda_career_jobs(
     timeout_ms = timeout_seconds * 1000
     try:
         completed = subprocess.run(
-            [binary, "fetch", "--dump", "html", "--log_level", "error",
-             "--http_timeout", str(timeout_ms), url],
-            capture_output=True, text=True, timeout=timeout_seconds + 2, check=False,
+            [
+                binary,
+                "fetch",
+                "--dump",
+                "html",
+                "--log_level",
+                "error",
+                "--http_timeout",
+                str(timeout_ms),
+                url,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds + 2,
+            check=False,
         )
     except Exception as exc:
         logger.debug("[search] Lightpanda failed for %s: %s", url, exc)
@@ -171,8 +184,13 @@ def fetch_lightpanda_career_jobs(
         logger.debug("[search] Lightpanda returned no content for %s", url)
         return []
     return extract_jobs_from_html(
-        completed.stdout, url, company["name"], title_filters,
-        company.get("location", ""), "Lightpanda career page", excluded_title_terms,
+        completed.stdout,
+        url,
+        company["name"],
+        title_filters,
+        company.get("location", ""),
+        "Lightpanda career page",
+        excluded_title_terms,
     )
 
 
@@ -195,8 +213,13 @@ def fetch_firecrawl_career_jobs(
         resp = requests.post(
             cfg.get("api_url", "https://api.firecrawl.dev/v2/scrape"),
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"url": url, "formats": ["markdown"], "onlyMainContent": True,
-                  "timeout": timeout_seconds * 1000, "parsers": []},
+            json={
+                "url": url,
+                "formats": ["markdown"],
+                "onlyMainContent": True,
+                "timeout": timeout_seconds * 1000,
+                "parsers": [],
+            },
             timeout=timeout_seconds + 5,
         )
         resp.raise_for_status()
@@ -210,8 +233,13 @@ def fetch_firecrawl_career_jobs(
     if not markdown:
         return []
     return _jobs_from_markdown_links(
-        markdown, url, company["name"], title_filters,
-        company.get("location", ""), "Firecrawl career page", excluded_title_terms,
+        markdown,
+        url,
+        company["name"],
+        title_filters,
+        company.get("location", ""),
+        "Firecrawl career page",
+        excluded_title_terms,
     )
 
 
@@ -235,8 +263,13 @@ def fetch_playwright_career_jobs(
             page.goto(url, wait_until="networkidle", timeout=pw_timeout)
             html = page.content()
             return extract_jobs_from_html(
-                html, page.url or url, company["name"], title_filters,
-                company.get("location", ""), "Playwright career page", excluded_title_terms,
+                html,
+                page.url or url,
+                company["name"],
+                title_filters,
+                company.get("location", ""),
+                "Playwright career page",
+                excluded_title_terms,
             )
         finally:
             browser.close()

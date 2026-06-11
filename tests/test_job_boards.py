@@ -69,9 +69,7 @@ JSEARCH_RESPONSE = {"status": "OK", "data": [JSEARCH_JOB]}
 
 # ── ArbeitnowSource ──────────────────────────────────────────────────────────
 
-_ENABLED_ARBEITNOW_CFG = {
-    "http": {"job_boards": {"arbeitnow": {"enabled": True, "max_pages": 1}}}
-}
+_ENABLED_ARBEITNOW_CFG = {"http": {"job_boards": {"arbeitnow": {"enabled": True, "max_pages": 1}}}}
 _REGIONS = {"DE": {"location": "Berlin", "country": "DE"}}
 _CONFIG = {"exclusion_rules": {"excluded_title_terms": []}}
 
@@ -82,9 +80,7 @@ class TestArbeitnowSource:
 
     def test_is_enabled_respects_config(self):
         disabled_cfg = {"http": {"job_boards": {"arbeitnow": {"enabled": False}}}}
-        with patch(
-            "job_hunter_core.sources.job_boards.load_api_config", return_value=disabled_cfg
-        ):
+        with patch("job_hunter_core.sources.job_boards.load_api_config", return_value=disabled_cfg):
             assert ArbeitnowSource().is_enabled({}) is False
 
     def test_fetch_returns_job_postings(self):
@@ -106,9 +102,7 @@ class TestArbeitnowSource:
 
     def test_fetch_returns_empty_when_disabled(self):
         disabled_cfg = {"http": {"job_boards": {"arbeitnow": {"enabled": False}}}}
-        with patch(
-            "job_hunter_core.sources.job_boards.load_api_config", return_value=disabled_cfg
-        ):
+        with patch("job_hunter_core.sources.job_boards.load_api_config", return_value=disabled_cfg):
             postings = ArbeitnowSource().fetch(["Product Manager"], _REGIONS, _CONFIG)
         assert postings == []
 
@@ -188,9 +182,7 @@ class TestArbeitnowSource:
         assert postings[0].posted == "2026-04-15"
 
     def test_fetch_stops_on_empty_page(self):
-        two_page_cfg = {
-            "http": {"job_boards": {"arbeitnow": {"enabled": True, "max_pages": 2}}}
-        }
+        two_page_cfg = {"http": {"job_boards": {"arbeitnow": {"enabled": True, "max_pages": 2}}}}
         with (
             patch(
                 "job_hunter_core.sources.job_boards.load_api_config",
@@ -225,9 +217,7 @@ class TestArbeitnowSource:
 
 # ── JSearchSource ─────────────────────────────────────────────────────────────
 
-_ENABLED_JSEARCH_CFG = {
-    "http": {"job_boards": {"jsearch": {"enabled": True, "num_pages": 1}}}
-}
+_ENABLED_JSEARCH_CFG = {"http": {"job_boards": {"jsearch": {"enabled": True, "num_pages": 1}}}}
 
 
 class TestJSearchSource:
@@ -270,9 +260,7 @@ class TestJSearchSource:
         src = JSearchSource.__new__(JSearchSource)
         src._rapidapi_key = "test-key"
         disabled_cfg = {"http": {"job_boards": {"jsearch": {"enabled": False}}}}
-        with patch(
-            "job_hunter_core.sources.job_boards.load_api_config", return_value=disabled_cfg
-        ):
+        with patch("job_hunter_core.sources.job_boards.load_api_config", return_value=disabled_cfg):
             postings = src.fetch(["Product Manager"], _REGIONS, _CONFIG)
         assert postings == []
 
@@ -394,7 +382,14 @@ class TestJSearchSource:
     def test_fetch_suppressed_after_failures(self, reset_jsearch_failure_state):
         src = JSearchSource.__new__(JSearchSource)
         src._rapidapi_key = "test-key"
-        config = {"http": {"job_boards": {"max_consecutive_failures": 3, "jsearch": {"enabled": True, "num_pages": 1}}}}
+        config = {
+            "http": {
+                "job_boards": {
+                    "max_consecutive_failures": 3,
+                    "jsearch": {"enabled": True, "num_pages": 1},
+                }
+            }
+        }
         with (
             patch("job_hunter_core.sources.job_boards.load_api_config", return_value=config),
             patch(
