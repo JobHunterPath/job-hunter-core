@@ -162,13 +162,6 @@ http:
     jobspy:
       enabled: true
       hours_old: 72
-      glassdoor_enabled: true
-      linkedin_enabled: false
-      linkedin_fetch_description: false
-      sites:
-        - google
-        - glassdoor
-        - zip_recruiter
     remotive:
       enabled: true
     the_muse:

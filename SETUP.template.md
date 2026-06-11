@@ -350,7 +350,7 @@ The pipeline skips each keyed source silently if its key is absent.
 | Adzuna | `ADZUNA_APP_ID` + `ADZUNA_API_KEY` (free) | 20 countries |
 | Reed | `REED_API_KEY` (free) | GB / IE |
 | JSearch | `RAPIDAPI_KEY` | Global via RapidAPI |
-| JobSpy | None (scraper library) | Configurable sites; LinkedIn off by default |
+| JobSpy | None (scraper library) | Google Jobs + Indeed (auto-selected per region country) |
 
 To disable a no-key source, set `http.job_boards.<name>.enabled: false` in `config/api_config.yml`.
 

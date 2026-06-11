@@ -116,11 +116,7 @@
               "type": "object",
               "properties": {
                 "enabled": { "type": "boolean" },
-                "hours_old": { "type": "integer", "minimum": 1 },
-                "glassdoor_enabled": { "type": "boolean" },
-                "linkedin_enabled": { "type": "boolean" },
-                "linkedin_fetch_description": { "type": "boolean" },
-                "sites": { "type": "array", "items": { "type": "string" } }
+                "hours_old": { "type": "integer", "minimum": 1 }
               }
             },
             "jobicy": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },

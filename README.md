@@ -43,7 +43,6 @@ job-hunter-core scrapes jobs from 25+ sources (ATS APIs, job boards, AI-assisted
 | Teamtailor | ATS API | |
 | Workday | ATS API | |
 | Indeed | Job board | Via python-jobspy; no API key |
-| LinkedIn | Job board | Via python-jobspy; no API key |
 | Google Jobs | Job board | Via python-jobspy; no API key |
 | Adzuna | Job board API | Requires API key |
 | Reed | Job board API | Requires API key |
@@ -75,7 +74,7 @@ All configuration lives in `config/`. See `config/templates/` for commented exam
 
 ## Terms of Service notice
 
-> **ToS Notice**: ATS APIs (Greenhouse, Lever, etc.) are publicly documented and safe to use. Other sources (Indeed, LinkedIn) are accessed via [python-jobspy](https://github.com/Bunsly/JobSpy) — a widely used open source library. Users are solely responsible for compliance with applicable terms of service, laws, and regulations. The authors provide no warranty and accept no liability.
+> **ToS Notice**: ATS APIs (Greenhouse, Lever, etc.) are publicly documented and safe to use. Other sources (Indeed, Google Jobs) are accessed via [python-jobspy](https://github.com/speedyapply/JobSpy) — a widely used open source library. Users are solely responsible for compliance with applicable terms of service, laws, and regulations. The authors provide no warranty and accept no liability.
 
 ## Contributing
 
