@@ -237,10 +237,13 @@ class TestJSearchSource:
         postings = src.fetch(["Product Manager"], _REGIONS, _CONFIG)
         assert postings == []
 
-    def test_fetch_returns_job_postings(self):
+    def test_fetch_returns_job_postings(self, tmp_path):
         src = JSearchSource.__new__(JSearchSource)
         src._rapidapi_key = "test-key"
+        import job_hunter_core.core.api_budget as _budget
+
         with (
+            patch.object(_budget, "ROOT", tmp_path),
             patch(
                 "job_hunter_core.sources.job_boards.load_api_config",
                 return_value=_ENABLED_JSEARCH_CFG,
