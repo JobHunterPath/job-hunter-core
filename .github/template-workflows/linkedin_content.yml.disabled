@@ -1,0 +1,242 @@
+# LinkedIn Content workflow — disabled by default.
+# To enable:
+#   1. Set linkedin.enabled: true in linkedin/config.yml
+#   2. Rename this file to linkedin_content.yml
+#   3. Uncomment the schedule: block in this file (search for 'schedule:')
+#      and adjust the cron times to your preference.
+#
+name: LinkedIn Content
+
+on:
+  schedule:
+    - cron: "0 14 * * 6" # all
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Which LinkedIn task to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - generate-ideas
+          - draft-posts
+          - discover-networking
+
+permissions:
+  contents: write
+
+concurrency:
+  group: linkedin-content-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  run-linkedin-task:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Resolve LinkedIn task
+        id: task
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule || '' }}
+          INPUT_TASK: ${{ github.event.inputs.task || '' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            task="${INPUT_TASK:-all}"
+          else
+            task=$(grep -E '^\s+- cron:' .github/workflows/linkedin_content.yml \
+              | grep -F "\"${EVENT_SCHEDULE}\"" \
+              | sed 's/.*#\s*//')
+            if [ -z "$task" ]; then
+              echo "::error::Unsupported schedule: $EVENT_SCHEDULE"
+              exit 1
+            fi
+          fi
+
+          echo "task=$task" >> "$GITHUB_OUTPUT"
+
+      - name: Check LinkedIn enabled
+        id: linkedin_enabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          enabled="$(awk '
+            /^linkedin:/ { in_linkedin=1; next }
+            in_linkedin && /^  enabled:/ { print $2; exit }
+          ' linkedin/config.yml)"
+
+          if [ "${enabled:-false}" = "true" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "LinkedIn workflow disabled in linkedin/config.yml; skipping."
+          fi
+
+      - name: Sync latest branch
+        if: steps.linkedin_enabled.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git pull --rebase origin main
+
+      - name: Resolve prebuilt runner image
+        if: steps.linkedin_enabled.outputs.enabled == 'true'
+        id: runner_image
+        shell: bash
+        env:
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/jobhunterpath/job-hunter-core:latest' }}
+        run: |
+          set -euo pipefail
+          image="${CORE_IMAGE}"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+          docker pull "$image"
+          echo "Using job-hunter core image: $image"
+
+      - name: Cache SearXNG image
+        if: steps.linkedin_enabled.outputs.enabled == 'true' && (steps.task.outputs.task == 'discover-networking' || steps.task.outputs.task == 'all')
+        uses: actions/cache@v5
+        with:
+          path: /tmp/searxng.tar
+          key: searxng-${{ hashFiles('.github/searxng/settings.yml') }}
+
+      - name: Load or pull SearXNG image
+        if: steps.linkedin_enabled.outputs.enabled == 'true' && (steps.task.outputs.task == 'discover-networking' || steps.task.outputs.task == 'all')
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f /tmp/searxng.tar ]; then
+            docker load -i /tmp/searxng.tar
+          else
+            docker pull ghcr.io/searxng/searxng:latest
+            docker save ghcr.io/searxng/searxng:latest -o /tmp/searxng.tar
+          fi
+
+      - name: Start SearXNG
+        if: steps.linkedin_enabled.outputs.enabled == 'true' && (steps.task.outputs.task == 'discover-networking' || steps.task.outputs.task == 'all')
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! docker run -d --name searxng \
+            -p 8080:8080 \
+            -v "${{ github.workspace }}/.github/searxng/settings.yml:/etc/searxng/settings.yml:ro" \
+            -e SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml \
+            ghcr.io/searxng/searxng:latest; then
+            echo "SearXNG container failed to start; continuing with other providers"
+            exit 0
+          fi
+
+          for _ in {1..30}; do
+            if curl -fsS "http://127.0.0.1:8080/search?q=test&format=json" >/dev/null; then
+              echo "SearXNG is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "SearXNG did not become ready; continuing with other providers"
+          docker logs searxng || true
+
+      - name: Run LinkedIn task
+        if: steps.linkedin_enabled.outputs.enabled == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          SEARXNG_BASE_URL: http://127.0.0.1:8080
+          LOG_LEVEL: INFO
+          LINKEDIN_TASK: ${{ steps.task.outputs.task }}
+          RUNNER_IMAGE: ${{ steps.runner_image.outputs.image }}
+        run: |
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e JOB_HUNTER_ROOT=/workspace \
+            -e ANTHROPIC_API_KEY \
+            -e OPENAI_API_KEY \
+            -e GOOGLE_API_KEY \
+            -e BRAVE_API_KEY \
+            -e TAVILY_API_KEY \
+            -e EXA_API_KEY \
+            -e SEARXNG_BASE_URL \
+            -e LOG_LEVEL \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$RUNNER_IMAGE" \
+            job-hunter linkedin "$LINKEDIN_TASK"
+
+      - name: Upload logs as artifact
+        if: always() && steps.linkedin_enabled.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: linkedin-content-${{ github.run_id }}
+          path: |
+            job_hunt.log
+            linkedin/ideas.md
+            linkedin/drafts/
+            linkedin/networking.md
+            linkedin/state.yml
+          retention-days: 30
+
+      - name: Commit LinkedIn outputs
+        if: steps.linkedin_enabled.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "linkedin-content-bot"
+          git config user.email "bot@job-hunt"
+
+          task="${{ steps.task.outputs.task }}"
+          case "$task" in
+            generate-ideas)
+              git add linkedin/ideas.md
+              commit_message="linkedin: generate raw ideas"
+              ;;
+            draft-posts)
+              git add linkedin/ideas.md linkedin/drafts/
+              commit_message="linkedin: draft weekly posts"
+              ;;
+            discover-networking)
+              git add linkedin/networking.md linkedin/state.yml
+              commit_message="linkedin: discover networking"
+              ;;
+            all)
+              git add linkedin/ideas.md linkedin/drafts/ linkedin/networking.md linkedin/state.yml
+              commit_message="linkedin: update content workspace"
+              ;;
+            *)
+              echo "::error::Unsupported LinkedIn task: $task"
+              exit 1
+              ;;
+          esac
+
+          if git diff --staged --quiet; then
+            echo "No LinkedIn outputs to commit."
+            exit 0
+          fi
+
+          git commit -m "$commit_message"
+
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep "$((attempt * 2))"
+          done
+
+          echo "::error::Could not rebase and push LinkedIn outputs after 3 attempts."
+          exit 1

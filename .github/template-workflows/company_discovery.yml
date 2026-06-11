@@ -1,0 +1,136 @@
+name: Company Discovery
+
+on:
+  schedule:
+    - cron: "0 18 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: company-discovery-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT || github.token }}
+
+      - name: Resolve prebuilt runner image
+        id: runner_image
+        shell: bash
+        env:
+          CORE_IMAGE: ${{ vars.JOB_HUNTER_CORE_IMAGE || 'ghcr.io/jobhunterpath/job-hunter-core:latest' }}
+        run: |
+          set -euo pipefail
+          image="${CORE_IMAGE}"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+          docker pull "$image"
+          echo "Using job-hunter core image: $image"
+
+      - name: Cache SearXNG image
+        uses: actions/cache@v5
+        with:
+          path: /tmp/searxng.tar
+          key: searxng-${{ hashFiles('.github/searxng/settings.yml') }}
+
+      - name: Load or pull SearXNG image
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f /tmp/searxng.tar ]; then
+            docker load -i /tmp/searxng.tar
+          else
+            docker pull ghcr.io/searxng/searxng:latest
+            docker save ghcr.io/searxng/searxng:latest -o /tmp/searxng.tar
+          fi
+
+      - name: Start SearXNG
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! docker run -d --name searxng \
+            -p 8080:8080 \
+            -v "${{ github.workspace }}/.github/searxng/settings.yml:/etc/searxng/settings.yml:ro" \
+            -e SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml \
+            ghcr.io/searxng/searxng:latest; then
+            echo "SearXNG container failed to start; continuing with other providers"
+            exit 0
+          fi
+
+          for _ in {1..30}; do
+            if curl -fsS "http://127.0.0.1:8080/search?q=test&format=json" >/dev/null; then
+              echo "SearXNG is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "SearXNG did not become ready; continuing with other providers"
+          docker logs searxng || true
+
+      - name: Discover companies
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          SEARXNG_BASE_URL: http://127.0.0.1:8080
+          LOG_LEVEL: INFO
+          RUNNER_IMAGE: ${{ steps.runner_image.outputs.image }}
+        run: |
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e ANTHROPIC_API_KEY \
+            -e OPENAI_API_KEY \
+            -e GOOGLE_API_KEY \
+            -e BRAVE_API_KEY \
+            -e TAVILY_API_KEY \
+            -e EXA_API_KEY \
+            -e FIRECRAWL_API_KEY \
+            -e SEARXNG_BASE_URL \
+            -e LOG_LEVEL \
+            -e JOB_HUNTER_ROOT=/workspace \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$RUNNER_IMAGE" \
+            job-hunter discover
+
+      - name: Upload discovery artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: company-discovery-${{ github.run_id }}
+          path: |
+            job_hunt.log
+            config/search_config.yml
+          retention-days: 30
+
+      - name: Commit discovered companies
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "company-discovery-bot"
+          git config user.email "bot@job-hunt"
+          git add config/search_config.yml
+
+          if git diff --staged --quiet; then
+            echo "No discovered companies to commit."
+            exit 0
+          fi
+
+          git commit -m "discover: $(date +%Y-%m-%d) update company list"
+          git pull --rebase origin main
+          git push
