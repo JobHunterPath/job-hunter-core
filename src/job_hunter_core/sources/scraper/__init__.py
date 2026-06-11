@@ -18,8 +18,6 @@ from urllib.parse import urlparse
 
 import requests  # noqa: F401
 
-from job_hunter_core.sources.search_providers.preflight import probe_search_providers
-from job_hunter_core.sources.search_providers.router import set_run_disabled
 from job_hunter_core.core.config import ROOT as REPO_ROOT
 from job_hunter_core.core.config import (
     load_api_config,
@@ -84,6 +82,8 @@ from job_hunter_core.sources.search_providers import (
     fetch_static_career_jobs,
     search_web,
 )
+from job_hunter_core.sources.search_providers.preflight import probe_search_providers
+from job_hunter_core.sources.search_providers.router import set_run_disabled
 from job_hunter_core.sources.the_muse_source import TheMuseSource
 from job_hunter_core.sources.weworkremotely_source import WeWorkRemotelySource
 from job_hunter_core.sources.wttj_source import WTTJSource
