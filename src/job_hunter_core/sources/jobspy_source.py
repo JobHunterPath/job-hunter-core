@@ -217,9 +217,7 @@ class JobSpySource(JobSourceAdapter):
                             if site in _DISABLED_SITES:
                                 continue
 
-                        logger.info(
-                            "[jobspy] [%s] Searching [%s] for %r", region_name, site, title
-                        )
+                        logger.info("[jobspy] [%s] Searching [%s] for %r", region_name, site, title)
                         try:
                             df = scrape_jobs(
                                 site_name=[site],

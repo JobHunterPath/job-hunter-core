@@ -16,6 +16,7 @@ def _no_preflight(monkeypatch):
         lambda: set(),
     )
 
+
 CONFIG = {
     "exclusion_rules": {
         "senior_flags": ["director", "vp ", "head of product"],

@@ -123,7 +123,9 @@ class TestJobSpyCircuitBreaker:
             SimpleNamespace(scrape_jobs=fake_scrape),
         )
 
-        with patch("job_hunter_core.sources.jobspy_source.load_api_config", return_value=_GLASSDOOR_CFG):
+        with patch(
+            "job_hunter_core.sources.jobspy_source.load_api_config", return_value=_GLASSDOOR_CFG
+        ):
             JobSpySource().fetch(
                 ["Product Manager", "Senior PM"],
                 {"DE": {"country": "DE", "location": "Berlin"}},
@@ -148,7 +150,9 @@ class TestJobSpyCircuitBreaker:
             SimpleNamespace(scrape_jobs=fake_scrape),
         )
 
-        with patch("job_hunter_core.sources.jobspy_source.load_api_config", return_value=_GLASSDOOR_CFG):
+        with patch(
+            "job_hunter_core.sources.jobspy_source.load_api_config", return_value=_GLASSDOOR_CFG
+        ):
             JobSpySource().fetch(
                 ["Product Manager"],
                 {"DE": {"country": "DE", "location": "Berlin"}},
@@ -217,7 +221,9 @@ class TestJobSpyCircuitBreaker:
             SimpleNamespace(scrape_jobs=fake_scrape),
         )
 
-        with patch("job_hunter_core.sources.jobspy_source.load_api_config", return_value=_GLASSDOOR_CFG):
+        with patch(
+            "job_hunter_core.sources.jobspy_source.load_api_config", return_value=_GLASSDOOR_CFG
+        ):
             jobs = JobSpySource().fetch(
                 ["Product Manager", "Senior PM"],
                 {"DE": {"country": "DE", "location": "Berlin"}},

@@ -21,10 +21,26 @@ class TestProbeSearchProviders:
         from job_hunter_core.sources.search_providers import preflight
 
         with (
-            patch.object(preflight, "SearxngProvider", return_value=providers.get("searxng", _make_provider("searxng", enabled=False))),
-            patch.object(preflight, "BraveProvider", return_value=providers.get("brave", _make_provider("brave", enabled=False))),
-            patch.object(preflight, "TavilyProvider", return_value=providers.get("tavily", _make_provider("tavily", enabled=False))),
-            patch.object(preflight, "ExaProvider", return_value=providers.get("exa", _make_provider("exa", enabled=False))),
+            patch.object(
+                preflight,
+                "SearxngProvider",
+                return_value=providers.get("searxng", _make_provider("searxng", enabled=False)),
+            ),
+            patch.object(
+                preflight,
+                "BraveProvider",
+                return_value=providers.get("brave", _make_provider("brave", enabled=False)),
+            ),
+            patch.object(
+                preflight,
+                "TavilyProvider",
+                return_value=providers.get("tavily", _make_provider("tavily", enabled=False)),
+            ),
+            patch.object(
+                preflight,
+                "ExaProvider",
+                return_value=providers.get("exa", _make_provider("exa", enabled=False)),
+            ),
         ):
             return preflight.probe_search_providers()
 
