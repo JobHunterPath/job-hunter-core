@@ -10,6 +10,7 @@ is needed.
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import threading
 from typing import Any
@@ -22,6 +23,7 @@ from job_hunter_core.sources.base import JobSourceAdapter
 logger = logging.getLogger(__name__)
 
 _RESULTS_PER_QUERY = 50
+_SCRAPE_TIMEOUT = 45  # seconds per site call; guards against hung network requests
 
 # Sites that returned HTTP 403 this run — never called again until process restarts.
 _DISABLED_SITES: set[str] = set()
@@ -197,18 +199,30 @@ class JobSpySource(JobSourceAdapter):
                             continue
 
                     logger.info("[jobspy] [%s] Searching [%s] for %r", region_name, site, title)
+                    kwargs = dict(
+                        site_name=[site],
+                        search_term=title,
+                        google_search_term=title,
+                        location=location,
+                        results_wanted=_RESULTS_PER_QUERY,
+                        hours_old=hours_old,
+                        country_indeed=country_indeed or "usa",
+                        description_format="markdown",
+                        verbose=0,
+                    )
                     try:
-                        df = scrape_jobs(
-                            site_name=[site],
-                            search_term=title,
-                            google_search_term=title,
-                            location=location,
-                            results_wanted=_RESULTS_PER_QUERY,
-                            hours_old=hours_old,
-                            country_indeed=country_indeed or "usa",
-                            description_format="markdown",
-                            verbose=0,
-                        )
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                            future = pool.submit(scrape_jobs, **kwargs)
+                            try:
+                                df = future.result(timeout=_SCRAPE_TIMEOUT)
+                            except concurrent.futures.TimeoutError:
+                                logger.warning(
+                                    "[jobspy] scrape_jobs timed out after %ds for %r via [%s]",
+                                    _SCRAPE_TIMEOUT,
+                                    title,
+                                    site,
+                                )
+                                df = None
                     except Exception as exc:
                         if _is_403_block(exc):
                             _disable_site(site)
