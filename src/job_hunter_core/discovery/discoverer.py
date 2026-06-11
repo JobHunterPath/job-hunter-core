@@ -19,6 +19,7 @@ import yaml
 from job_hunter_core.core.config import ROOT as REPO_ROOT
 from job_hunter_core.core.llm_client import get_llm_client
 from job_hunter_core.core.llm_utils import get_llm_role_settings
+from job_hunter_core.core.utils import url_is_alive
 from job_hunter_core.sources.adzuna_source import AdzunaSource
 from job_hunter_core.sources.arbeitsagentur_source import ArbeitsagenturSource
 from job_hunter_core.sources.ats_urls import extract_career_url
@@ -360,7 +361,11 @@ def _career_url_has_job_signal(
     if not _career_url_is_specific(career_url):
         return False
     if _is_ats_career_url(career_url):
-        return True
+        url = career_url if "://" in career_url else f"https://{career_url}"
+        alive = url_is_alive(url, timeout=8)
+        if not alive:
+            print(f"  [validate] ATS URL unreachable (dead slug?): {career_url}")
+        return alive
     try:
         from job_hunter_core.sources.career_pages import extract_career_page_jobs
 
@@ -560,8 +565,10 @@ def find_career_url(company_name: str, existing_urls: set[str], region_config: d
                 if domain_match:
                     domain = domain_match.group(1)
                     career_url = f"{domain}{path}"
-                    if career_url.lower() not in existing_urls and _career_url_is_specific(
-                        career_url
+                    if (
+                        career_url.lower() not in existing_urls
+                        and _career_url_is_specific(career_url)
+                        and url_is_alive(f"https://{career_url}", timeout=8)
                     ):
                         print(f"  [found] {company_name} -> {career_url} (direct)")
                         return {"name": company_name, "career_url": career_url}

@@ -78,6 +78,7 @@ def test_career_url_lookups_add_returned_companies(monkeypatch, tmp_path):
         lambda *args: [{"name": "GammaCo", "career_url": "jobs.lever.co/gammaco"}],
     )
     monkeypatch.setattr(discoverer, "has_jobs_in_location", lambda *args: False)
+    monkeypatch.setattr(discoverer, "url_is_alive", lambda url, timeout=8: True)
 
     def fake_find(name, existing_urls, region_config):
         return {"name": name, "career_url": f"jobs.lever.co/{name.lower()}"}
@@ -153,6 +154,7 @@ def test_deadline_during_lookup_saves_partial_results_and_stops(monkeypatch, tmp
     calls = []
     monkeypatch.setattr(discoverer, "discover_company_names", lambda *args: ["PartialCo"])
     monkeypatch.setattr(discoverer, "discover_company_candidates", lambda *args: [])
+    monkeypatch.setattr(discoverer, "url_is_alive", lambda url, timeout=8: True)
 
     def fake_parallel(items, worker, max_workers, deadline, label):
         calls.append(label)
@@ -203,6 +205,7 @@ def test_overlap_checks_only_newly_discovered_companies(monkeypatch, tmp_path):
             "career_url": f"jobs.lever.co/{name.lower()}",
         },
     )
+    monkeypatch.setattr(discoverer, "url_is_alive", lambda url, timeout=8: True)
 
     def fake_has_jobs(company_name, region_config):
         checked.append(company_name)
@@ -367,6 +370,7 @@ def test_ats_only_discovery_adds_companies_without_llm(monkeypatch, tmp_path):
         ],
     )
     monkeypatch.setattr(discoverer, "has_jobs_in_location", lambda *args: False)
+    monkeypatch.setattr(discoverer, "url_is_alive", lambda url, timeout=8: True)
 
     discoverer.run()
 
