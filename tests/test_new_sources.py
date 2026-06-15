@@ -75,22 +75,39 @@ class TestJobicySource:
             assert JobicySource().is_enabled({}) is False
 
     def test_fetch_returns_job_postings(self):
+        get_mock = MagicMock(return_value=_mock_get({"jobs": [_JOBICY_JOB]}))
         with (
             patch(
                 "job_hunter_core.sources.jobicy_source.load_api_config",
                 return_value=_JOBICY_CFG,
             ),
             patch("job_hunter_core.sources.jobicy_source.reserve_api_call", return_value=True),
-            patch(
-                "job_hunter_core.sources.jobicy_source.requests.get",
-                return_value=_mock_get({"jobs": [_JOBICY_JOB]}),
-            ),
+            patch("job_hunter_core.sources.jobicy_source.requests.get", get_mock),
         ):
             jobs = JobicySource().fetch(["Software Engineer"], _REGIONS, _EXCL)
         assert len(jobs) == 1
         assert isinstance(jobs[0], JobPosting)
         assert jobs[0].title == "Software Engineer"
         assert jobs[0].source == "Jobicy"
+        assert get_mock.call_args.kwargs["params"]["geo"] == "germany"
+
+    def test_fetch_omits_invalid_iso_geo(self):
+        get_mock = MagicMock(return_value=_mock_get({"jobs": [_JOBICY_JOB]}))
+        with (
+            patch(
+                "job_hunter_core.sources.jobicy_source.load_api_config",
+                return_value=_JOBICY_CFG,
+            ),
+            patch("job_hunter_core.sources.jobicy_source.reserve_api_call", return_value=True),
+            patch("job_hunter_core.sources.jobicy_source.requests.get", get_mock),
+        ):
+            jobs = JobicySource().fetch(
+                ["Software Engineer"],
+                {"my": {"country": "MY", "location": "Kuala Lumpur"}},
+                _EXCL,
+            )
+        assert len(jobs) == 1
+        assert "geo" not in get_mock.call_args.kwargs["params"]
 
     def test_fetch_returns_empty_when_disabled(self):
         disabled = {"http": {"job_boards": {"jobicy": {"enabled": False}}}}
@@ -186,11 +203,7 @@ _WWR_RSS_MATCHING = b"""<?xml version="1.0" encoding="UTF-8"?>
 # Jooble
 # ═══════════════════════════════════════════════════════════════════════════
 
-_JOOBLE_CFG = {
-    "http": {
-        "job_boards": {"jooble": {"enabled": True, "timeout_seconds": 10, "max_pages_per_query": 3}}
-    }
-}
+_JOOBLE_CFG = {"http": {"job_boards": {"jooble": {"enabled": True, "timeout_seconds": 10}}}}
 
 _JOOBLE_JOB = {
     "title": "Software Engineer",
@@ -207,9 +220,7 @@ _JOOBLE_JOB = {
 # ═══════════════════════════════════════════════════════════════════════════
 
 _ADZUNA_CFG_PAGINATE = {
-    "http": {
-        "job_boards": {"adzuna": {"enabled": True, "results_per_page": 2, "max_pages_per_query": 3}}
-    }
+    "http": {"job_boards": {"adzuna": {"enabled": True, "results_per_page": 2}}}
 }
 
 _ADZUNA_JOB = lambda n: {  # noqa: E731
@@ -223,11 +234,7 @@ _ADZUNA_JOB = lambda n: {  # noqa: E731
 
 _ADZUNA_GB_REGIONS = {"GB": {"location": "", "country": "GB"}}
 
-_REED_CFG_PAGINATE = {
-    "http": {
-        "job_boards": {"reed": {"enabled": True, "results_wanted": 2, "max_pages_per_query": 3}}
-    }
-}
+_REED_CFG_PAGINATE = {"http": {"job_boards": {"reed": {"enabled": True, "results_wanted": 2}}}}
 
 _REED_JOB = lambda n: {  # noqa: E731
     "jobTitle": "Software Engineer",
@@ -442,6 +449,28 @@ class TestGlintsSource:
         assert len(jobs) == 1
         assert jobs[0].company == "GlintsCo"
 
+    def test_fetch_stops_at_default_page_cap_when_pages_are_full(self):
+        full_page = [
+            {
+                "id": f"gl-{index}",
+                "title": "Product Manager",
+                "company": {"name": "GlintsCo"},
+                "createdAt": "2026-06-01",
+                "city": {"name": "Singapore"},
+                "country": {"name": "Singapore"},
+            }
+            for index in range(30)
+        ]
+        cfg = {"http": {"job_boards": {"glints": {"enabled": True}}}}
+        get_mock = MagicMock(return_value=_mock_get({"data": {"jobs": {"data": full_page}}}))
+        with (
+            patch("job_hunter_core.sources.glints_source.load_api_config", return_value=cfg),
+            patch("job_hunter_core.sources.glints_source.requests.get", get_mock),
+        ):
+            jobs = GlintsSource().fetch(["Product Manager"], _SG, _CONFIG)
+        assert len(jobs) == 90
+        assert get_mock.call_count == 3
+
 
 class TestGulfTalentSource:
     def test_name(self):
@@ -522,6 +551,32 @@ class TestJobStreetSource:
         assert len(jobs) >= 1
         assert isinstance(jobs[0], JobPosting)
         assert jobs[0].source == "JobStreet"
+
+    def test_fetch_uses_same_page_for_playwright_fallback_after_block(self):
+        blocked = _mock_get({}, status=403)
+        fallback_pages: list[int] = []
+
+        def fallback(_domain, _site_key, _title, page, _timeout_ms):
+            fallback_pages.append(page)
+            return [{"_stub": True, "_id": "js-1"}]
+
+        with (
+            patch(
+                "job_hunter_core.sources.jobstreet_source.load_api_config",
+                return_value=_EMPTY_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.jobstreet_source.requests.get",
+                return_value=blocked,
+            ),
+            patch(
+                "job_hunter_core.sources.jobstreet_source._fetch_page_playwright",
+                fallback,
+            ),
+        ):
+            jobs = JobStreetSource().fetch(["Product Manager"], _MY, _CONFIG)
+        assert len(jobs) == 1
+        assert fallback_pages == [1]
 
 
 class TestMyCareersFutureSource:
@@ -620,13 +675,7 @@ class TestReedSource:
     def test_fetch_returns_job_postings(self):
         src = ReedSource.__new__(ReedSource)
         src._api_key = "test-key"
-        cfg = {
-            "http": {
-                "job_boards": {
-                    "reed": {"enabled": True, "results_wanted": 1, "max_pages_per_query": 1}
-                }
-            }
-        }
+        cfg = {"http": {"job_boards": {"reed": {"enabled": True, "results_wanted": 1}}}}
         page_data = {"results": [_REED_JOB(1)]}
         with (
             patch("job_hunter_core.sources.reed_source.load_api_config", return_value=cfg),
@@ -661,13 +710,7 @@ class TestAdzunaSource:
         src = AdzunaSource.__new__(AdzunaSource)
         src._app_id = "app123"
         src._api_key = "key123"
-        cfg = {
-            "http": {
-                "job_boards": {
-                    "adzuna": {"enabled": True, "results_per_page": 1, "max_pages_per_query": 1}
-                }
-            }
-        }
+        cfg = {"http": {"job_boards": {"adzuna": {"enabled": True, "results_per_page": 1}}}}
         page_data = {"results": [_ADZUNA_JOB(1)]}
         with (
             patch("job_hunter_core.sources.adzuna_source.load_api_config", return_value=cfg),

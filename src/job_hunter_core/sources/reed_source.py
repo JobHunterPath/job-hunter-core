@@ -25,6 +25,7 @@ from job_hunter_core.core.config import REED_API_KEY, get_timeout, load_api_conf
 from job_hunter_core.core.utils import title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
+from job_hunter_core.sources.source_config import DEFAULT_SINGLE_PAGE_SOURCE_CAP, source_page_cap
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ class ReedSource(JobSourceAdapter):
             return []
 
         results_wanted = int(reed_cfg.get("results_wanted", 50))
-        max_pages = int(reed_cfg.get("max_pages_per_query", 1))
+        max_pages = source_page_cap(DEFAULT_SINGLE_PAGE_SOURCE_CAP)
         _excluded = (
             excluded_title_terms
             if excluded_title_terms is not None

@@ -103,6 +103,25 @@ def test_job_source_preflight_plain_429_is_run_rate_limit(
     assert results["arbeitnow"].status == "rate_limited"
 
 
+def test_job_source_preflight_plain_403_is_blocked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(preflight, "load_api_config", lambda: _api_cfg_for("arbeitnow"))
+    monkeypatch.setattr(
+        preflight.requests,
+        "get",
+        lambda *args, **kwargs: Response(status_code=403, text="Forbidden"),
+    )
+
+    results = preflight.probe_job_sources(
+        ["Product Manager"],
+        {"berlin": {"country": "DE", "location": "Berlin"}},
+        {},
+    )
+
+    assert results["arbeitnow"].status == "blocked"
+
+
 def test_job_source_preflight_malformed_response_is_broken(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

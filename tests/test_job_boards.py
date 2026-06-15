@@ -69,7 +69,7 @@ JSEARCH_RESPONSE = {"status": "OK", "data": [JSEARCH_JOB]}
 
 # ── ArbeitnowSource ──────────────────────────────────────────────────────────
 
-_ENABLED_ARBEITNOW_CFG = {"http": {"job_boards": {"arbeitnow": {"enabled": True, "max_pages": 1}}}}
+_ENABLED_ARBEITNOW_CFG = {"http": {"job_boards": {"arbeitnow": {"enabled": True}}}}
 _REGIONS = {"DE": {"location": "Berlin", "country": "DE"}}
 _CONFIG = {"exclusion_rules": {"excluded_title_terms": []}}
 
@@ -181,24 +181,20 @@ class TestArbeitnowSource:
             postings = ArbeitnowSource().fetch(["Product Manager"], _REGIONS, _CONFIG)
         assert postings[0].posted == "2026-04-15"
 
-    def test_fetch_stops_on_empty_page(self):
-        two_page_cfg = {"http": {"job_boards": {"arbeitnow": {"enabled": True, "max_pages": 2}}}}
+    def test_fetch_uses_code_owned_single_page_cap(self):
         with (
             patch(
                 "job_hunter_core.sources.job_boards.load_api_config",
-                return_value=two_page_cfg,
+                return_value=_ENABLED_ARBEITNOW_CFG,
             ),
             patch(
                 "job_hunter_core.sources.job_boards.requests.get",
-                side_effect=[
-                    _mock_get(ARBEITNOW_PAGE),
-                    _mock_get(ARBEITNOW_EMPTY),
-                ],
+                return_value=_mock_get(ARBEITNOW_PAGE),
             ) as mock_get,
         ):
             postings = ArbeitnowSource().fetch(["Product Manager"], _REGIONS, _CONFIG)
         assert len(postings) == 1
-        assert mock_get.call_count == 2
+        assert mock_get.call_count == 1
 
     def test_fetch_returns_empty_on_api_error(self):
         with (

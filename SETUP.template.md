@@ -300,6 +300,7 @@ Job-search providers — add the ones relevant to your region and search strateg
 | Adzuna (Canada, UK, DE, NL, SG, AU…) | `ADZUNA_APP_ID` + `ADZUNA_API_KEY` |
 | Reed.co.uk (UK / Ireland) | `REED_API_KEY` |
 | Jooble (global aggregator) | `JOOBLE_API_KEY` |
+| Firecrawl (career-page fallback) | `FIRECRAWL_API_KEY` |
 
 The pipeline skips each keyed source silently if its key is absent.
 
@@ -313,8 +314,16 @@ The pipeline skips each keyed source silently if its key is absent.
 | Reed | `REED_API_KEY` (free) | GB / IE |
 | JSearch | `RAPIDAPI_KEY` | Global via RapidAPI |
 | JobSpy | None (scraper library) | Google Jobs + Indeed (auto-selected per region country) |
+| Firecrawl | `FIRECRAWL_API_KEY` | Optional cloud markdown fallback after local career-page extraction fails |
 
 To disable a no-key source, set `http.job_boards.<name>.enabled: false` in `config/api_config.yml`.
+Paged sources are capped by safe defaults in the maintained core image.
+
+**Preflight status meanings:** `not_applicable` means the source does not match
+your configured regions; `missing_key` means an optional secret is absent;
+`quota_exhausted` is non-fatal and the source is skipped until budget resets;
+`blocked` or `rate_limited` means the source refused the probe; `broken` means
+the live endpoint contract did not match what the scraper can currently parse.
 
 **Expanding job titles** — to search more title variants, add them directly to `global_search.job_titles` in `search_config.yml`. To generate ideas, ask an AI chatbot:
 > *"I'm searching for [role]. Suggest 8–10 adjacent job titles I could add to broaden my search without changing my career target. Exclude intern and junior variants."*

@@ -27,6 +27,7 @@ from job_hunter_core.core.config import ADZUNA_API_KEY, ADZUNA_APP_ID, get_timeo
 from job_hunter_core.core.utils import location_matches, title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
+from job_hunter_core.sources.source_config import DEFAULT_SINGLE_PAGE_SOURCE_CAP, source_page_cap
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class AdzunaSource(JobSourceAdapter):
             return []
 
         results_per_page = int(adzuna_cfg.get("results_per_page", 50))
-        max_pages = int(adzuna_cfg.get("max_pages_per_query", 1))
+        max_pages = source_page_cap(DEFAULT_SINGLE_PAGE_SOURCE_CAP)
         _excluded = (
             excluded_title_terms
             if excluded_title_terms is not None

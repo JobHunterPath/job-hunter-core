@@ -57,7 +57,9 @@ def test_template_job_hunt_passes_job_board_api_keys_to_container():
         env = step.get("env") or {}
         run = step.get("run") or ""
         assert env["JOOBLE_API_KEY"] == "${{ secrets.JOOBLE_API_KEY }}"
+        assert env["FIRECRAWL_API_KEY"] == "${{ secrets.FIRECRAWL_API_KEY }}"
         assert "-e JOOBLE_API_KEY" in run
+        assert "-e FIRECRAWL_API_KEY" in run
 
 
 def test_search_schema_rejects_region_companies() -> None:

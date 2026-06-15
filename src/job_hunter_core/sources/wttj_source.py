@@ -14,6 +14,11 @@ from job_hunter_core.core.config import get_timeout, load_api_config
 from job_hunter_core.core.utils import strip_html, title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
+from job_hunter_core.sources.source_config import (
+    sleep_between_pages,
+    source_page_cap,
+    source_page_delay,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +62,8 @@ class WTTJSource(JobSourceAdapter):
             return []
 
         timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))
+        max_pages = source_page_cap()
+        page_delay = source_page_delay()
         _excluded = (
             excluded_title_terms
             if excluded_title_terms is not None
@@ -69,8 +76,7 @@ class WTTJSource(JobSourceAdapter):
             location = region_config.get("location", "")
 
             for title in title_filters:
-                page = 1
-                while True:
+                for page in range(1, max_pages + 1):
                     params: dict = {
                         "query": title,
                         "page": page,
@@ -152,16 +158,25 @@ class WTTJSource(JobSourceAdapter):
                             )
                         )
                     logger.info(
-                        "[wttj] +%d jobs for %r in %s page %d",
+                        "[wttj] +%d jobs for %r in %s page %d/%d",
                         len(jobs) - before,
                         title,
                         region_name,
                         page,
+                        max_pages,
                     )
 
                     if len(items) < _PAGE_SIZE:
                         break
-                    page += 1
+                    if page == max_pages:
+                        logger.warning(
+                            "[wttj] reached page cap=%d for %r in %s; stopping",
+                            max_pages,
+                            title,
+                            region_name,
+                        )
+                        break
+                    sleep_between_pages(page_delay, page, max_pages)
 
         logger.info("[wttj] Complete: %d total jobs", len(jobs))
         return jobs

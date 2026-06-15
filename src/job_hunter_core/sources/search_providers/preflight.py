@@ -48,11 +48,12 @@ from job_hunter_core.sources.search_providers.providers import (
     SearxngProvider,
     TavilyProvider,
 )
+from job_hunter_core.sources.source_config import jobicy_geo_slug
 
 logger = logging.getLogger(__name__)
 
 _PROBE_QUERY = "software engineer"
-_DISABLE_STATUSES = {"broken", "quota_exhausted", "rate_limited"}
+_DISABLE_STATUSES = {"blocked", "broken", "quota_exhausted", "rate_limited"}
 _SKIP_STATUSES = _DISABLE_STATUSES | {"disabled", "missing_key", "not_applicable"}
 
 
@@ -128,10 +129,35 @@ def probe_job_sources(
         status: sorted(name for name, result in results.items() if result.status == status)
         for status in sorted({result.status for result in results.values()} - {"ok"})
     }
+    _log_source_health(results, usable, skipped)
+    return results
+
+
+def _log_source_health(
+    results: dict[str, SourceProbeResult], usable: list[str], skipped: dict[str, list[str]]
+) -> None:
     logger.info("[preflight] usable job sources: %s", usable)
     if skipped:
         logger.info("[preflight] skipped job sources: %s", skipped)
-    return results
+
+    summary = {
+        "usable": usable,
+        "region_skipped": skipped.get("not_applicable", []),
+        "missing_key": skipped.get("missing_key", []),
+        "quota_exhausted": skipped.get("quota_exhausted", []),
+        "blocked": skipped.get("blocked", []),
+        "rate_limited": skipped.get("rate_limited", []),
+        "broken": skipped.get("broken", []),
+        "disabled": skipped.get("disabled", []),
+    }
+    logger.info("[preflight] source health summary: %s", summary)
+    region_reasons = {
+        name: result.reason
+        for name, result in sorted(results.items())
+        if result.status == "not_applicable"
+    }
+    if region_reasons:
+        logger.info("[preflight] region-skipped source reasons: %s", region_reasons)
 
 
 def _source_cfg(boards_cfg: dict[str, Any], source_name: str) -> dict[str, Any]:
@@ -179,6 +205,8 @@ def _classify_probe_exception(source_name: str, exc: BaseException) -> SourcePro
         return SourceProbeResult(source_name, "quota_exhausted", str(exc)[:160])
     response = getattr(exc, "response", None)
     status = getattr(response, "status_code", None)
+    if status == 403:
+        return SourceProbeResult(source_name, "blocked", str(exc)[:160])
     if status == 429:
         return SourceProbeResult(source_name, "rate_limited", str(exc)[:160])
     return SourceProbeResult(source_name, "broken", str(exc)[:160])
@@ -357,10 +385,10 @@ def _probe_jobicy(
     title: str, regions: dict[str, dict], cfg: dict, _config: dict
 ) -> SourceProbeResult:
     region = _first_region(regions)
-    iso = str((region[1] if region else {}).get("country") or "").lower()
+    geo = jobicy_geo_slug(region[1] if region else {})
     params: dict[str, Any] = {"count": 1, "tag": title}
-    if iso:
-        params["geo"] = iso
+    if geo:
+        params["geo"] = geo
     return _probe_json(
         "jobicy",
         lambda: requests.get(jobicy_source._API_URL, params=params, timeout=_timeout(cfg)),

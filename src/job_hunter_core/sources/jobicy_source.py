@@ -1,7 +1,7 @@
 """Jobicy remote jobs API source — no key required.
 
 Free public API: https://jobicy.com/jobs-rss-feed
-Up to 100 results per request. Supports geo (ISO 3166-1 alpha-2) and tag filters.
+Up to 100 results per request. Supports documented geo slugs and tag filters.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from job_hunter_core.core.config import get_timeout, load_api_config
 from job_hunter_core.core.utils import strip_html, title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
+from job_hunter_core.sources.source_config import jobicy_geo_slug
 
 logger = logging.getLogger(__name__)
 
@@ -52,18 +53,18 @@ class JobicySource(JobSourceAdapter):
         jobs: list[JobPosting] = []
 
         for region_name, region_config in enabled_regions.items():
-            iso = region_config.get("country", "").lower()
+            geo = jobicy_geo_slug(region_config)
 
             for title in title_filters:
                 if not reserve_api_call("jobicy"):
                     continue
 
                 params: dict = {"count": 100, "tag": title}
-                if iso:
-                    params["geo"] = iso
+                if geo:
+                    params["geo"] = geo
 
                 logger.info(
-                    "[jobicy] [%s] Searching for %r (geo=%r)", region_name, title, iso or "any"
+                    "[jobicy] [%s] Searching for %r (geo=%r)", region_name, title, geo or "any"
                 )
 
                 try:

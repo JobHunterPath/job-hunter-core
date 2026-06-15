@@ -1,7 +1,8 @@
 """Glints — Southeast Asia job board (SG, ID, MY, VN, PH).
 
 Unofficial REST-like JSON API. No auth required.
-Only fires for SEA regions (SG, ID, MY, VN, PH).
+The Glints market also includes TH and TW, but this adapter only fires for
+currently mapped SEA regions (SG, ID, MY, VN, PH).
 """
 
 from __future__ import annotations
@@ -14,6 +15,11 @@ from job_hunter_core.core.config import get_timeout, load_api_config
 from job_hunter_core.core.utils import strip_html, title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
+from job_hunter_core.sources.source_config import (
+    sleep_between_pages,
+    source_page_cap,
+    source_page_delay,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +86,8 @@ class GlintsSource(JobSourceAdapter):
             return []
 
         timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))
+        max_pages = source_page_cap()
+        page_delay = source_page_delay()
         _excluded = (
             excluded_title_terms
             if excluded_title_terms is not None
@@ -93,8 +101,7 @@ class GlintsSource(JobSourceAdapter):
                 continue
 
             for title in title_filters:
-                page = 1
-                while True:
+                for page in range(1, max_pages + 1):
                     try:
                         resp = requests.get(
                             _API_URL,
@@ -167,16 +174,25 @@ class GlintsSource(JobSourceAdapter):
                             )
                         )
                     logger.info(
-                        "[glints] +%d jobs for %r in %s page %d",
+                        "[glints] +%d jobs for %r in %s page %d/%d",
                         len(jobs) - before,
                         title,
                         region_name,
                         page,
+                        max_pages,
                     )
 
                     if len(items) < _PAGE_SIZE:
                         break
-                    page += 1
+                    if page == max_pages:
+                        logger.warning(
+                            "[glints] reached page cap=%d for %r in %s; stopping",
+                            max_pages,
+                            title,
+                            region_name,
+                        )
+                        break
+                    sleep_between_pages(page_delay, page, max_pages)
 
         logger.info("[glints] Complete: %d total jobs", len(jobs))
         return jobs

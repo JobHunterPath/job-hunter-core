@@ -22,6 +22,7 @@ from job_hunter_core.core.config import JOOBLE_API_KEY, get_timeout, load_api_co
 from job_hunter_core.core.utils import title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
+from job_hunter_core.sources.source_config import DEFAULT_PAGED_SOURCE_CAP, source_page_cap
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ class JoobleSource(JobSourceAdapter):
             return []
 
         timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))
-        max_pages = int(source_cfg.get("max_pages_per_query", 3))
+        max_pages = source_page_cap(DEFAULT_PAGED_SOURCE_CAP)
         _excluded = (
             excluded_title_terms
             if excluded_title_terms is not None

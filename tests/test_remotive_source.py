@@ -20,7 +20,6 @@ _ENABLED_CFG = {
             "remotive": {
                 "enabled": True,
                 "timeout_seconds": 10,
-                "max_pages_per_query": 1,
             }
         }
     }

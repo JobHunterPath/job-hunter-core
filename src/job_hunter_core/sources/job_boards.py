@@ -26,11 +26,15 @@ from job_hunter_core.core.config import RAPIDAPI_KEY, get_timeout, load_api_conf
 from job_hunter_core.core.utils import location_matches, strip_html, title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
+from job_hunter_core.sources.source_config import (
+    DEFAULT_SINGLE_PAGE_SOURCE_CAP,
+    source_page_cap,
+    source_page_delay,
+)
 
 _TIMEOUT = get_timeout("job_boards")
 _JSEARCH_FAILURES = 0
 _SNIPPET_CHARS = 1000  # description chars kept as snippet for Arbeitnow / JSearch results
-_DEFAULT_ARBEITNOW_MAX_PAGES = 1
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +96,8 @@ class ArbeitnowSource(JobSourceAdapter):
         if not arbeitnow_cfg.get("enabled", False):
             return []
 
-        max_pages = int(arbeitnow_cfg.get("max_pages", _DEFAULT_ARBEITNOW_MAX_PAGES))
-        page_delay_seconds = float(arbeitnow_cfg.get("page_delay_seconds", 0) or 0)
+        max_pages = source_page_cap(DEFAULT_SINGLE_PAGE_SOURCE_CAP)
+        page_delay = source_page_delay()
         _excluded = (
             excluded_title_terms
             if excluded_title_terms is not None
@@ -152,8 +156,8 @@ class ArbeitnowSource(JobSourceAdapter):
                             region=region_name,
                         )
                     )
-                if page_delay_seconds and page < max_pages:
-                    time.sleep(page_delay_seconds)
+                if page_delay and page < max_pages:
+                    time.sleep(page_delay)
 
         logger.info(f"[arbeitnow] {len(jobs)} matching jobs")
         return jobs

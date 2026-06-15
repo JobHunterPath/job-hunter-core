@@ -14,6 +14,11 @@ from job_hunter_core.core.config import get_timeout, load_api_config
 from job_hunter_core.core.utils import strip_html, title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
+from job_hunter_core.sources.source_config import (
+    sleep_between_pages,
+    source_page_cap,
+    source_page_delay,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +136,8 @@ class JobStreetSource(JobSourceAdapter):
 
         timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))
         timeout_ms = timeout * 1000
+        max_pages = source_page_cap()
+        page_delay = source_page_delay()
         _excluded = (
             excluded_title_terms
             if excluded_title_terms is not None
@@ -148,39 +155,7 @@ class JobStreetSource(JobSourceAdapter):
             req_headers = _headers(domain)
 
             for title in title_filters:
-                page = 1
-                use_playwright_fallback = False
-                while True:
-                    if use_playwright_fallback:
-                        stubs = _fetch_page_playwright(domain, site_key, title, page, timeout_ms)
-                        if not stubs:
-                            break
-                        before = len(jobs)
-                        for stub in stubs:
-                            if stub.get("_stub"):
-                                job_id = stub["_id"]
-                                jobs.append(
-                                    JobPosting(
-                                        title=title,
-                                        company="",
-                                        url=_job_url(domain, job_id),
-                                        posted="",
-                                        location=region_config.get("location", iso),
-                                        snippet="",
-                                        source="JobStreet",
-                                        query=f"{title} @ {region_name}",
-                                        region=region_name,
-                                    )
-                                )
-                        logger.info(
-                            "[jobstreet] +%d stubs via Playwright for %r in %s page %d",
-                            len(jobs) - before,
-                            title,
-                            region_name,
-                            page,
-                        )
-                        break  # Playwright fallback is single-page only
-
+                for page in range(1, max_pages + 1):
                     try:
                         resp = requests.get(
                             api_url,
@@ -201,8 +176,35 @@ class JobStreetSource(JobSourceAdapter):
                                 title,
                                 region_name,
                             )
-                            use_playwright_fallback = True
-                            continue
+                            stubs = _fetch_page_playwright(
+                                domain, site_key, title, page, timeout_ms
+                            )
+                            before = len(jobs)
+                            for stub in stubs:
+                                if stub.get("_stub"):
+                                    job_id = stub["_id"]
+                                    jobs.append(
+                                        JobPosting(
+                                            title=title,
+                                            company="",
+                                            url=_job_url(domain, job_id),
+                                            posted="",
+                                            location=region_config.get("location", iso),
+                                            snippet="",
+                                            source="JobStreet",
+                                            query=f"{title} @ {region_name}",
+                                            region=region_name,
+                                        )
+                                    )
+                            logger.info(
+                                "[jobstreet] +%d stubs via Playwright for %r in %s page %d/%d",
+                                len(jobs) - before,
+                                title,
+                                region_name,
+                                page,
+                                max_pages,
+                            )
+                            break  # Playwright fallback is single-page only
                         resp.raise_for_status()
                         data = resp.json()
                     except Exception as exc:
@@ -255,16 +257,25 @@ class JobStreetSource(JobSourceAdapter):
                             )
                         )
                     logger.info(
-                        "[jobstreet] +%d jobs for %r in %s page %d",
+                        "[jobstreet] +%d jobs for %r in %s page %d/%d",
                         len(jobs) - before,
                         title,
                         region_name,
                         page,
+                        max_pages,
                     )
 
                     if len(items) < _PAGE_SIZE:
                         break
-                    page += 1
+                    if page == max_pages:
+                        logger.warning(
+                            "[jobstreet] reached page cap=%d for %r in %s; stopping",
+                            max_pages,
+                            title,
+                            region_name,
+                        )
+                        break
+                    sleep_between_pages(page_delay, page, max_pages)
 
         logger.info("[jobstreet] Complete: %d total jobs", len(jobs))
         return jobs

@@ -13,6 +13,11 @@ from job_hunter_core.core.config import get_timeout, load_api_config
 from job_hunter_core.core.utils import strip_html, title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
+from job_hunter_core.sources.source_config import (
+    sleep_between_pages,
+    source_page_cap,
+    source_page_delay,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +56,8 @@ class MyCareersFutureSource(JobSourceAdapter):
             return []
 
         timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))
+        max_pages = source_page_cap()
+        page_delay = source_page_delay()
         _excluded = (
             excluded_title_terms
             if excluded_title_terms is not None
@@ -63,8 +70,7 @@ class MyCareersFutureSource(JobSourceAdapter):
                 continue
 
             for title in title_filters:
-                page = 0
-                while True:
+                for page in range(max_pages):
                     try:
                         resp = requests.get(
                             _API_URL,
@@ -132,16 +138,25 @@ class MyCareersFutureSource(JobSourceAdapter):
                             )
                         )
                     logger.info(
-                        "[mycareersfuture] +%d jobs for %r in %s page %d",
+                        "[mycareersfuture] +%d jobs for %r in %s page %d/%d",
                         len(jobs) - before,
                         title,
                         region_name,
-                        page,
+                        page + 1,
+                        max_pages,
                     )
 
                     if len(results) < _PAGE_SIZE:
                         break
-                    page += 1
+                    if page + 1 == max_pages:
+                        logger.warning(
+                            "[mycareersfuture] reached page cap=%d for %r in %s; stopping",
+                            max_pages,
+                            title,
+                            region_name,
+                        )
+                        break
+                    sleep_between_pages(page_delay, page + 1, max_pages)
 
         logger.info("[mycareersfuture] Complete: %d total jobs", len(jobs))
         return jobs

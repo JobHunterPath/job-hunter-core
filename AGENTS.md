@@ -22,6 +22,7 @@ You are working on the automation engine that powers the job search pipeline.
 - Never hardcode personal data — all user-specific values live in `config/`.
 - External I/O must have timeouts and log failures; no silent `except` blocks.
 - Config-driven behavior — add new sources, providers, or output formats via config, not code rewrites.
+- Keep config files clean and minimal: safe optimized defaults belong in code constants, with config used only for user-specific values or meaningful overrides.
 - All imports use the `job_hunter_core.*` namespace (e.g., `from job_hunter_core.core.config import load_api_config`).
 - Multi-provider LLM support: Anthropic (primary), OpenAI, Google, Ollama — provider selection is config-driven.
 

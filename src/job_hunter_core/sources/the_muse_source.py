@@ -10,6 +10,7 @@ from job_hunter_core.core.config import get_timeout, load_api_config
 from job_hunter_core.core.utils import location_matches, strip_html, title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
+from job_hunter_core.sources.source_config import DEFAULT_SINGLE_PAGE_SOURCE_CAP, source_page_cap
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class TheMuseSource(JobSourceAdapter):
             return []
 
         timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))
-        max_pages = int(source_cfg.get("max_pages_per_query", 1))
+        max_pages = source_page_cap(DEFAULT_SINGLE_PAGE_SOURCE_CAP)
         _excluded = (
             excluded_title_terms
             if excluded_title_terms is not None

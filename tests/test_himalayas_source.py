@@ -19,7 +19,6 @@ _ENABLED_CFG = {
             "himalayas": {
                 "enabled": True,
                 "timeout_seconds": 10,
-                "max_pages_per_query": 1,
             }
         }
     }
