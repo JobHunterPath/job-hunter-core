@@ -104,14 +104,7 @@
         "job_boards": {
           "type": "object",
           "properties": {
-            "arbeitnow": {
-              "type": "object",
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "max_pages": { "type": "integer", "minimum": 1 },
-                "page_delay_seconds": { "type": "number", "minimum": 0 }
-              }
-            },
+            "arbeitnow": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "arbeitsagentur": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "himalayas": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "remotive": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
