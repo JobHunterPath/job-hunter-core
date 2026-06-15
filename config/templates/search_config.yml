@@ -6,16 +6,6 @@ regions:
     search_lang: "en"
     location: "Your City"  # City name passed to job board APIs
     description: "Primary search region"
-    job_titles:
-      - "Product Manager"
-      - "Product Owner"
-    companies:
-      - name: Example SaaS Company
-        career_url: boards.greenhouse.io/example
-      - name: Example Lever Company
-        career_url: jobs.lever.co/example
-      - name: Example Careers Site
-        career_url: careers.example.com
 
   # --- Optional region examples for new job board sources ---
   # Uncomment and adjust to activate. Each region auto-enables the boards
@@ -25,47 +15,59 @@ regions:
   #   enabled: false
   #   country: "SG"
   #   location: "Singapore"
-  #   job_titles:
-  #     - "Product Manager"
 
   # ireland:
   #   enabled: false
   #   country: "IE"
   #   location: "Dublin"
-  #   job_titles:
-  #     - "Product Manager"
 
   # canada:
   #   enabled: false
   #   country: "CA"
   #   location: "Toronto"
-  #   job_titles:
-  #     - "Product Manager"
 
   # uae:
   #   enabled: false
   #   country: "AE"
   #   location: "Dubai"
-  #   job_titles:
-  #     - "Product Manager"
 
   # saudi_arabia:
   #   enabled: false
   #   country: "SA"
   #   location: "Riyadh"
-  #   job_titles:
-  #     - "Product Manager"
-
-scraping:
-  total_timeout_seconds: 1800  # 30 min ceiling for company scraping phase
 
 global_search:
   job_titles:
     - "Product Manager"
     - "Product Owner"
 
+llm_job_search:
+  enabled: false
+  trigger_threshold: 15   # run LLM search if fewer than N candidates found
+  max_results_per_run: 20
+
 exclusion_rules:
-  exclude_german_language: true
+  # Drop listings written in these languages
+  excluded_languages:
+    - german
+
+  # User-configurable indicators per language (supplement the built-in heuristics)
+  language_indicators:
+    german:
+      - wir suchen
+      - wir freuen uns
+      - jetzt bewerben
+      - ihre aufgaben
+      - ihr profil
+      - deine aufgaben
+      - dein profil
+      - was wir bieten
+      - was du mitbringst
+      - das bieten wir
+      - stellenangebot
+      - berufserfahrung
+      - deutschkenntnisse
+
   excluded_url_patterns:
     - "linkedin\\.com/jobs/search"
     - "linkedin\\.com/jobs/[^/?#]+-jobs"
@@ -73,6 +75,7 @@ exclusion_rules:
     - "linkedin\\.com/jobs/remote-"
     - "linkedin\\.com/jobs/[a-z]+-stellen"
     - "linkedin\\.com/jobs/[a-z]+-stellenangebote"
+
   excluded_title_terms:
     - engineer
     - engineering
@@ -95,6 +98,7 @@ exclusion_rules:
     - praktikum
     - praktikant
     - trainee
+
   excluded_industries:
     - "gambling"
     - "casino"
@@ -104,56 +108,19 @@ exclusion_rules:
     - "banking"
     - "credit institution"
     - "fintech lending"
+
   senior_flags:
     - "director"
     - "vp "
     - "vice president"
     - "head of product"
     - "chief product"
+
   stale_indicators:
     - "no longer available"
     - "this job has expired"
     - "position has been filled"
     - "not accepting applications"
-  german_indicators:
-    - wir suchen
-    - wir freuen uns
-    - jetzt bewerben
-    - ihre aufgaben
-    - ihr profil
-    - deine aufgaben
-    - dein profil
-    - was wir bieten
-    - was du mitbringst
-    - das bieten wir
-    - stellenangebot
-    - berufserfahrung
-    - deutschkenntnisse
-
-discovery:
-  max_workers: 4
-  total_timeout_seconds: 1800
-  reserve_seconds: 30
-  overlap_scope: region
-  # LLM discovery uses these simple sector names. ATS/search discovery also
-  # runs from your configured regions and job titles.
-  # To run company discovery without LLM sector suggestions, clear this list
-  # (set sectors: []). The pipeline will use ATS-posting discovery only, which
-  # finds real companies from live job postings without any LLM calls or API keys.
-  sectors:
-    - "automotive & mobility"
-    - "commercial aviation & travel tech"
-    - "industrial automation & enterprise SaaS"
-    - "health tech & life sciences"
-    - "climate tech & energy"
-    - "logistics & supply chain tech"
-    - "developer tools & cloud infrastructure"
-    - "marketplace & e-commerce tech"
-    - "insurtech & regtech"
-    - "education tech & HR tech"
-    - "proptech & smart building"
-    - "cybersecurity & privacy tech"
-    - "{location} tech startups & scale-ups"
 
 excluded_companies:
   - "Example Excluded Company"

@@ -126,7 +126,6 @@ def test_scrape_skips_disabled_source(monkeypatch: pytest.MonkeyPatch) -> None:
     disabled["jobicy"] = preflight.SourceProbeResult("jobicy", "broken", "test")
 
     monkeypatch.setattr(scraper_module, "load_search_config", lambda: {"regions": {}})
-    monkeypatch.setattr(scraper_module, "load_companies", lambda _region=None: [])
     monkeypatch.setattr(scraper_module, "probe_search_providers", lambda: set())
     monkeypatch.setattr(scraper_module, "set_run_disabled", lambda _disabled: None)
     monkeypatch.setattr(scraper_module, "probe_job_sources", lambda *_args: disabled)

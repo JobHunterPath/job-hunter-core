@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def _jobs_from_hunt(region: str | None = None) -> tuple[list[dict[str, Any]], set[str], set[str]]:
-    """Scrape configured companies/boards, then deduplicate against processed jobs."""
+    """Scrape all enabled sources, then deduplicate against processed jobs."""
     jobs = scrape(region=region)
     if not jobs:
         return [], set(), set()

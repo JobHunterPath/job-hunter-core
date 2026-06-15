@@ -3,12 +3,11 @@ Job hunt pipeline orchestrator.
 
 Two modes, one entry point:
 
-  hunt (default)   Scrape jobs from configured companies and boards.
+  hunt (default)   Search all enabled job sources and boards for configured titles.
                    Runs daily via GitHub Actions.
 
   tailor-links     Tailor resume for a specific list of URLs.
                    Pass --links "URL1, URL2" or set TAILOR_LINKS env var.
-                   Discovered companies are registered to search_config.yml regions.
 """
 
 from __future__ import annotations
@@ -42,7 +41,6 @@ from job_hunter_core.pipeline.scorer import filter_matches, strategic_override_c
 from job_hunter_core.pipeline.tailor_pipeline import (
     _jobs_from_links,  # noqa: F401
     _load_search_rules,  # noqa: F401
-    _register_company,  # noqa: F401
     run_tailor,
 )
 from job_hunter_core.pipeline.tailorer import tailor

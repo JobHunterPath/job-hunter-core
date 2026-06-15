@@ -67,7 +67,6 @@ jobs:
           cp -r template-source/.github/scripts/. .github/scripts/
 
           cp template-source/.github/workflows/job_hunt.yml .github/workflows/job_hunt.yml
-          cp template-source/.github/workflows/company_discovery.yml .github/workflows/company_discovery.yml
           cp template-source/.github/workflows/tailor_links.yml .github/workflows/tailor_links.yml
           cp template-source/.github/workflows/tailor_raw.yml .github/workflows/tailor_raw.yml
           if [ -f .github/workflows/linkedin_content.yml ]; then

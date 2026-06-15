@@ -7,9 +7,8 @@ You are working on the automation engine that powers the job search pipeline.
 ## Architecture
 
 - `src/job_hunter_core/core/` — config loader, llm_client, utils, metrics, config_schema
-- `src/job_hunter_core/pipeline/` — orchestrator, scorer, tailorer, cover_writer, enrichment, validator, pdf_compiler, readme_writer, company_registry, hunt_pipeline, tailor_pipeline
+- `src/job_hunter_core/pipeline/` — orchestrator, scorer, tailorer, cover_writer, enrichment, validator, pdf_compiler, readme_writer, hunt_pipeline, tailor_pipeline
 - `src/job_hunter_core/sources/` — ats, adzuna_source, reed_source, jobspy_source, job_boards, search_providers, jd_fetcher, job_policy, ai_web_search, arbeitsagentur_source, himalayas_source, ats_urls
-- `src/job_hunter_core/discovery/` — discoverer (weekly company discovery)
 - `src/job_hunter_core/tracking/` — tracker (dedup), discovery_cache
 - `src/job_hunter_core/linkedin/` — generate_ideas, draft_posts, discover_engagement, defaults.yml
 - `config/` — all runtime behavior: search config, scoring weights, LLM provider settings
@@ -19,7 +18,7 @@ You are working on the automation engine that powers the job search pipeline.
 ## Operating Rules
 
 - Python handles all deterministic work: scraping, ATS, PDF compilation, state tracking, dedup.
-- LLM handles judgment: scoring, tailoring, cover letter generation, company discovery.
+- LLM handles judgment: scoring, tailoring, cover letter generation.
 - Never hardcode personal data — all user-specific values live in `config/`.
 - External I/O must have timeouts and log failures; no silent `except` blocks.
 - Config-driven behavior — add new sources, providers, or output formats via config, not code rewrites.
@@ -28,9 +27,10 @@ You are working on the automation engine that powers the job search pipeline.
 
 ## Search Provider Architecture
 
-- **Pre-flight gate**: `_run_disabled = get_exhausted_providers()` at the top of `scrape()`. Passed into all search calls for the entire run — never read `api_usage.json` inside per-company loops.
-- **Per-company fallback**: `search_web(..., allowed={"searxng"}, disabled=_run_disabled)`. Paid APIs (Brave/Tavily/Exa) are restricted to the global ATS discovery phase only.
-- **ATS discovery** (once per run, global): `discover_ats_jobs_by_search(..., disabled=_run_disabled)`. No `allowed` restriction — paid providers are appropriate here.
+- **Pre-flight gate**: `probe_search_providers()` at the top of `scrape()`. Fires a live test query against each enabled provider; any that fail or return 0 results are excluded for this run via `set_run_disabled()` — no file state read.
+- **Source-first job fetching**: all enabled job-board sources (`JobSpySource`, `HimalayasSource`, `ArbeitsagenturSource`, etc.) are fetched in parallel per enabled region using `global_search.job_titles`. No per-company loop or per-company fallback.
+- **ATS discovery** (once per run, global): `discover_ats_jobs_by_search(..., disabled=_run_disabled)`. Paid providers (Brave/Tavily/Exa) are used here; no restriction.
+- **LLM job search** (optional, gated by `llm_job_search.enabled`): `fetch_ai_web_search_jobs()` uses the `ai_web_search` LLM role (Claude Haiku by default) to generate targeted queries when candidate count is below `trigger_threshold`.
 
 ## Dedup Architecture
 
@@ -46,7 +46,6 @@ job-hunter hunt --scrape-only [--region <key>]      # scrape + enrich snapshot o
 job-hunter hunt --from-snapshot <path>              # score + tailor from scrape snapshot
 job-hunter tailor-links --links <comma-separated-urls> [--skip-score] [--force]
 job-hunter tailor-raw --jd <text> [--title] [--company] [--skip-score] [--force]
-job-hunter discover                    # weekly company discovery
 job-hunter merge-tracker               # merge dedup tracker state
 job-hunter resolve-hunt-region         # resolve active region from config
 job-hunter linkedin <generate-ideas|draft-posts|discover-networking|all> [--config]

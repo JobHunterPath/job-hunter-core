@@ -45,7 +45,6 @@ job-hunter hunt --scrape-only [--region primary]
 job-hunter hunt --from-snapshot outputs/state/hunt_scrape_YYYY-MM-DD_primary.json
 job-hunter tailor-links --links "https://example.com/job"
 job-hunter tailor-raw --jd "..." --title "Product Manager" --company "Acme"
-job-hunter discover [--region primary]
 job-hunter config check
 ```
 

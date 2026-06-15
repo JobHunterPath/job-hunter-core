@@ -255,50 +255,12 @@ Press `Ctrl+Alt+V` (`Cmd+Alt+V` on Mac) to open the PDF preview panel. The file 
 
 Open the config files and fill in the details for your situation.
 
-**`config/search_config.yml`** — companies and job titles:
+**`config/search_config.yml`** — job titles and regions:
 
-Set the job titles you want to search for, the region where you want to work,
-and a list of company career pages to check every day. The default region is
-`primary`; change its `location` to your target city or country.
+Set the job titles you want to search for and the regions where you want to work.
+The default region is `primary`; change its `location` to your target city or country.
 
-Use this AI prompt to seed your company list:
-
-```text
-Find 30 companies whose career pages a job-hunt bot should check daily.
-
-Region: [CITY OR COUNTRY]
-Target roles: [YOUR JOB TITLES]
-Preferences: [INDUSTRY, COMPANY SIZE, REMOTE/HYBRID/ONSITE]
-Avoid: [ANY COMPANIES OR INDUSTRIES TO EXCLUDE]
-
-Return YAML only, formatted like this:
-companies:
-  - name: Company Name
-    career_url: careers.company.com
-
-Rules:
-- Use the career subdomain or ATS board domain, not a specific job listing URL.
-- Do not include duplicate companies.
-- Do not change any other files.
-```
-
-Paste the returned YAML under the `companies:` key in your `primary` region.
-
-**Weekly company discovery** - the company_discovery workflow runs weekly and
-uses two sources. ATS/search discovery looks for real postings from your
-configured regions and job titles. LLM discovery suggests companies from the
-simple sector names in `discovery.sectors`. Add or remove sector strings to
-match the industries you want to target. The `{location}` placeholder is filled
-in from each region's `location` value.
-
-To run company discovery without LLM suggestions (no LLM credits used for the discovery
-step), set `discovery.sectors: []`. The pipeline will rely entirely on ATS-posting
-discovery, which finds real companies from live job postings across Greenhouse, Lever,
-Ashby, SmartRecruiters, Workable, Personio, Recruitee, Hibob, Teamtailor, Breezy, and
-Workday without any API keys.
-
-Industries listed in `exclusion_rules.excluded_industries` are passed to the LLM
-as off-limits during discovery and are also used by the scraper's job filter to
+Industries listed in `exclusion_rules.excluded_industries` are used by the job filter to
 skip postings from those industries.
 
 

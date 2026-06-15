@@ -25,6 +25,9 @@ _LISTING_ONLY_PATHS = {
 }
 
 _GERMAN_WORD_RE = re.compile(r"[a-z\u00e4\u00f6\u00fc\u00df]+", re.IGNORECASE)
+_GERMAN_MIN_WORDS = 18
+_GERMAN_MIN_HITS = 6
+_GERMAN_MIN_UNIQUE_HITS = 4
 _GERMAN_LANGUAGE_MARKERS = {
     "als",
     "auf",
@@ -75,11 +78,23 @@ _GERMAN_LANGUAGE_MARKERS = {
 
 def _looks_like_german_text(text: str) -> bool:
     words = _GERMAN_WORD_RE.findall(text.lower())
-    if len(words) < 18:
+    if len(words) < _GERMAN_MIN_WORDS:
         return False
 
     hits = [word for word in words if word in _GERMAN_LANGUAGE_MARKERS]
-    return len(hits) >= 6 and len(set(hits)) >= 4
+    return len(hits) >= _GERMAN_MIN_HITS and len(set(hits)) >= _GERMAN_MIN_UNIQUE_HITS
+
+
+_CORPORATE_SUFFIX_RE = re.compile(
+    r"\b(gmbh|ag|inc|inc\.|ltd|ltd\.|llc|plc|se|sa|s\.a\.|corp|corp\.|corporation|group)\b",
+    re.IGNORECASE,
+)
+
+
+def normalize_company_name(company: str) -> str:
+    normalized = _CORPORATE_SUFFIX_RE.sub("", company or "")
+    normalized = re.sub(r"[^a-z0-9]+", " ", normalized.lower())
+    return " ".join(normalized.split())
 
 
 @dataclass(frozen=True)
@@ -118,22 +133,48 @@ class JobPolicy:
 
     def is_excluded_company(self, company: str) -> bool:
         excluded = self.config.get("excluded_companies", [])
-        company_lower = company.lower()
-        return any(e.lower() == company_lower for e in excluded)
+        company_norm = normalize_company_name(company)
+        return bool(company_norm) and any(
+            normalize_company_name(str(e)) == company_norm for e in excluded
+        )
 
     def is_excluded_industry(self, snippet: str) -> bool:
         excluded_industries = self.exclusion_rules.get("excluded_industries", [])
         return any(kw in snippet.lower() for kw in excluded_industries)
 
     def is_german(self, title: str, snippet: str) -> bool:
-        if not self.exclusion_rules.get("exclude_german_language", True):
+        return self.is_excluded_language(title, snippet, language="german")
+
+    def is_excluded_language(
+        self, title: str, snippet: str, *, language: str | None = None
+    ) -> bool:
+        excluded_languages = [
+            str(lang).strip().lower()
+            for lang in self.exclusion_rules.get("excluded_languages", []) or []
+            if str(lang).strip()
+        ]
+        if language:
+            if language.lower() not in excluded_languages:
+                return False
+            languages = [language.lower()]
+        else:
+            languages = excluded_languages
+        if not languages:
             return False
 
+        language_indicators = self.exclusion_rules.get("language_indicators", {}) or {}
         combined = (title + " " + snippet).lower()
-        german_indicators = self.exclusion_rules.get("german_indicators", [])
-        return any(word in combined for word in german_indicators) or _looks_like_german_text(
-            combined
-        )
+        for lang in languages:
+            indicators = [
+                str(value).strip().lower()
+                for value in language_indicators.get(lang, []) or []
+                if str(value).strip()
+            ]
+            if indicators and any(indicator in combined for indicator in indicators):
+                return True
+            if lang == "german" and _looks_like_german_text(combined):
+                return True
+        return False
 
     def accepts_job_content(self, job: dict, title_filters: list[str]) -> bool:
         title = job.get("title", "")
@@ -147,8 +188,11 @@ class JobPolicy:
         if self.is_excluded_company(company):
             logger.debug("[skip] Excluded company: %s", company[:60])
             return False
-        if self.is_german(title, snippet):
-            logger.debug("[skip] German posting: %s", title[:60])
+        if self.is_stale_posting(title, snippet):
+            logger.debug("[skip] Stale/closed posting: %s", title[:60])
+            return False
+        if self.is_excluded_language(title, snippet):
+            logger.debug("[skip] Excluded-language posting: %s", title[:60])
             return False
         if self.is_too_senior(title, snippet):
             logger.debug("[skip] Too senior: %s", title[:60])

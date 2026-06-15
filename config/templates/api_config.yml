@@ -10,7 +10,6 @@ llm:
     scoring: anthropic
     tailoring: anthropic
     cover_letter: anthropic
-    discovery: anthropic
     linkedin: anthropic
     jd_extraction: anthropic
     ai_web_search: anthropic
@@ -21,7 +20,6 @@ llm:
     scoring: "claude-haiku-4-5-20251001"
     tailoring: "claude-sonnet-4-6"
     cover_letter: "claude-sonnet-4-6"
-    discovery: "claude-sonnet-4-6"
     linkedin: "claude-sonnet-4-6"
     jd_extraction: "claude-haiku-4-5-20251001"
     ai_web_search: "claude-haiku-4-5-20251001"  # may 529 at peak hours; switch to sonnet if reliability matters more than cost
@@ -30,7 +28,6 @@ llm:
     scoring: 1000
     tailoring: 4000
     cover_letter: 800
-    discovery: 400
     linkedin: 6000
     jd_extraction: 1500
     ai_web_search: 1200

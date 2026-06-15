@@ -12,7 +12,6 @@ import yaml
 
 from job_hunter_core.core.config import ROOT as REPO_ROOT
 from job_hunter_core.core.utils import title_matches
-from job_hunter_core.pipeline.company_registry import register_company
 from job_hunter_core.sources.jd_fetcher import fetch_jd, jd_from_text
 from job_hunter_core.tracking.tracker import load_processed
 
@@ -48,10 +47,6 @@ def _load_search_rules() -> tuple[list[str], list[str]]:
     return title_filters, excluded_title_terms
 
 
-def _register_company(job: dict[str, Any]) -> None:
-    register_company(job, ROOT, region=job.get("region"))
-
-
 def _jobs_from_links(
     raw: str,
     force: bool,
@@ -61,7 +56,6 @@ def _jobs_from_links(
     Fetch job descriptions from a list of direct URLs.
 
     Skips URLs already in applied_jobs.yml unless --force is set.
-    Registers each new company to search_config.yml regions for future hunt runs.
     """
     jobs: list[dict[str, Any]] = []
     title_filters, excluded_title_terms = _load_search_rules()
@@ -78,7 +72,6 @@ def _jobs_from_links(
                     job.get("company", "?"),
                 )
                 continue
-            _register_company(job)
             jobs.append(job)
             logger.info("  fetched: %s @ %s", job["title"], job["company"])
         else:

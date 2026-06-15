@@ -1,38 +1,29 @@
 """Hybrid job scraper.
 
-The fallback order is intentionally conservative:
-  1. Direct ATS APIs where available.
-  2. Static career-page scraping with requests + BeautifulSoup.
-  3. Playwright rendering for JavaScript-heavy career pages.
-  4. Search providers: SearXNG, Brave, Tavily, Exa.
+The scraper is source-first: every configured title is searched across every
+enabled source for every enabled region, then normalized through one policy gate.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import random
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 from urllib.parse import urlparse
 
 import requests  # noqa: F401
 
 from job_hunter_core.core.config import ROOT as REPO_ROOT
-from job_hunter_core.core.config import (
-    load_api_config,
-)
 from job_hunter_core.sources.adzuna_source import AdzunaSource
 from job_hunter_core.sources.ai_web_search import fetch_ai_web_search_jobs
 from job_hunter_core.sources.arbeitsagentur_source import ArbeitsagenturSource
-from job_hunter_core.sources.ats import fetch_ats_jobs
 from job_hunter_core.sources.eures_source import EURESSource
 from job_hunter_core.sources.glints_source import GlintsSource
 from job_hunter_core.sources.gulftalent_source import GulfTalentSource
 from job_hunter_core.sources.himalayas_source import HimalayasSource
 from job_hunter_core.sources.job_boards import ArbeitnowSource, JSearchSource
-from job_hunter_core.sources.job_policy import JobPolicy, make_job_filter
+from job_hunter_core.sources.job_policy import make_job_filter
 from job_hunter_core.sources.jobbank_source import JobBankSource
 from job_hunter_core.sources.jobicy_source import JobicySource
 from job_hunter_core.sources.jobspy_source import JobSpySource
@@ -43,8 +34,9 @@ from job_hunter_core.sources.reed_source import ReedSource
 from job_hunter_core.sources.remoteok_source import RemoteOKSource
 from job_hunter_core.sources.remotive_source import RemotiveSource
 from job_hunter_core.sources.scraper._config import (
-    build_queries,
-    load_companies,
+    enabled_regions as resolve_enabled_regions,
+)
+from job_hunter_core.sources.scraper._config import (
     load_search_config,
 )
 from job_hunter_core.sources.scraper._policy import (
@@ -75,11 +67,6 @@ from job_hunter_core.sources.search_providers import (
     all_providers_exhausted,
     canonicalize_url,  # noqa: F401
     discover_ats_jobs_by_search,
-    fetch_firecrawl_career_jobs,
-    fetch_lightpanda_career_jobs,
-    fetch_playwright_career_jobs,
-    fetch_static_career_jobs,
-    search_web,
 )
 from job_hunter_core.sources.search_providers.preflight import (
     probe_job_sources,
@@ -172,29 +159,19 @@ def _make_filter(
 
 
 def scrape(region: str | None = None) -> list[dict]:
-    """Scrape jobs for configured companies and global boards."""
+    """Scrape jobs from all enabled sources for configured titles and regions."""
     config = load_search_config()
-    companies = list(load_companies(region))
-    random.shuffle(companies)
     stats = ScrapeStats()
 
     # Probe all search providers once at run start. Dead or quota-exhausted providers
-    # are disabled for the entire run without repeated file reads per company.
+    # are disabled for the entire run.
     _run_disabled = probe_search_providers()
     set_run_disabled(_run_disabled)
 
     global_cfg = config.get("global_search", {})
     title_filters = global_cfg.get("job_titles", [])
     excluded_title_terms = config.get("exclusion_rules", {}).get("excluded_title_terms", [])
-    if region:
-        region_cfg = config.get("regions", {}).get(region)
-        enabled_regions = (
-            {region: region_cfg} if region_cfg and region_cfg.get("enabled", True) else {}
-        )
-    else:
-        enabled_regions = {
-            name: rc for name, rc in config.get("regions", {}).items() if rc.get("enabled", True)
-        }
+    enabled_regions = resolve_enabled_regions(config, region)
     source_preflight = probe_job_sources(title_filters, enabled_regions, config)
     source_skip_logged: set[str] = set()
 
@@ -217,7 +194,6 @@ def scrape(region: str | None = None) -> list[dict]:
     cached_candidate_urls = load_cached_candidate_urls()
     candidate_cache_updates: set[str] = set()
     lock = threading.Lock()
-    policy = JobPolicy(config)
     add_job = _make_filter(
         config,
         seen_urls,
@@ -228,223 +204,12 @@ def scrape(region: str | None = None) -> list[dict]:
         candidate_cache_updates,
     )
 
-    if not companies:
-        logger.warning("[scraper] No companies to scrape. Check search_config.yml")
-
-    scraping_cfg = config.get("scraping", {})
-    max_workers = int(scraping_cfg.get("max_workers", 10))
-
-    def _process_company(company: dict) -> None:
-        company_region = company.get("region", "")
-        company_region_config = company.get("_region_config") or {
-            "location": company.get("location", ""),
-            "country": company.get("country", ""),
-            "search_lang": company.get("search_lang", ""),
-        }
-        stats.record("ats_api", attempted=1)
-        ats_jobs = fetch_ats_jobs(
-            company, company.get("location", ""), title_filters, excluded_title_terms
-        )
-        if ats_jobs is not None:
-            stats.record("ats_api", returned=len(ats_jobs))
-            accepted = 0
-            for job in ats_jobs:
-                if add_job({**job, "region": company_region}):
-                    accepted += 1
-            stats.record("ats_api", accepted=accepted, skipped=len(ats_jobs) - accepted)
-            return
-
-        direct_found = 0
-        stats.record("static_career_page", attempted=1)
-        try:
-            static_jobs = list(
-                fetch_static_career_jobs(company, title_filters, excluded_title_terms)
-            )
-            stats.record("static_career_page", returned=len(static_jobs))
-            for job in static_jobs:
-                if add_job({**job, "region": company_region}):
-                    direct_found += 1
-            stats.record(
-                "static_career_page",
-                accepted=direct_found,
-                skipped=len(static_jobs) - direct_found,
-            )
-        except Exception as e:
-            stats.record("static_career_page", failed=1)
-            logger.debug("[scraper] HTTP career scrape failed for %s: %s", company["name"], e)
-
-        if direct_found == 0:
-            stats.record("lightpanda_career_page", attempted=1)
-            try:
-                lp_jobs = list(
-                    fetch_lightpanda_career_jobs(company, title_filters, excluded_title_terms)
-                )
-                stats.record("lightpanda_career_page", returned=len(lp_jobs))
-                lp_accepted = 0
-                for job in lp_jobs:
-                    if add_job({**job, "region": company_region}):
-                        direct_found += 1
-                        lp_accepted += 1
-                stats.record(
-                    "lightpanda_career_page",
-                    accepted=lp_accepted,
-                    skipped=len(lp_jobs) - lp_accepted,
-                )
-            except Exception as e:
-                stats.record("lightpanda_career_page", failed=1)
-                logger.debug(
-                    "[scraper] Lightpanda career scrape failed for %s: %s", company["name"], e
-                )
-
-        if direct_found == 0:
-            stats.record("playwright_career_page", attempted=1)
-            try:
-                pw_jobs = list(
-                    fetch_playwright_career_jobs(company, title_filters, excluded_title_terms)
-                )
-                stats.record("playwright_career_page", returned=len(pw_jobs))
-                pw_accepted = 0
-                for job in pw_jobs:
-                    if add_job({**job, "region": company_region}):
-                        direct_found += 1
-                        pw_accepted += 1
-                stats.record(
-                    "playwright_career_page",
-                    accepted=pw_accepted,
-                    skipped=len(pw_jobs) - pw_accepted,
-                )
-            except Exception as e:
-                stats.record("playwright_career_page", failed=1)
-                logger.debug(
-                    "[scraper] Playwright career scrape failed for %s: %s", company["name"], e
-                )
-
-        if direct_found == 0:
-            stats.record("firecrawl_career_page", attempted=1)
-            if _source_available("firecrawl"):
-                try:
-                    fc_jobs = list(
-                        fetch_firecrawl_career_jobs(company, title_filters, excluded_title_terms)
-                    )
-                    stats.record("firecrawl_career_page", returned=len(fc_jobs))
-                    fc_accepted = 0
-                    for job in fc_jobs:
-                        if add_job({**job, "region": company_region}):
-                            direct_found += 1
-                            fc_accepted += 1
-                    stats.record(
-                        "firecrawl_career_page",
-                        accepted=fc_accepted,
-                        skipped=len(fc_jobs) - fc_accepted,
-                    )
-                except Exception as e:
-                    stats.record("firecrawl_career_page", failed=1)
-                    logger.debug(
-                        "[scraper] Firecrawl career scrape failed for %s: %s",
-                        company["name"],
-                        e,
-                    )
-
-        if direct_found:
-            return
-
-        if all_providers_exhausted():
-            logger.debug("[scraper] %s: search skipped (ATS-only mode)", company["name"])
-            return
-
-        for query, company_name, _ in build_queries([company], config):
-            stats.record("search_fallback", attempted=1)
-            try:
-                # Restrict per-company fallback to SearXNG only — paid API keys
-                # (Brave/Tavily/Exa) are reserved for the global ATS discovery phase.
-                raw = search_web(
-                    query,
-                    company_region_config,
-                    count=10,
-                    allowed={"searxng"},
-                    disabled=_run_disabled,
-                )
-                stats.record("search_fallback", returned=len(raw))
-            except Exception as e:
-                stats.record("search_fallback", failed=1)
-                logger.warning("[scraper] Search error for %s: %s", company_name, e)
-                continue
-
-            filtered_count = 0
-            accepted_count = 0
-            for item in raw:
-                url = item.get("url", "")
-                title = item.get("title", "")
-                snippet = item.get("description", "")
-
-                if not url:
-                    continue
-                if not _url_matches_career_site(company["career_url"], url):
-                    logger.debug(
-                        "[scraper] Off-target result skipped (career=%s, got %s)",
-                        company["career_url"],
-                        url,
-                    )
-                    filtered_count += 1
-                    continue
-                if not policy.accepts_search_result_url(url, title, snippet):
-                    filtered_count += 1
-                    continue
-
-                if add_job(
-                    {
-                        "title": title,
-                        "company": company_name,
-                        "url": url,
-                        "posted": "",
-                        "snippet": snippet,
-                        "source": item.get("source", "Search fallback"),
-                        "query": query,
-                        "region": company_region,
-                    }
-                ):
-                    accepted_count += 1
-
-            stats.record(
-                "search_fallback",
-                accepted=accepted_count,
-                skipped=filtered_count,
-            )
-            if filtered_count > 0:
-                logger.debug(
-                    "[scraper] Filtered %s ineligible results from %s", filtered_count, company_name
-                )
-
-    total_scrape_timeout = int(scraping_cfg.get("total_timeout_seconds", 1800))
-    total_companies = len(companies)
-    company_counter = 0
-    company_counter_lock = threading.Lock()
-
-    def _process_company_tracked(company: dict) -> None:
-        nonlocal company_counter
-        with company_counter_lock:
-            company_counter += 1
-            idx = company_counter
-        logger.info("[scraper] [%d/%d] %s", idx, total_companies, company["name"])
-        _process_company(company)
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(_process_company_tracked, company): company for company in companies
-        }
-        try:
-            for future in as_completed(futures, timeout=total_scrape_timeout):
-                company = futures[future]
-                try:
-                    future.result()
-                except Exception as e:
-                    stats.record("ats_api", failed=1)
-                    logger.warning("[scraper] Error processing %s: %s", company.get("name", "?"), e)
-        except TimeoutError:
-            logger.warning(
-                "[scraper] Company scraping hit %ss total timeout, proceeding with partial results",
-                total_scrape_timeout,
-            )
+    if not title_filters:
+        logger.warning("[scraper] global_search.job_titles is empty; no source searches run")
+        return []
+    if not enabled_regions:
+        logger.warning("[scraper] No enabled regions found in search_config.yml")
+        return []
 
     stats.record("ats_search_discovery", attempted=1)
     try:
@@ -453,7 +218,6 @@ def scrape(region: str | None = None) -> list[dict]:
                 title_filters,
                 enabled_regions,
                 excluded_title_terms,
-                ats_discovery_cfg=config.get("ats_discovery", {}),
                 disabled=_run_disabled,
             )
         )
@@ -547,31 +311,36 @@ def scrape(region: str | None = None) -> list[dict]:
         cache_candidate=False,
     )
 
-    api_cfg_loaded = load_api_config()
-    ai_web_cfg = (
-        api_cfg_loaded.get("http", {}).get("search_providers", {}).get("ai_web_search", {}) or {}
-    )
-    ai_min_jobs = int(ai_web_cfg.get("run_if_fewer_than_jobs", 0) or 0)
-    if ai_min_jobs > 0 and len(results) >= ai_min_jobs:
-        logger.info(
-            "[scraper] Skipping AI web search: %s result(s) already meet threshold %s",
-            len(results),
-            ai_min_jobs,
-        )
-        stats.record("ai_web_search", skipped=1)
+    llm_search_cfg = config.get("llm_job_search", {}) or {}
+    if llm_search_cfg.get("enabled", False):
+        ai_min_jobs = int(llm_search_cfg.get("trigger_threshold", 0) or 0)
+        if ai_min_jobs > 0 and len(results) >= ai_min_jobs:
+            logger.info(
+                "[scraper] Skipping AI web search: %s result(s) already meet threshold %s",
+                len(results),
+                ai_min_jobs,
+            )
+            stats.record("ai_web_search", skipped=1)
+        else:
+            stats.record("ai_web_search", attempted=1)
+            try:
+                ai_jobs = list(fetch_ai_web_search_jobs(title_filters, enabled_regions))
+                stats.record("ai_web_search", returned=len(ai_jobs))
+                ai_accepted = 0
+                for job in ai_jobs:
+                    if add_job(job, cache_candidate=True):
+                        ai_accepted += 1
+                stats.record(
+                    "ai_web_search",
+                    accepted=ai_accepted,
+                    skipped=len(ai_jobs) - ai_accepted,
+                )
+            except Exception as e:
+                stats.record("ai_web_search", failed=1)
+                logger.warning("[scraper] AI web search failed: %s", e)
     else:
         stats.record("ai_web_search", attempted=1)
-        try:
-            ai_jobs = list(fetch_ai_web_search_jobs(title_filters, enabled_regions))
-            stats.record("ai_web_search", returned=len(ai_jobs))
-            ai_accepted = 0
-            for job in ai_jobs:
-                if add_job(job, allow_excluded_urls=True, cache_candidate=True):
-                    ai_accepted += 1
-            stats.record("ai_web_search", accepted=ai_accepted, skipped=len(ai_jobs) - ai_accepted)
-        except Exception as e:
-            stats.record("ai_web_search", failed=1)
-            logger.warning("[scraper] AI web search failed: %s", e)
+        stats.record("ai_web_search", skipped=1)
 
     stats.log_summary(ats_only=all_providers_exhausted())
     logger.info("[scraper] Complete: %s jobs found", len(results))

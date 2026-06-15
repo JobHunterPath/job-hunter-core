@@ -1,4 +1,4 @@
-"""Search configuration and company loading utilities for the scraper."""
+"""Search configuration utilities for source-first scraping."""
 
 from __future__ import annotations
 
@@ -21,76 +21,22 @@ def load_search_config() -> dict:
     return config
 
 
-def load_companies(region: str | None = None) -> list[dict]:
-    """Load enabled companies from search_config.yml, optionally scoped by region."""
-    config = load_search_config()
-    excluded = {name.lower() for name in config.get("excluded_companies", [])}
-    companies = []
+def enabled_regions(config: dict, region: str | None = None) -> dict[str, dict]:
+    """Return enabled search regions, optionally scoped to one region key."""
+    regions = config.get("regions", {}) or {}
 
-    regions_to_load = [region] if region else config.get("regions", {}).keys()
-
-    for reg in regions_to_load:
-        if reg not in config.get("regions", {}):
-            logger.warning("[scraper] Region %r not found in search_config.yml", reg)
-            continue
-
-        region_config = config["regions"][reg]
+    if region:
+        region_config = regions.get(region)
+        if not region_config:
+            logger.warning("[scraper] Region %r not found in search_config.yml", region)
+            return {}
         if not region_config.get("enabled", True):
-            logger.info("[scraper] Region %r is disabled. Skipping.", reg)
-            continue
+            logger.info("[scraper] Region %r is disabled. Skipping.", region)
+            return {}
+        return {region: region_config}
 
-        location = region_config.get("location", "")
-        loaded = 0
-        for company in region_config.get("companies", []):
-            if company["name"].lower() in excluded:
-                logger.info("[scraper] Skipping excluded company: %s", company["name"])
-                continue
-            companies.append(
-                {
-                    **company,
-                    "region": reg,
-                    "location": location,
-                    "country": region_config.get("country", ""),
-                    "search_lang": region_config.get("search_lang", ""),
-                    "_region_config": region_config,
-                }
-            )
-            loaded += 1
-
-        logger.info(
-            "[scraper] Loaded %s companies from region %r (location=%r)",
-            loaded,
-            reg,
-            location,
-        )
-
-    logger.info("[scraper] Total: %s companies", len(companies))
-    return companies
-
-
-def build_queries(companies: list[dict], config: dict) -> list[tuple[str, str, str]]:
-    """Build search queries. Returns (query, company_name, location)."""
-    queries = []
-    job_titles = config.get("global_search", {}).get("job_titles", [])
-    excluded_title_terms = config.get("exclusion_rules", {}).get("excluded_title_terms", [])
-    exclusions = " ".join(f'-"{term}"' for term in excluded_title_terms)
-
-    if not job_titles:
-        logger.warning("[scraper] global_search.job_titles is empty; no search queries built")
-        return queries
-
-    for company in companies:
-        url = company["career_url"]
-        name = company["name"]
-        location = company.get("location", "")
-
-        for title in job_titles:
-            query = f'"{title}" site:{url}'
-            if location:
-                query += f' "{location}"'
-            if exclusions:
-                query += f" {exclusions}"
-            queries.append((query, name, location or "global"))
-
-    logger.info("[scraper] Built %s search queries for %s companies", len(queries), len(companies))
-    return queries
+    return {
+        name: region_config
+        for name, region_config in regions.items()
+        if isinstance(region_config, dict) and region_config.get("enabled", True)
+    }

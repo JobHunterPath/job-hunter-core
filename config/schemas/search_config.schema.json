@@ -3,78 +3,55 @@
   "title": "search_config",
   "type": "object",
   "required": ["regions", "global_search", "exclusion_rules"],
+  "additionalProperties": false,
   "properties": {
     "regions": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "required": ["enabled", "country"],
+        "additionalProperties": false,
         "properties": {
           "enabled": { "type": "boolean" },
           "primary": { "type": "boolean" },
           "country": { "type": "string", "minLength": 2, "maxLength": 2 },
           "search_lang": { "type": "string" },
           "location": { "type": "string" },
-          "description": { "type": "string" },
-          "companies": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["name"],
-              "properties": {
-                "name": { "type": "string" },
-                "career_url": { "type": "string" }
-              }
-            }
-          },
-          "job_titles": { "type": "array", "items": { "type": "string" } }
+          "description": { "type": "string" }
         }
-      }
-    },
-    "scraping": {
-      "type": "object",
-      "properties": {
-        "total_timeout_seconds": { "type": "integer", "minimum": 60 }
-      }
-    },
-    "ats_discovery": {
-      "type": "object",
-      "properties": {
-        "enabled": { "type": "boolean" }
       }
     },
     "global_search": {
       "type": "object",
       "required": ["job_titles"],
+      "additionalProperties": false,
       "properties": {
-        "job_titles": { "type": "array", "items": { "type": "string" } }
+        "job_titles": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
       }
     },
     "llm_job_search": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "enabled": { "type": "boolean" },
         "trigger_threshold": { "type": "integer", "minimum": 0 },
         "max_results_per_run": { "type": "integer", "minimum": 1 }
       }
     },
-    "discovery": {
-      "type": "object",
-      "properties": {
-        "total_timeout_seconds": { "type": "integer", "minimum": 60 },
-        "sectors": { "type": "array", "items": { "type": "string" } }
-      }
-    },
     "exclusion_rules": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "excluded_languages": { "type": "array", "items": { "type": "string" } },
+        "language_indicators": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
         "excluded_url_patterns": { "type": "array", "items": { "type": "string" } },
         "excluded_title_terms": { "type": "array", "items": { "type": "string" } },
         "excluded_industries": { "type": "array", "items": { "type": "string" } },
         "senior_flags": { "type": "array", "items": { "type": "string" } },
-        "stale_indicators": { "type": "array", "items": { "type": "string" } },
-        "language_indicators": { "type": "object" }
+        "stale_indicators": { "type": "array", "items": { "type": "string" } }
       }
     },
     "excluded_companies": { "type": "array", "items": { "type": "string" } }

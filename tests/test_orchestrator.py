@@ -104,12 +104,10 @@ def test_jobs_from_links_skips_irrelevant_extracted_title():
             return_value=(["Product Manager"], ["engineer"]),
         ),
         patch("job_hunter_core.pipeline.orchestrator.fetch_jd", return_value=irrelevant),
-        patch("job_hunter_core.pipeline.orchestrator._register_company") as register,
     ):
         jobs = orchestrator._jobs_from_links("https://example.com/jobs/engineer", False, set())
 
     assert jobs == []
-    register.assert_not_called()
 
 
 def test_hunt_no_new_jobs_is_successful_empty_run():

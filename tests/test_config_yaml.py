@@ -1,8 +1,10 @@
 """Smoke tests for YAML files touched by automation changes."""
 
+import json
 import subprocess
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -19,7 +21,6 @@ def test_workflow_and_config_yaml_parse():
 
 def test_private_template_yaml_files_parse_when_present():
     files = [
-        ".github/workflows/company_discovery.yml",
         ".github/workflows/job_hunt.yml",
         ".github/workflows/linkedin_content.yml",
         ".github/workflows/tailor_links.yml",
@@ -59,24 +60,57 @@ def test_template_job_hunt_passes_job_board_api_keys_to_container():
         assert "-e JOOBLE_API_KEY" in run
 
 
-def test_daily_hunt_crons_match_enabled_regions_with_companies():
-    if (
-        not Path("config/search_config.yml").exists()
-        or not Path(".github/workflows/job_hunt.yml").exists()
-    ):
+def test_search_schema_rejects_region_companies() -> None:
+    jsonschema = pytest.importorskip("jsonschema")
+    schema_path = Path("config/schemas/search_config.schema.json")
+    if not schema_path.exists():
         return
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    bad = {
+        "regions": {
+            "primary": {
+                "enabled": True,
+                "country": "DE",
+                "companies": [{"name": "Acme"}],
+            }
+        },
+        "global_search": {"job_titles": []},
+        "exclusion_rules": {},
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=bad, schema=schema)
 
-    config = yaml.safe_load(Path("config/search_config.yml").read_text(encoding="utf-8"))
-    workflow = yaml.safe_load(Path(".github/workflows/job_hunt.yml").read_text(encoding="utf-8"))
 
-    regions = [
-        name
-        for name, region in (config.get("regions") or {}).items()
-        if region.get("enabled", True) and region.get("companies")
-    ]
-    hunt_crons = [item["cron"] for item in workflow[True]["schedule"]]
+def test_search_schema_rejects_top_level_scraping() -> None:
+    jsonschema = pytest.importorskip("jsonschema")
+    schema_path = Path("config/schemas/search_config.schema.json")
+    if not schema_path.exists():
+        return
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    bad = {
+        "regions": {},
+        "global_search": {"job_titles": []},
+        "exclusion_rules": {},
+        "scraping": {"total_timeout_seconds": 120},
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=bad, schema=schema)
 
-    assert len(hunt_crons) == len(regions)
+
+def test_search_schema_rejects_top_level_ats_discovery() -> None:
+    jsonschema = pytest.importorskip("jsonschema")
+    schema_path = Path("config/schemas/search_config.schema.json")
+    if not schema_path.exists():
+        return
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    bad = {
+        "regions": {},
+        "global_search": {"job_titles": []},
+        "exclusion_rules": {},
+        "ats_discovery": {"enabled": True},
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=bad, schema=schema)
 
 
 def test_template_profile_files_are_present_or_optional():
@@ -144,23 +178,6 @@ def test_live_template_config_shapes_match():
         live = yaml.safe_load(Path(live_path).read_text(encoding="utf-8")) or {}
         template = yaml.safe_load(Path(template_path).read_text(encoding="utf-8")) or {}
         assert _shape(live) == _shape(template), f"{live_path} drifted from {template_path}"
-
-
-def test_discovery_runtime_knobs_exist_in_live_and_template_configs():
-    required = {
-        "max_workers": int,
-        "total_timeout_seconds": int,
-        "reserve_seconds": int,
-        "overlap_scope": str,
-    }
-    for file in ("config/search_config.yml", "config/templates/search_config.yml"):
-        path = Path(file)
-        if not path.exists():
-            continue
-        config = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        discovery = config.get("discovery") or {}
-        for key, expected_type in required.items():
-            assert isinstance(discovery.get(key), expected_type), f"{file}: discovery.{key}"
 
 
 _REPO_ROOT = Path(__file__).parent.parent

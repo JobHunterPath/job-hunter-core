@@ -45,6 +45,51 @@ _SOURCE_URL_PATTERNS = {
     "ashby": (r"^jobs\.ashbyhq\.com$", r"^/[^/]+/[0-9a-f-]{36}"),
 }
 
+_DEFAULT_SOURCE_CONFIGS = {
+    "greenhouse": {
+        "enabled": True,
+        "query_templates": ['site:greenhouse.io "{title}" "{location}"'],
+    },
+    "lever": {
+        "enabled": True,
+        "query_templates": ['site:jobs.lever.co "{title}" "{location}"'],
+    },
+    "ashby": {
+        "enabled": True,
+        "query_templates": ['site:jobs.ashbyhq.com "{title}" "{location}"'],
+    },
+    "smartrecruiters": {
+        "enabled": True,
+        "query_templates": ['site:jobs.smartrecruiters.com "{title}" "{location}"'],
+    },
+    "workable": {
+        "enabled": True,
+        "query_templates": ['site:apply.workable.com "{title}" "{location}"'],
+    },
+    "personio": {
+        "enabled": True,
+        "query_templates": [
+            '(site:jobs.personio.de OR site:jobs.personio.com) "{title}" "{location}"'
+        ],
+    },
+    "recruitee": {
+        "enabled": True,
+        "query_templates": ['site:recruitee.com "{title}" "{location}"'],
+    },
+    "hibob": {
+        "enabled": True,
+        "query_templates": ['site:careers.hibob.com/jobs "{title}" "{location}"'],
+    },
+    "generic_web": {
+        "enabled": True,
+        "query_templates": [
+            '"{title}" "{location}" job apply '
+            "-site:glassdoor.com -site:indeed.com -site:linkedin.com "
+            "-site:monster.com -site:xing.com -site:stepstone.de"
+        ],
+    },
+}
+
 
 @dataclass
 class AIWebSearchBudget:
@@ -82,9 +127,15 @@ class AIWebSearchBudget:
 
 
 def ai_web_search_config() -> dict[str, Any]:
-    return (
+    api_cfg = (
         load_api_config().get("http", {}).get("search_providers", {}).get("ai_web_search", {}) or {}
     )
+    search_cfg = (_load_search_config().get("llm_job_search", {}) or {}).copy()
+    merged = {**api_cfg, **search_cfg}
+    if "max_results_per_run" in search_cfg:
+        merged["max_total_results_per_run"] = search_cfg["max_results_per_run"]
+    merged["enabled"] = bool(search_cfg.get("enabled", False))
+    return merged
 
 
 def enabled() -> bool:
@@ -110,7 +161,7 @@ def make_budget(config: dict[str, Any] | None = None) -> AIWebSearchBudget:
 
 
 def _source_configs(config: dict[str, Any]) -> dict[str, Any]:
-    return config.get("sources") or {}
+    return config.get("sources") or _DEFAULT_SOURCE_CONFIGS
 
 
 def _load_search_config() -> dict[str, Any]:
@@ -151,9 +202,14 @@ def build_rule_context(
     stale_indicators = exclusion_rules.get("stale_indicators", [])
     if stale_indicators:
         lines.append(f"- Reject stale/closed indicators: {_compact_list(stale_indicators)}")
-    german_indicators = exclusion_rules.get("german_indicators", [])
-    if german_indicators:
-        lines.append(f"- Reject German-language indicators: {_compact_list(german_indicators)}")
+    excluded_languages = exclusion_rules.get("excluded_languages", [])
+    if excluded_languages:
+        lines.append(f"- Reject languages: {_compact_list(excluded_languages)}")
+    language_indicators = exclusion_rules.get("language_indicators", {}) or {}
+    for language in excluded_languages or []:
+        indicators = language_indicators.get(str(language).lower(), [])
+        if indicators:
+            lines.append(f"- Reject {language} indicators: {_compact_list(indicators)}")
     excluded_industries = exclusion_rules.get("excluded_industries", [])
     if excluded_industries:
         lines.append(f"- Reject excluded industries: {_compact_list(excluded_industries)}")
@@ -390,6 +446,7 @@ def _normalize(
         "snippet": str(item.get("snippet") or "").strip(),
         "source": f"AI web search: {source}",
         "query": query,
+        "region": str(region_config.get("name") or "") if region_config else "",
     }
 
 
@@ -425,9 +482,11 @@ def fetch_ai_web_search_jobs(
                     time.sleep(prompt_delay)
                 first_prompt = False
 
+                region_context = dict(region_config)
+                region_context.setdefault("name", region_name)
                 user = (
                     f"Query: {query}\n"
-                    f"{build_rule_context(search_config, title_filters, region_config)}\n"
+                    f"{build_rule_context(search_config, title_filters, region_context)}\n"
                     f"Return up to {remaining} current job postings as JSON."
                 )
                 try:
@@ -444,7 +503,7 @@ def fetch_ai_web_search_jobs(
                                 title_filters,
                                 config,
                                 search_config,
-                                region_config,
+                                region_context,
                             )
                         )
                     ][:remaining]

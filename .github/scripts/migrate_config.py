@@ -47,9 +47,18 @@ USER_PRESERVED_PREFIXES: dict[str, frozenset[str]] = {
             "excluded_companies",  # user's personal exclusion list
             "exclusion_rules",  # user's custom filter rules
             "global_search.job_titles",  # user's job title list
-            "discovery.sectors",  # user's sector list for LLM discovery
+            "llm_job_search",  # user's LLM search switch and caps
         }
     ),
+}
+
+SEARCH_REGION_ALLOWED_KEYS = {
+    "enabled",
+    "primary",
+    "country",
+    "search_lang",
+    "location",
+    "description",
 }
 
 # Sections the user owns entirely: once the user has any content under a key,
@@ -132,6 +141,22 @@ def prune_obsolete_keys(
     return result, removed
 
 
+def prune_search_region_keys(config: dict) -> tuple[dict, list[str]]:
+    regions = config.get("regions")
+    if not isinstance(regions, dict):
+        return config, []
+
+    removed: list[str] = []
+    for region_name, region_config in regions.items():
+        if not isinstance(region_config, dict):
+            continue
+        for key in list(region_config):
+            if key not in SEARCH_REGION_ALLOWED_KEYS:
+                removed.append(f"regions.{region_name}.{key}")
+                del region_config[key]
+    return config, removed
+
+
 def main() -> int:
     if len(sys.argv) != 4:
         print(
@@ -155,6 +180,9 @@ def main() -> int:
     owned = USER_OWNED_SECTIONS.get(upstream_path.name, frozenset())
     merged, added = deep_merge(upstream, user, owned=owned)
     pruned, removed = prune_obsolete_keys(merged, upstream, preserved)
+    if upstream_path.name == "search_config.yml":
+        pruned, region_removed = prune_search_region_keys(pruned)
+        removed.extend(region_removed)
 
     output_path.write_text(
         yaml.safe_dump(pruned, sort_keys=False, allow_unicode=False),
