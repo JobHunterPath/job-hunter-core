@@ -251,44 +251,85 @@ def scrape(region: str | None = None) -> list[dict]:
             stats.record(name, failed=1)
             logger.warning("[scraper] %s failed: %s", name, e)
 
-    _collect_source("jobspy", lambda: JobSpySource().fetch(title_filters, enabled_regions, config))
     _collect_source(
-        "himalayas", lambda: HimalayasSource().fetch(title_filters, enabled_regions, config)
+        "jobspy",
+        lambda: JobSpySource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
     )
     _collect_source(
-        "remotive", lambda: RemotiveSource().fetch(title_filters, enabled_regions, config)
+        "himalayas",
+        lambda: HimalayasSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
     )
     _collect_source(
-        "the_muse", lambda: TheMuseSource().fetch(title_filters, enabled_regions, config)
+        "remotive",
+        lambda: RemotiveSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
     )
-    _collect_source("jobicy", lambda: JobicySource().fetch(title_filters, enabled_regions, config))
     _collect_source(
-        "remoteok", lambda: RemoteOKSource().fetch(title_filters, enabled_regions, config)
+        "the_muse",
+        lambda: TheMuseSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "jobicy",
+        lambda: JobicySource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "remoteok",
+        lambda: RemoteOKSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
     )
     _collect_source(
         "weworkremotely",
         lambda: WeWorkRemotelySource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
     )
     _collect_source(
         "mycareersfuture",
         lambda: MyCareersFutureSource().fetch(title_filters, enabled_regions, config),
-    )
-    _collect_source("eures", lambda: EURESSource().fetch(title_filters, enabled_regions, config))
-    _collect_source(
-        "jobbank", lambda: JobBankSource().fetch(title_filters, enabled_regions, config)
-    )
-    _collect_source("wttj", lambda: WTTJSource().fetch(title_filters, enabled_regions, config))
-    _collect_source("glints", lambda: GlintsSource().fetch(title_filters, enabled_regions, config))
-    _collect_source(
-        "gulftalent", lambda: GulfTalentSource().fetch(title_filters, enabled_regions, config)
+        cache_candidate=False,
     )
     _collect_source(
-        "jobstreet", lambda: JobStreetSource().fetch(title_filters, enabled_regions, config)
+        "eures",
+        lambda: EURESSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
     )
-    _collect_source("jooble", lambda: JoobleSource().fetch(title_filters, enabled_regions, config))
+    _collect_source(
+        "jobbank",
+        lambda: JobBankSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "wttj",
+        lambda: WTTJSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "glints",
+        lambda: GlintsSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "gulftalent",
+        lambda: GulfTalentSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "jobstreet",
+        lambda: JobStreetSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "jooble",
+        lambda: JoobleSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
     _collect_source(
         "arbeitsagentur",
         lambda: ArbeitsagenturSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
     )
     _collect_source(
         "arbeitnow",

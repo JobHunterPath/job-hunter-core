@@ -17,6 +17,15 @@ logger = logging.getLogger(__name__)
 _SEARCH_URL = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/app/jobs"
 _DETAIL_URL = "https://www.arbeitsagentur.de/jobsuche/jobdetail/{0}"
 
+# Arbeitsagentur requires German city names; English names return 0 results.
+_DE_CITY_NAMES: dict[str, str] = {
+    "Munich": "München",
+    "Cologne": "Köln",
+    "Nuremberg": "Nürnberg",
+    "Dusseldorf": "Düsseldorf",
+    "Düsseldorf": "Düsseldorf",
+}
+
 
 def _location(item: dict[str, Any]) -> str:
     place = item.get("arbeitsort") or {}
@@ -66,11 +75,12 @@ class ArbeitsagenturSource(JobSourceAdapter):
             if str(region_config.get("country") or "").upper() != "DE":
                 continue
             location = str(region_config.get("location") or "")
+            wo_location = _DE_CITY_NAMES.get(location, location)
             for title in title_filters:
                 try:
                     resp = requests.get(
                         _SEARCH_URL,
-                        params={"was": title, "wo": location, "page": 1, "size": size},
+                        params={"was": title, "wo": wo_location, "page": 1, "size": size},
                         headers={"X-API-Key": "jobboerse-jobsuche"},
                         timeout=timeout,
                     )

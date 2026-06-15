@@ -69,7 +69,7 @@ class EURESSource(JobSourceAdapter):
 
     def is_enabled(self, config: dict) -> bool:  # noqa: ARG002
         source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("eures", {}) or {}
-        return bool(source_cfg.get("enabled", True))
+        return bool(source_cfg.get("enabled", False))
 
     def fetch(
         self,
@@ -84,7 +84,7 @@ class EURESSource(JobSourceAdapter):
         Only runs for EU/EEA regions (country code in _EU_EEA_CODES).
         """
         source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("eures", {}) or {}
-        if not source_cfg.get("enabled", True):
+        if not source_cfg.get("enabled", False):
             return []
 
         timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))

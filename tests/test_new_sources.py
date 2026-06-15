@@ -391,8 +391,9 @@ class TestEURESSource:
             assert EURESSource().is_enabled({}) is False
 
     def test_fetch_returns_job_postings(self):
+        enabled_cfg = {"http": {"job_boards": {"eures": {"enabled": True}}}}
         with (
-            patch("job_hunter_core.sources.eures_source.load_api_config", return_value=_EMPTY_CFG),
+            patch("job_hunter_core.sources.eures_source.load_api_config", return_value=enabled_cfg),
             patch(
                 "job_hunter_core.sources.eures_source.requests.post",
                 return_value=_mock_post(_EURES_RESPONSE),
@@ -646,8 +647,9 @@ class TestWTTJSource:
             assert WTTJSource().is_enabled({}) is False
 
     def test_fetch_returns_job_postings(self):
+        enabled_cfg = {"http": {"job_boards": {"wttj": {"enabled": True}}}}
         with (
-            patch("job_hunter_core.sources.wttj_source.load_api_config", return_value=_EMPTY_CFG),
+            patch("job_hunter_core.sources.wttj_source.load_api_config", return_value=enabled_cfg),
             patch(
                 "job_hunter_core.sources.wttj_source.requests.get",
                 return_value=_mock_get(_WTTJ_RESPONSE),

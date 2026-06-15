@@ -43,7 +43,7 @@ class WTTJSource(JobSourceAdapter):
 
     def is_enabled(self, config: dict) -> bool:  # noqa: ARG002
         source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("wttj", {}) or {}
-        return bool(source_cfg.get("enabled", True))
+        return bool(source_cfg.get("enabled", False))
 
     def fetch(
         self,
@@ -58,7 +58,7 @@ class WTTJSource(JobSourceAdapter):
         Global board — fires for all enabled regions; uses aroundQuery for location filtering.
         """
         source_cfg = load_api_config().get("http", {}).get("job_boards", {}).get("wttj", {}) or {}
-        if not source_cfg.get("enabled", True):
+        if not source_cfg.get("enabled", False):
             return []
 
         timeout = int(source_cfg.get("timeout_seconds") or get_timeout("job_boards"))

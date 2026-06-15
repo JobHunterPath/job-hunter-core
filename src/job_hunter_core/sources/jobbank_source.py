@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 _SEARCH_URL = "https://www.jobbank.gc.ca/jobsearch/jobsearch"
 _BASE_URL = "https://www.jobbank.gc.ca"
+_JSESSIONID_RE = re.compile(r";jsessionid=[^?#]*")
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -95,12 +96,10 @@ class JobBankSource(JobSourceAdapter):
                     continue
 
                 soup = BeautifulSoup(html, "html.parser")
-                articles = soup.find_all(
-                    "article", {"class": re.compile(r"resultcount|job-result", re.I)}
-                )
+                # JobBank renders each job as <article class="action-buttons" id="article-{id}">
+                articles = soup.select("article.action-buttons[id^='article-']")
                 if not articles:
-                    # Fallback: any article with a job link
-                    articles = soup.select("article.found-job-offer, article[data-id]")
+                    articles = soup.find_all("article")
 
                 before = len(jobs)
                 for article in articles:
@@ -116,12 +115,13 @@ class JobBankSource(JobSourceAdapter):
                         continue
 
                     company_tag = article.find(
-                        class_=re.compile(r"business-title|company|employer", re.I)
+                        class_=re.compile(r"business|company|employer", re.I)
                     )
                     company = company_tag.get_text(strip=True) if company_tag else ""
 
                     link_tag = article.find("a", href=True)
                     href = link_tag["href"] if link_tag else ""
+                    href = _JSESSIONID_RE.sub("", href)
                     if href and not href.startswith("http"):
                         href = _BASE_URL + href
 

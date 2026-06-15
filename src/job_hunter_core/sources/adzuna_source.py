@@ -24,7 +24,7 @@ from job_hunter_core.core.api_budget import (
     reserve_api_call,
 )
 from job_hunter_core.core.config import ADZUNA_API_KEY, ADZUNA_APP_ID, get_timeout, load_api_config
-from job_hunter_core.core.utils import location_matches, title_matches
+from job_hunter_core.core.utils import title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
 from job_hunter_core.sources.source_config import DEFAULT_SINGLE_PAGE_SOURCE_CAP, source_page_cap
@@ -168,9 +168,6 @@ class AdzunaSource(JobSourceAdapter):
                             continue
 
                         location_str = item.get("location", {}).get("display_name", "")
-                        if location_str and "remote" not in location_str.lower():
-                            if location and not location_matches(location_str, location):
-                                continue
                         description = (item.get("description") or "")[:1000]
                         snippet = f"{location_str} — {description}" if location_str else description
 
