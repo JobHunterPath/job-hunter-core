@@ -18,7 +18,7 @@ from job_hunter_core.core.config import ROOT as REPO_ROOT
 from job_hunter_core.sources.adzuna_source import AdzunaSource
 from job_hunter_core.sources.ai_web_search import fetch_ai_web_search_jobs
 from job_hunter_core.sources.arbeitsagentur_source import ArbeitsagenturSource
-from job_hunter_core.sources.eures_source import EURESSource
+from job_hunter_core.sources.careerjet_source import CareerjetSource
 from job_hunter_core.sources.glints_source import GlintsSource
 from job_hunter_core.sources.gulftalent_source import GulfTalentSource
 from job_hunter_core.sources.himalayas_source import HimalayasSource
@@ -74,8 +74,9 @@ from job_hunter_core.sources.search_providers.preflight import (
 )
 from job_hunter_core.sources.search_providers.router import set_run_disabled
 from job_hunter_core.sources.the_muse_source import TheMuseSource
+from job_hunter_core.sources.usajobs_source import USAJobsSource
 from job_hunter_core.sources.weworkremotely_source import WeWorkRemotelySource
-from job_hunter_core.sources.wttj_source import WTTJSource
+from job_hunter_core.sources.workingnomads_source import WorkingNomadsSource
 from job_hunter_core.tracking.discovery_cache import (
     load_cached_candidate_urls,
     save_cached_candidate_urls,
@@ -292,18 +293,8 @@ def scrape(region: str | None = None) -> list[dict]:
         cache_candidate=False,
     )
     _collect_source(
-        "eures",
-        lambda: EURESSource().fetch(title_filters, enabled_regions, config),
-        cache_candidate=False,
-    )
-    _collect_source(
         "jobbank",
         lambda: JobBankSource().fetch(title_filters, enabled_regions, config),
-        cache_candidate=False,
-    )
-    _collect_source(
-        "wttj",
-        lambda: WTTJSource().fetch(title_filters, enabled_regions, config),
         cache_candidate=False,
     )
     _collect_source(
@@ -349,6 +340,21 @@ def scrape(region: str | None = None) -> list[dict]:
     _collect_source(
         "reed",
         lambda: ReedSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "careerjet",
+        lambda: CareerjetSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "workingnomads",
+        lambda: WorkingNomadsSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "usajobs",
+        lambda: USAJobsSource().fetch(title_filters, enabled_regions, config),
         cache_candidate=False,
     )
 

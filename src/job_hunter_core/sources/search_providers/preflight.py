@@ -25,7 +25,7 @@ from job_hunter_core.core.config import (
 from job_hunter_core.sources import (
     adzuna_source,
     arbeitsagentur_source,
-    eures_source,
+    careerjet_source,
     glints_source,
     gulftalent_source,
     himalayas_source,
@@ -39,8 +39,9 @@ from job_hunter_core.sources import (
     remoteok_source,
     remotive_source,
     the_muse_source,
+    usajobs_source,
     weworkremotely_source,
-    wttj_source,
+    workingnomads_source,
 )
 from job_hunter_core.sources.search_providers.providers import (
     BraveProvider,
@@ -395,52 +396,6 @@ def _probe_jobicy(
     )
 
 
-def _probe_eures(
-    title: str, regions: dict[str, dict], cfg: dict, _config: dict
-) -> SourceProbeResult:
-    region = _first_region(regions, countries=set(eures_source._EU_EEA_CODES))
-    if region is None:
-        return _not_applicable("eures", "no EU/EEA region")
-    _, region_cfg = region
-    payload = {
-        "dataSetRequest": {
-            "keywords": title,
-            "countryCode": str(region_cfg.get("country") or "").upper(),
-            "pageNumber": 0,
-            "pageSize": 1,
-            "sortBy": "BEST_MATCH",
-        }
-    }
-    return _probe_json(
-        "eures",
-        lambda: requests.post(
-            eures_source._API_URL,
-            json=payload,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=_timeout(cfg),
-        ),
-    )
-
-
-def _probe_wttj(
-    title: str, regions: dict[str, dict], cfg: dict, _config: dict
-) -> SourceProbeResult:
-    region = _first_region(regions)
-    location = str((region[1] if region else {}).get("location") or "")
-    params: dict[str, Any] = {"query": title, "page": 1, "per_page": 1, "language": "en"}
-    if location:
-        params["aroundQuery"] = location
-    return _probe_json(
-        "wttj",
-        lambda: requests.get(
-            wttj_source._API_URL,
-            params=params,
-            headers=wttj_source._HEADERS,
-            timeout=_timeout(cfg),
-        ),
-    )
-
-
 def _probe_glints(
     title: str, regions: dict[str, dict], cfg: dict, _config: dict
 ) -> SourceProbeResult:
@@ -634,6 +589,66 @@ def _probe_mycareersfuture(
     )
 
 
+def _probe_careerjet(
+    title: str, regions: dict[str, dict], cfg: dict, _config: dict
+) -> SourceProbeResult:
+    affid = cfg.get("affid", "")
+    if not affid:
+        return _missing_key("careerjet", "affid not configured in api_config.yml")
+    region = _first_region(regions)
+    region_cfg = region[1] if region else {}
+    country = str(region_cfg.get("country") or "").upper()
+    locale = careerjet_source._ISO_TO_LOCALE.get(country, "en_GB")
+    return _probe_json(
+        "careerjet",
+        lambda: requests.get(
+            careerjet_source._API_URL,
+            params={
+                "affid": affid,
+                "keywords": title,
+                "locale_code": locale,
+                "pagesize": 1,
+                "page": 1,
+            },
+            timeout=_timeout(cfg),
+        ),
+    )
+
+
+def _probe_workingnomads(
+    _title: str, _regions: dict[str, dict], cfg: dict, _config: dict
+) -> SourceProbeResult:
+    return _probe_json(
+        "workingnomads",
+        lambda: requests.get(workingnomads_source._API_URL, timeout=_timeout(cfg)),
+        allow_list=True,
+    )
+
+
+def _probe_usajobs(
+    title: str, regions: dict[str, dict], cfg: dict, _config: dict
+) -> SourceProbeResult:
+    region = _first_region(regions, countries={"US"})
+    if region is None:
+        return _not_applicable("usajobs", "no US region")
+    api_key, user_agent = usajobs_source._get_usajobs_creds()
+    if not api_key or not user_agent:
+        return _missing_key("usajobs", "USAJOBS_API_KEY or USAJOBS_USER_AGENT not set")
+    return _probe_json(
+        "usajobs",
+        lambda: requests.get(
+            usajobs_source._API_URL,
+            headers={
+                "Authorization-Key": api_key,
+                "User-Agent": user_agent,
+                "Host": "data.usajobs.gov",
+            },
+            params={"Keyword": title, "ResultsPerPage": 1, "Page": 1},
+            timeout=_timeout(cfg),
+        ),
+    )
+
+
 def _probe_jobspy(
     _title: str, _regions: dict[str, dict], _cfg: dict, _config: dict
 ) -> SourceProbeResult:
@@ -651,8 +666,6 @@ def _source_probes() -> dict[
         "firecrawl": _probe_firecrawl,
         "jobicy": _probe_jobicy,
         "arbeitnow": _probe_arbeitnow,
-        "eures": _probe_eures,
-        "wttj": _probe_wttj,
         "glints": _probe_glints,
         "gulftalent": _probe_gulftalent,
         "jobstreet": _probe_jobstreet,
@@ -665,4 +678,7 @@ def _source_probes() -> dict[
         "weworkremotely": _probe_weworkremotely,
         "mycareersfuture": _probe_mycareersfuture,
         "jobspy": _probe_jobspy,
+        "careerjet": _probe_careerjet,
+        "workingnomads": _probe_workingnomads,
+        "usajobs": _probe_usajobs,
     }

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.adzuna_source import AdzunaSource
-from job_hunter_core.sources.eures_source import EURESSource
+from job_hunter_core.sources.careerjet_source import CareerjetSource
 from job_hunter_core.sources.glints_source import GlintsSource
 from job_hunter_core.sources.gulftalent_source import GulfTalentSource
 from job_hunter_core.sources.jobbank_source import JobBankSource
@@ -14,8 +14,9 @@ from job_hunter_core.sources.jooble_source import JoobleSource
 from job_hunter_core.sources.mycareersfuture_source import MyCareersFutureSource
 from job_hunter_core.sources.reed_source import ReedSource
 from job_hunter_core.sources.remoteok_source import RemoteOKSource
+from job_hunter_core.sources.usajobs_source import USAJobsSource
 from job_hunter_core.sources.weworkremotely_source import WeWorkRemotelySource
-from job_hunter_core.sources.wttj_source import WTTJSource
+from job_hunter_core.sources.workingnomads_source import WorkingNomadsSource
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -247,8 +248,7 @@ _REED_JOB = lambda n: {  # noqa: E731
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Regional sources — MyCareersFuture / EURES / JobBank / WTTJ / Glints /
-#                   GulfTalent / JobStreet
+# Regional sources — MyCareersFuture / JobBank / Glints / GulfTalent / JobStreet
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -298,22 +298,6 @@ _MCF_RESPONSE = {
     ]
 }
 
-_EURES_RESPONSE = {
-    "jvs": [
-        {
-            "header": {
-                "id": "EU-12345",
-                "title": "Product Manager",
-                "employerName": "EuroCorp",
-                "placeOfWork": {"city": "Amsterdam", "countryCode": "NL"},
-                "startDate": "2026-06-01",
-            },
-            "jvDescription": {"description": "<p>Lead product in Amsterdam.</p>"},
-            "urls": {"applied": "https://eures.europa.eu/en/jobs-and-cts/jv/EU-12345"},
-        }
-    ]
-}
-
 _JB_HTML = """<html><body>
 <article class="resultcount">
   <h3><a href="/job-posting/12345">Product Manager</a></h3>
@@ -321,20 +305,6 @@ _JB_HTML = """<html><body>
   <span class="location">Toronto, ON</span>
   <span class="date">2026-06-01</span>
 </article></body></html>"""
-
-_WTTJ_RESPONSE = {
-    "jobs": [
-        {
-            "id": "wttj-pm-1",
-            "name": "Product Manager",
-            "organization": {"name": "StartupFR", "slug": "startupfr"},
-            "slug": "pm-role",
-            "published_at": "2026-06-01",
-            "office": {"city": "Paris", "country": {"code": "FR"}},
-            "description": "Lead our product team.",
-        }
-    ]
-}
 
 _GLINTS_RESPONSE = {
     "data": {
@@ -379,30 +349,6 @@ _JS_RESPONSE = {
 # ═══════════════════════════════════════════════════════════════════════════
 # Class-level JobSourceAdapter tests
 # ═══════════════════════════════════════════════════════════════════════════
-
-
-class TestEURESSource:
-    def test_name(self):
-        assert EURESSource().name == "eures"
-
-    def test_is_enabled_false_when_disabled(self):
-        disabled = {"http": {"job_boards": {"eures": {"enabled": False}}}}
-        with patch("job_hunter_core.sources.eures_source.load_api_config", return_value=disabled):
-            assert EURESSource().is_enabled({}) is False
-
-    def test_fetch_returns_job_postings(self):
-        enabled_cfg = {"http": {"job_boards": {"eures": {"enabled": True}}}}
-        with (
-            patch("job_hunter_core.sources.eures_source.load_api_config", return_value=enabled_cfg),
-            patch(
-                "job_hunter_core.sources.eures_source.requests.post",
-                return_value=_mock_post(_EURES_RESPONSE),
-            ),
-        ):
-            jobs = EURESSource().fetch(["Product Manager"], _NL, _CONFIG)
-        assert len(jobs) >= 1
-        assert isinstance(jobs[0], JobPosting)
-        assert jobs[0].source == "EURES"
 
 
 class TestGlintsSource:
@@ -637,30 +583,6 @@ class TestWeWorkRemotelySource:
         assert jobs[0].source == "WeWorkRemotely"
 
 
-class TestWTTJSource:
-    def test_name(self):
-        assert WTTJSource().name == "wttj"
-
-    def test_is_enabled_false_when_disabled(self):
-        disabled = {"http": {"job_boards": {"wttj": {"enabled": False}}}}
-        with patch("job_hunter_core.sources.wttj_source.load_api_config", return_value=disabled):
-            assert WTTJSource().is_enabled({}) is False
-
-    def test_fetch_returns_job_postings(self):
-        enabled_cfg = {"http": {"job_boards": {"wttj": {"enabled": True}}}}
-        with (
-            patch("job_hunter_core.sources.wttj_source.load_api_config", return_value=enabled_cfg),
-            patch(
-                "job_hunter_core.sources.wttj_source.requests.get",
-                return_value=_mock_get(_WTTJ_RESPONSE),
-            ),
-        ):
-            jobs = WTTJSource().fetch(["Product Manager"], _FR, _CONFIG)
-        assert len(jobs) >= 1
-        assert isinstance(jobs[0], JobPosting)
-        assert jobs[0].source == "Welcome to the Jungle"
-
-
 class TestReedSource:
     def test_name(self):
         src = ReedSource.__new__(ReedSource)
@@ -759,3 +681,213 @@ class TestJoobleSource:
         assert len(jobs) >= 1
         assert isinstance(jobs[0], JobPosting)
         assert jobs[0].source == "Jooble"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Careerjet
+# ═══════════════════════════════════════════════════════════════════════════
+
+_CAREERJET_CFG = {
+    "http": {
+        "job_boards": {"careerjet": {"enabled": True, "affid": "test123", "timeout_seconds": 10}}
+    }
+}
+
+_CAREERJET_JOB = {
+    "title": "Software Engineer",
+    "company": "TechCorp",
+    "url": "https://careerjet.com/job/1",
+    "date": "2026-06-01",
+    "locations": "Berlin, Germany",
+    "description": "Build great systems.",
+}
+
+
+class TestCareerjetSource:
+    def test_name(self):
+        assert CareerjetSource().name == "careerjet"
+
+    def test_is_enabled_false_when_no_affid(self):
+        cfg = {"http": {"job_boards": {"careerjet": {"enabled": True, "affid": ""}}}}
+        with patch("job_hunter_core.sources.careerjet_source.load_api_config", return_value=cfg):
+            assert CareerjetSource().is_enabled({}) is False
+
+    def test_is_enabled_false_when_disabled(self):
+        cfg = {"http": {"job_boards": {"careerjet": {"enabled": False, "affid": "x"}}}}
+        with patch("job_hunter_core.sources.careerjet_source.load_api_config", return_value=cfg):
+            assert CareerjetSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        response = {"jobs": [_CAREERJET_JOB], "total": 1}
+        get_mock = MagicMock(return_value=_mock_get(response))
+        with (
+            patch(
+                "job_hunter_core.sources.careerjet_source.load_api_config",
+                return_value=_CAREERJET_CFG,
+            ),
+            patch("job_hunter_core.sources.careerjet_source.requests.get", get_mock),
+        ):
+            jobs = CareerjetSource().fetch(["Software Engineer"], _DE, _CONFIG)
+        assert len(jobs) == 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "Careerjet"
+        assert jobs[0].title == "Software Engineer"
+        params = get_mock.call_args.kwargs["params"]
+        assert params["affid"] == "test123"
+        assert params["locale_code"] == "de_DE"
+
+    def test_fetch_uses_correct_locale_for_ireland(self):
+        response = {"jobs": [_CAREERJET_JOB], "total": 1}
+        get_mock = MagicMock(return_value=_mock_get(response))
+        with (
+            patch(
+                "job_hunter_core.sources.careerjet_source.load_api_config",
+                return_value=_CAREERJET_CFG,
+            ),
+            patch("job_hunter_core.sources.careerjet_source.requests.get", get_mock),
+        ):
+            CareerjetSource().fetch(["Software Engineer"], _IE, _CONFIG)
+        assert get_mock.call_args.kwargs["params"]["locale_code"] == "en_IE"
+
+    def test_fetch_returns_empty_when_no_affid(self):
+        cfg = {"http": {"job_boards": {"careerjet": {"enabled": True, "affid": ""}}}}
+        with patch("job_hunter_core.sources.careerjet_source.load_api_config", return_value=cfg):
+            jobs = CareerjetSource().fetch(["Software Engineer"], _DE, _CONFIG)
+        assert jobs == []
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Working Nomads
+# ═══════════════════════════════════════════════════════════════════════════
+
+_WN_CFG = {"http": {"job_boards": {"workingnomads": {"enabled": True, "timeout_seconds": 10}}}}
+
+_WN_JOB = {
+    "title": "Software Engineer",
+    "company_name": "NomadCo",
+    "url": "https://workingnomads.com/job/1",
+    "pub_date": "2026-06-01T00:00:00Z",
+    "region": "Worldwide",
+    "description": "Work from anywhere.",
+}
+
+
+class TestWorkingNomadsSource:
+    def test_name(self):
+        assert WorkingNomadsSource().name == "workingnomads"
+
+    def test_is_enabled_false_when_disabled(self):
+        cfg = {"http": {"job_boards": {"workingnomads": {"enabled": False}}}}
+        with patch(
+            "job_hunter_core.sources.workingnomads_source.load_api_config", return_value=cfg
+        ):
+            assert WorkingNomadsSource().is_enabled({}) is False
+
+    def test_fetch_returns_job_postings(self):
+        with (
+            patch(
+                "job_hunter_core.sources.workingnomads_source.load_api_config",
+                return_value=_WN_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.workingnomads_source.requests.get",
+                return_value=_mock_get([_WN_JOB]),
+            ),
+        ):
+            jobs = WorkingNomadsSource().fetch(["Software Engineer"], _DE, _CONFIG)
+        assert len(jobs) == 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "WorkingNomads"
+        assert jobs[0].company == "NomadCo"
+
+    def test_fetch_filters_by_title(self):
+        jobs_data = [
+            {**_WN_JOB, "title": "Software Engineer"},
+            {**_WN_JOB, "title": "Marketing Manager", "url": "https://workingnomads.com/job/2"},
+        ]
+        with (
+            patch(
+                "job_hunter_core.sources.workingnomads_source.load_api_config",
+                return_value=_WN_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.workingnomads_source.requests.get",
+                return_value=_mock_get(jobs_data),
+            ),
+        ):
+            jobs = WorkingNomadsSource().fetch(["Software Engineer"], _DE, _CONFIG)
+        assert len(jobs) == 1
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# USAJOBS
+# ═══════════════════════════════════════════════════════════════════════════
+
+_US = {"us": {"country": "US", "location": "Washington DC"}}
+
+_USAJOBS_CFG = {"http": {"job_boards": {"usajobs": {"enabled": True, "timeout_seconds": 10}}}}
+
+_USAJOBS_ITEM = {
+    "MatchedObjectDescriptor": {
+        "PositionTitle": "Software Engineer",
+        "OrganizationName": "Department of Defense",
+        "PositionURI": "https://usajobs.gov/job/1",
+        "PublicationStartDate": "2026-06-01",
+        "PositionLocationDisplay": "Washington, DC",
+        "UserArea": {"Details": {"JobSummary": "Build federal systems."}},
+    }
+}
+
+_USAJOBS_RESPONSE = {"SearchResult": {"SearchResultItems": [_USAJOBS_ITEM]}}
+
+
+class TestUSAJobsSource:
+    def test_name(self):
+        assert USAJobsSource().name == "usajobs"
+
+    def test_fetch_skips_non_us_regions(self):
+        with (
+            patch(
+                "job_hunter_core.sources.usajobs_source.load_api_config",
+                return_value=_USAJOBS_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.usajobs_source._get_usajobs_creds",
+                return_value=("key", "user@example.com"),
+            ),
+        ):
+            jobs = USAJobsSource().fetch(["Software Engineer"], _DE, _CONFIG)
+        assert jobs == []
+
+    def test_fetch_returns_job_postings(self):
+        get_mock = MagicMock(return_value=_mock_get(_USAJOBS_RESPONSE))
+        with (
+            patch(
+                "job_hunter_core.sources.usajobs_source.load_api_config",
+                return_value=_USAJOBS_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.usajobs_source._get_usajobs_creds",
+                return_value=("key", "user@example.com"),
+            ),
+            patch("job_hunter_core.sources.usajobs_source.requests.get", get_mock),
+        ):
+            jobs = USAJobsSource().fetch(["Software Engineer"], _US, _CONFIG)
+        assert len(jobs) == 1
+        assert isinstance(jobs[0], JobPosting)
+        assert jobs[0].source == "USAJOBS"
+        assert jobs[0].company == "Department of Defense"
+
+    def test_fetch_returns_empty_without_creds(self):
+        with (
+            patch(
+                "job_hunter_core.sources.usajobs_source.load_api_config",
+                return_value=_USAJOBS_CFG,
+            ),
+            patch(
+                "job_hunter_core.sources.usajobs_source._get_usajobs_creds",
+                return_value=("", ""),
+            ),
+        ):
+            jobs = USAJobsSource().fetch(["Software Engineer"], _US, _CONFIG)
+        assert jobs == []

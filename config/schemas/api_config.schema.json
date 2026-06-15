@@ -104,6 +104,15 @@
         "job_boards": {
           "type": "object",
           "properties": {
+            "careerjet": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "affid": { "type": "string" }
+              }
+            },
+            "workingnomads": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
+            "usajobs": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "arbeitnow": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "arbeitsagentur": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "himalayas": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
@@ -124,9 +133,7 @@
             "weworkremotely": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "jooble": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "mycareersfuture": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
-            "eures": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "jobbank": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
-            "wttj": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "glints": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "gulftalent": { "type": "object", "properties": { "enabled": { "type": "boolean" } } },
             "jobstreet": { "type": "object", "properties": { "enabled": { "type": "boolean" } } }

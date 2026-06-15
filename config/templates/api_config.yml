@@ -51,6 +51,9 @@ secrets:
     env_var: "EXA_API_KEY"
   firecrawl:
     env_var: "FIRECRAWL_API_KEY"
+  usajobs:
+    api_key_env_var: "USAJOBS_API_KEY"
+    user_agent_env_var: "USAJOBS_USER_AGENT"
   rapidapi:
     env_var: "RAPIDAPI_KEY"
   jooble:
@@ -148,6 +151,16 @@ http:
             - '"{title}" "{location}" job apply -site:glassdoor.com -site:indeed.com -site:linkedin.com -site:monster.com -site:xing.com -site:stepstone.de'
 
   job_boards:
+    careerjet:
+      enabled: true
+      # Free affiliate ID — register at https://www.careerjet.com/affiliate_program.html
+      affid: ""
+    workingnomads:
+      enabled: true
+    usajobs:
+      # Free API key — register at https://developer.usajobs.gov/
+      # Also set USAJOBS_USER_AGENT to the email you registered with.
+      enabled: true
     arbeitnow:
       enabled: true
     jsearch:
@@ -173,11 +186,7 @@ http:
       enabled: true
     mycareersfuture:
       enabled: true
-    eures:
-      enabled: true
     jobbank:
-      enabled: true
-    wttj:
       enabled: true
     glints:
       enabled: true
