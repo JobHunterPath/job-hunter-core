@@ -75,7 +75,6 @@ jobs:
             cp template-source/.github/workflows/linkedin_content.yml.disabled .github/workflows/linkedin_content.yml.disabled
           fi
           cp template-source/.github/workflows/update_from_template.yml .github/workflows/update_from_template.yml
-          rm -f .github/workflows/company_discovery.yml
 
       - name: Preserve custom cron schedules
         shell: bash
