@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
@@ -117,8 +118,18 @@ def drop_dead_urls_before_enrichment(
             checked = list(executor.map(_check_job, jobs))
 
     alive = [job for ok, job in checked if ok]
+    dead = [job for ok, job in checked if not ok]
     rejected = len(checked) - len(alive)
 
     if rejected:
         logger.info("[pipeline] Dropped %s dead URL(s) before enrichment", rejected)
+        by_source = Counter(str(job.get("source") or "unknown") for job in dead)
+        logger.info("[pipeline] Dead URL sources before enrichment: %s", dict(by_source))
+        if jobs and not alive:
+            logger.warning(
+                "[pipeline] All %s scraped job URL(s) failed verification before enrichment; "
+                "sources=%s",
+                len(jobs),
+                dict(by_source),
+            )
     return alive

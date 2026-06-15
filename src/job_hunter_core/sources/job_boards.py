@@ -12,7 +12,7 @@ so they complement the per-company ATS fetchers in sources/ats.py.
 from __future__ import annotations
 
 import logging
-import os
+import time
 from datetime import UTC, datetime
 
 import requests
@@ -22,15 +22,15 @@ from job_hunter_core.core.api_budget import (
     mark_api_exhausted,
     reserve_api_call,
 )
-from job_hunter_core.core.config import get_timeout, load_api_config
+from job_hunter_core.core.config import RAPIDAPI_KEY, get_timeout, load_api_config
 from job_hunter_core.core.utils import location_matches, strip_html, title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
 
 _TIMEOUT = get_timeout("job_boards")
 _JSEARCH_FAILURES = 0
-_ARBEITNOW_TIMEOUT = 15  # seconds: per-page HTTP timeout for Arbeitnow API calls
 _SNIPPET_CHARS = 1000  # description chars kept as snippet for Arbeitnow / JSearch results
+_DEFAULT_ARBEITNOW_MAX_PAGES = 1
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,8 @@ class ArbeitnowSource(JobSourceAdapter):
         if not arbeitnow_cfg.get("enabled", False):
             return []
 
-        max_pages = int(arbeitnow_cfg.get("max_pages", 3))
+        max_pages = int(arbeitnow_cfg.get("max_pages", _DEFAULT_ARBEITNOW_MAX_PAGES))
+        page_delay_seconds = float(arbeitnow_cfg.get("page_delay_seconds", 0) or 0)
         _excluded = (
             excluded_title_terms
             if excluded_title_terms is not None
@@ -110,9 +111,13 @@ class ArbeitnowSource(JobSourceAdapter):
             )
             for page in range(1, max_pages + 1):
                 try:
-                    resp = requests.get(
-                        ARBEITNOW_URL, params={"page": page}, timeout=_ARBEITNOW_TIMEOUT
-                    )
+                    resp = requests.get(ARBEITNOW_URL, params={"page": page}, timeout=_TIMEOUT)
+                    if resp.status_code == 429:
+                        logger.warning(
+                            "[arbeitnow] page %s: rate limited; stopping for this run",
+                            page,
+                        )
+                        break
                     resp.raise_for_status()
                     data = resp.json().get("data", [])
                 except Exception as e:
@@ -147,6 +152,8 @@ class ArbeitnowSource(JobSourceAdapter):
                             region=region_name,
                         )
                     )
+                if page_delay_seconds and page < max_pages:
+                    time.sleep(page_delay_seconds)
 
         logger.info(f"[arbeitnow] {len(jobs)} matching jobs")
         return jobs
@@ -154,7 +161,7 @@ class ArbeitnowSource(JobSourceAdapter):
 
 class JSearchSource(JobSourceAdapter):
     def __init__(self) -> None:
-        self._rapidapi_key: str = os.environ.get("RAPIDAPI_KEY", "")
+        self._rapidapi_key: str = RAPIDAPI_KEY
 
     @property
     def name(self) -> str:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import shutil
 import subprocess
@@ -13,7 +12,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from job_hunter_core.core.api_budget import reserve_api_call
-from job_hunter_core.core.config import get_timeout, load_api_config
+from job_hunter_core.core.config import FIRECRAWL_API_KEY, get_timeout, load_api_config
 from job_hunter_core.core.utils import title_matches
 from job_hunter_core.sources.search_providers._constants import USER_AGENT
 from job_hunter_core.sources.search_providers._url_utils import (
@@ -199,7 +198,7 @@ def fetch_firecrawl_career_jobs(
     title_filters: list[str],
     excluded_title_terms: list[str] | None = None,
 ) -> list[dict]:
-    api_key = os.environ.get("FIRECRAWL_API_KEY", "")
+    api_key = FIRECRAWL_API_KEY
     if not api_key:
         logger.debug("[search] FIRECRAWL_API_KEY not set; skipping cloud scrape")
         return []

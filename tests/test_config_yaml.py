@@ -42,6 +42,23 @@ def test_private_template_yaml_files_parse_when_present():
             yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
+def test_template_job_hunt_passes_job_board_api_keys_to_container():
+    path = Path(".github/template-workflows/job_hunt.yml")
+    if not path.exists():
+        return
+
+    workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["hunt"]["steps"]
+    named_steps = {step.get("name"): step for step in steps}
+
+    for name in ("Scrape jobs", "Tailor jobs"):
+        step = named_steps[name]
+        env = step.get("env") or {}
+        run = step.get("run") or ""
+        assert env["JOOBLE_API_KEY"] == "${{ secrets.JOOBLE_API_KEY }}"
+        assert "-e JOOBLE_API_KEY" in run
+
+
 def test_daily_hunt_crons_match_enabled_regions_with_companies():
     if (
         not Path("config/search_config.yml").exists()

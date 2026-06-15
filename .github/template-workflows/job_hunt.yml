@@ -143,6 +143,7 @@ jobs:
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_API_KEY: ${{ secrets.ADZUNA_API_KEY }}
           REED_API_KEY: ${{ secrets.REED_API_KEY }}
+          JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
           LOG_LEVEL: INFO
           RUNNER_IMAGE: ${{ steps.runner_image.outputs.image }}
         run: |
@@ -162,6 +163,7 @@ jobs:
             -e ADZUNA_APP_ID \
             -e ADZUNA_API_KEY \
             -e REED_API_KEY \
+            -e JOOBLE_API_KEY \
             -e LOG_LEVEL \
             -e JOB_HUNTER_ROOT=/workspace \
             -v "$GITHUB_WORKSPACE:/workspace" \
@@ -192,6 +194,7 @@ jobs:
           ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
           ADZUNA_API_KEY: ${{ secrets.ADZUNA_API_KEY }}
           REED_API_KEY: ${{ secrets.REED_API_KEY }}
+          JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
           LOG_LEVEL: INFO
           RUNNER_IMAGE: ${{ steps.runner_image.outputs.image }}
         run: |
@@ -210,6 +213,7 @@ jobs:
             -e ADZUNA_APP_ID \
             -e ADZUNA_API_KEY \
             -e REED_API_KEY \
+            -e JOOBLE_API_KEY \
             -e LOG_LEVEL \
             -e JOB_HUNTER_ROOT=/workspace \
             -v "$GITHUB_WORKSPACE:/workspace" \

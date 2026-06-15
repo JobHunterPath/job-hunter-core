@@ -10,7 +10,6 @@ Required env var (optional — source skips silently if absent):
 from __future__ import annotations
 
 import logging
-import os
 
 import requests
 
@@ -19,7 +18,7 @@ from job_hunter_core.core.api_budget import (
     mark_api_exhausted,
     reserve_api_call,
 )
-from job_hunter_core.core.config import get_timeout, load_api_config
+from job_hunter_core.core.config import JOOBLE_API_KEY, get_timeout, load_api_config
 from job_hunter_core.core.utils import title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
@@ -31,7 +30,7 @@ _BASE_URL = "https://jooble.org/api/{api_key}"
 
 class JoobleSource(JobSourceAdapter):
     def __init__(self) -> None:
-        self._api_key: str = os.environ.get("JOOBLE_API_KEY", "")
+        self._api_key: str = JOOBLE_API_KEY
 
     @property
     def name(self) -> str:

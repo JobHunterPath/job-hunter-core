@@ -419,6 +419,29 @@ class TestGlintsSource:
         assert isinstance(jobs[0], JobPosting)
         assert jobs[0].source == "Glints"
 
+    def test_fetch_accepts_list_response(self):
+        response = [
+            {
+                "title": "Product Manager",
+                "company": {"name": "GlintsCo"},
+                "id": "123",
+                "city": {"name": "Singapore"},
+                "country": {"name": "Singapore"},
+                "description": "<p>Own product delivery.</p>",
+                "createdAt": "2026-06-01T00:00:00Z",
+            }
+        ]
+        with (
+            patch("job_hunter_core.sources.glints_source.load_api_config", return_value=_EMPTY_CFG),
+            patch(
+                "job_hunter_core.sources.glints_source.requests.get",
+                return_value=_mock_get(response),
+            ),
+        ):
+            jobs = GlintsSource().fetch(["Product Manager"], _SG, _CONFIG)
+        assert len(jobs) == 1
+        assert jobs[0].company == "GlintsCo"
+
 
 class TestGulfTalentSource:
     def test_name(self):

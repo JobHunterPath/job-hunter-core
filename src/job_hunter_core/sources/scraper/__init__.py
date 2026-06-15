@@ -81,7 +81,10 @@ from job_hunter_core.sources.search_providers import (
     fetch_static_career_jobs,
     search_web,
 )
-from job_hunter_core.sources.search_providers.preflight import probe_search_providers
+from job_hunter_core.sources.search_providers.preflight import (
+    probe_job_sources,
+    probe_search_providers,
+)
 from job_hunter_core.sources.search_providers.router import set_run_disabled
 from job_hunter_core.sources.the_muse_source import TheMuseSource
 from job_hunter_core.sources.weworkremotely_source import WeWorkRemotelySource
@@ -192,6 +195,22 @@ def scrape(region: str | None = None) -> list[dict]:
         enabled_regions = {
             name: rc for name, rc in config.get("regions", {}).items() if rc.get("enabled", True)
         }
+    source_preflight = probe_job_sources(title_filters, enabled_regions, config)
+    source_skip_logged: set[str] = set()
+
+    def _source_available(name: str) -> bool:
+        result = source_preflight.get(name)
+        if result is None or result.status == "ok":
+            return True
+        if name not in source_skip_logged:
+            source_skip_logged.add(name)
+            logger.info(
+                "[preflight] %s: disabled for this run (%s%s)",
+                name,
+                result.status,
+                f": {result.reason}" if result.reason else "",
+            )
+        return False
 
     results: list[dict] = []
     seen_urls: set[str] = set()
@@ -302,26 +321,29 @@ def scrape(region: str | None = None) -> list[dict]:
 
         if direct_found == 0:
             stats.record("firecrawl_career_page", attempted=1)
-            try:
-                fc_jobs = list(
-                    fetch_firecrawl_career_jobs(company, title_filters, excluded_title_terms)
-                )
-                stats.record("firecrawl_career_page", returned=len(fc_jobs))
-                fc_accepted = 0
-                for job in fc_jobs:
-                    if add_job({**job, "region": company_region}):
-                        direct_found += 1
-                        fc_accepted += 1
-                stats.record(
-                    "firecrawl_career_page",
-                    accepted=fc_accepted,
-                    skipped=len(fc_jobs) - fc_accepted,
-                )
-            except Exception as e:
-                stats.record("firecrawl_career_page", failed=1)
-                logger.debug(
-                    "[scraper] Firecrawl career scrape failed for %s: %s", company["name"], e
-                )
+            if _source_available("firecrawl"):
+                try:
+                    fc_jobs = list(
+                        fetch_firecrawl_career_jobs(company, title_filters, excluded_title_terms)
+                    )
+                    stats.record("firecrawl_career_page", returned=len(fc_jobs))
+                    fc_accepted = 0
+                    for job in fc_jobs:
+                        if add_job({**job, "region": company_region}):
+                            direct_found += 1
+                            fc_accepted += 1
+                    stats.record(
+                        "firecrawl_career_page",
+                        accepted=fc_accepted,
+                        skipped=len(fc_jobs) - fc_accepted,
+                    )
+                except Exception as e:
+                    stats.record("firecrawl_career_page", failed=1)
+                    logger.debug(
+                        "[scraper] Firecrawl career scrape failed for %s: %s",
+                        company["name"],
+                        e,
+                    )
 
         if direct_found:
             return
@@ -449,216 +471,81 @@ def scrape(region: str | None = None) -> list[dict]:
         stats.record("ats_search_discovery", failed=1)
         logger.warning("[scraper] ATS search discovery failed: %s", e)
 
-    stats.record("jobspy", attempted=1)
-    try:
-        jobspy_postings = JobSpySource().fetch(title_filters, enabled_regions, config)
-        stats.record("jobspy", returned=len(jobspy_postings))
-        jobspy_accepted = 0
-        for jp in jobspy_postings:
-            if add_job(jp.to_dict(), cache_candidate=True):
-                jobspy_accepted += 1
-        stats.record(
-            "jobspy", accepted=jobspy_accepted, skipped=len(jobspy_postings) - jobspy_accepted
-        )
-    except Exception as e:
-        stats.record("jobspy", failed=1)
-        logger.warning("[scraper] JobSpy failed: %s", e)
+    def _collect_source(name: str, fetcher, *, cache_candidate: bool = True) -> None:
+        stats.record(name, attempted=1)
+        if not _source_available(name):
+            return
+        try:
+            postings = fetcher()
+            stats.record(name, returned=len(postings))
+            accepted = 0
+            for jp in postings:
+                if add_job(jp.to_dict(), cache_candidate=cache_candidate):
+                    accepted += 1
+            stats.record(name, accepted=accepted, skipped=len(postings) - accepted)
+        except Exception as e:
+            stats.record(name, failed=1)
+            logger.warning("[scraper] %s failed: %s", name, e)
 
-    stats.record("himalayas", attempted=1)
-    try:
-        him_postings = HimalayasSource().fetch(title_filters, enabled_regions, config)
-        stats.record("himalayas", returned=len(him_postings))
-        him_accepted = 0
-        for jp in him_postings:
-            if add_job(jp.to_dict(), cache_candidate=True):
-                him_accepted += 1
-        stats.record("himalayas", accepted=him_accepted, skipped=len(him_postings) - him_accepted)
-    except Exception as e:
-        stats.record("himalayas", failed=1)
-        logger.warning("[scraper] Himalayas failed: %s", e)
-
-    try:
-        for jp in RemotiveSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] Remotive failed: %s", e)
-
-    try:
-        for jp in TheMuseSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] The Muse failed: %s", e)
-
-    stats.record("jobicy", attempted=1)
-    try:
-        jobicy_postings = JobicySource().fetch(title_filters, enabled_regions, config)
-        stats.record("jobicy", returned=len(jobicy_postings))
-        jobicy_accepted = 0
-        for jp in jobicy_postings:
-            if add_job(jp.to_dict(), cache_candidate=True):
-                jobicy_accepted += 1
-        stats.record(
-            "jobicy", accepted=jobicy_accepted, skipped=len(jobicy_postings) - jobicy_accepted
-        )
-    except Exception as e:
-        stats.record("jobicy", failed=1)
-        logger.warning("[scraper] Jobicy failed: %s", e)
-
-    stats.record("remoteok", attempted=1)
-    try:
-        remoteok_postings = RemoteOKSource().fetch(title_filters, enabled_regions, config)
-        stats.record("remoteok", returned=len(remoteok_postings))
-        remoteok_accepted = 0
-        for jp in remoteok_postings:
-            if add_job(jp.to_dict(), cache_candidate=True):
-                remoteok_accepted += 1
-        stats.record(
-            "remoteok",
-            accepted=remoteok_accepted,
-            skipped=len(remoteok_postings) - remoteok_accepted,
-        )
-    except Exception as e:
-        stats.record("remoteok", failed=1)
-        logger.warning("[scraper] RemoteOK failed: %s", e)
-
-    stats.record("weworkremotely", attempted=1)
-    try:
-        wwr_postings = WeWorkRemotelySource().fetch(title_filters, enabled_regions, config)
-        stats.record("weworkremotely", returned=len(wwr_postings))
-        wwr_accepted = 0
-        for jp in wwr_postings:
-            if add_job(jp.to_dict(), cache_candidate=True):
-                wwr_accepted += 1
-        stats.record(
-            "weworkremotely", accepted=wwr_accepted, skipped=len(wwr_postings) - wwr_accepted
-        )
-    except Exception as e:
-        stats.record("weworkremotely", failed=1)
-        logger.warning("[scraper] WeWorkRemotely failed: %s", e)
-
-    try:
-        for jp in MyCareersFutureSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] MyCareersFuture failed: %s", e)
-
-    try:
-        for jp in EURESSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] EURES failed: %s", e)
-
-    try:
-        for jp in JobBankSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] JobBank Canada failed: %s", e)
-
-    try:
-        for jp in WTTJSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] Welcome to the Jungle failed: %s", e)
-
-    try:
-        for jp in GlintsSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] Glints failed: %s", e)
-
-    try:
-        for jp in GulfTalentSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] GulfTalent failed: %s", e)
-
-    try:
-        for jp in JobStreetSource().fetch(title_filters, enabled_regions, config):
-            add_job(jp.to_dict(), cache_candidate=True)
-    except Exception as e:
-        logger.warning("[scraper] JobStreet failed: %s", e)
-
-    stats.record("jooble", attempted=1)
-    try:
-        jooble_postings = JoobleSource().fetch(title_filters, enabled_regions, config)
-        stats.record("jooble", returned=len(jooble_postings))
-        jooble_accepted = 0
-        for jp in jooble_postings:
-            if add_job(jp.to_dict(), cache_candidate=True):
-                jooble_accepted += 1
-        stats.record(
-            "jooble", accepted=jooble_accepted, skipped=len(jooble_postings) - jooble_accepted
-        )
-    except Exception as e:
-        stats.record("jooble", failed=1)
-        logger.warning("[scraper] Jooble failed: %s", e)
-
-    stats.record("arbeitsagentur", attempted=1)
-    try:
-        aa_postings = ArbeitsagenturSource().fetch(title_filters, enabled_regions, config)
-        stats.record("arbeitsagentur", returned=len(aa_postings))
-        aa_accepted = 0
-        for jp in aa_postings:
-            if add_job(jp.to_dict(), cache_candidate=True):
-                aa_accepted += 1
-        stats.record("arbeitsagentur", accepted=aa_accepted, skipped=len(aa_postings) - aa_accepted)
-    except Exception as e:
-        stats.record("arbeitsagentur", failed=1)
-        logger.warning("[scraper] Arbeitsagentur failed: %s", e)
-
-    stats.record("arbeitnow", attempted=1)
-    try:
-        arbeitnow_postings = ArbeitnowSource().fetch(title_filters, enabled_regions, config)
-        stats.record("arbeitnow", returned=len(arbeitnow_postings))
-        an_accepted = 0
-        for jp in arbeitnow_postings:
-            if add_job(jp.to_dict()):
-                an_accepted += 1
-        stats.record(
-            "arbeitnow", accepted=an_accepted, skipped=len(arbeitnow_postings) - an_accepted
-        )
-    except Exception as e:
-        stats.record("arbeitnow", failed=1)
-        logger.warning("[scraper] Arbeitnow failed: %s", e)
-
-    stats.record("jsearch", attempted=1)
-    try:
-        jsearch_postings = JSearchSource().fetch(title_filters, enabled_regions, config)
-        stats.record("jsearch", returned=len(jsearch_postings))
-        js_accepted = 0
-        for jp in jsearch_postings:
-            if add_job(jp.to_dict()):
-                js_accepted += 1
-        stats.record("jsearch", accepted=js_accepted, skipped=len(jsearch_postings) - js_accepted)
-    except Exception as e:
-        stats.record("jsearch", failed=1)
-        logger.warning("[scraper] JSearch failed: %s", e)
-
-    stats.record("adzuna", attempted=1)
-    try:
-        az_postings = AdzunaSource().fetch(title_filters, enabled_regions, config)
-        stats.record("adzuna", returned=len(az_postings))
-        az_accepted = 0
-        for jp in az_postings:
-            if add_job(jp.to_dict()):
-                az_accepted += 1
-        stats.record("adzuna", accepted=az_accepted, skipped=len(az_postings) - az_accepted)
-    except Exception as e:
-        stats.record("adzuna", failed=1)
-        logger.warning("[scraper] Adzuna failed: %s", e)
-
-    stats.record("reed", attempted=1)
-    try:
-        reed_postings = ReedSource().fetch(title_filters, enabled_regions, config)
-        stats.record("reed", returned=len(reed_postings))
-        reed_accepted = 0
-        for jp in reed_postings:
-            if add_job(jp.to_dict()):
-                reed_accepted += 1
-        stats.record("reed", accepted=reed_accepted, skipped=len(reed_postings) - reed_accepted)
-    except Exception as e:
-        stats.record("reed", failed=1)
-        logger.warning("[scraper] Reed failed: %s", e)
+    _collect_source("jobspy", lambda: JobSpySource().fetch(title_filters, enabled_regions, config))
+    _collect_source(
+        "himalayas", lambda: HimalayasSource().fetch(title_filters, enabled_regions, config)
+    )
+    _collect_source(
+        "remotive", lambda: RemotiveSource().fetch(title_filters, enabled_regions, config)
+    )
+    _collect_source(
+        "the_muse", lambda: TheMuseSource().fetch(title_filters, enabled_regions, config)
+    )
+    _collect_source("jobicy", lambda: JobicySource().fetch(title_filters, enabled_regions, config))
+    _collect_source(
+        "remoteok", lambda: RemoteOKSource().fetch(title_filters, enabled_regions, config)
+    )
+    _collect_source(
+        "weworkremotely",
+        lambda: WeWorkRemotelySource().fetch(title_filters, enabled_regions, config),
+    )
+    _collect_source(
+        "mycareersfuture",
+        lambda: MyCareersFutureSource().fetch(title_filters, enabled_regions, config),
+    )
+    _collect_source("eures", lambda: EURESSource().fetch(title_filters, enabled_regions, config))
+    _collect_source(
+        "jobbank", lambda: JobBankSource().fetch(title_filters, enabled_regions, config)
+    )
+    _collect_source("wttj", lambda: WTTJSource().fetch(title_filters, enabled_regions, config))
+    _collect_source("glints", lambda: GlintsSource().fetch(title_filters, enabled_regions, config))
+    _collect_source(
+        "gulftalent", lambda: GulfTalentSource().fetch(title_filters, enabled_regions, config)
+    )
+    _collect_source(
+        "jobstreet", lambda: JobStreetSource().fetch(title_filters, enabled_regions, config)
+    )
+    _collect_source("jooble", lambda: JoobleSource().fetch(title_filters, enabled_regions, config))
+    _collect_source(
+        "arbeitsagentur",
+        lambda: ArbeitsagenturSource().fetch(title_filters, enabled_regions, config),
+    )
+    _collect_source(
+        "arbeitnow",
+        lambda: ArbeitnowSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "jsearch",
+        lambda: JSearchSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "adzuna",
+        lambda: AdzunaSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
+    _collect_source(
+        "reed",
+        lambda: ReedSource().fetch(title_filters, enabled_regions, config),
+        cache_candidate=False,
+    )
 
     api_cfg_loaded = load_api_config()
     ai_web_cfg = (

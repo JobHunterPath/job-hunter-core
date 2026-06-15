@@ -540,7 +540,7 @@ def test_firecrawl_career_jobs_require_key_and_budget(monkeypatch):
         assert kwargs["json"]["formats"] == ["markdown"]
         return Response()
 
-    monkeypatch.setenv("FIRECRAWL_API_KEY", "key")
+    monkeypatch.setattr(_fetchers_mod, "FIRECRAWL_API_KEY", "key")
     monkeypatch.setattr(_fetchers_mod, "reserve_api_call", reserve)
     monkeypatch.setattr(search_providers.requests, "post", post)
     monkeypatch.setattr(

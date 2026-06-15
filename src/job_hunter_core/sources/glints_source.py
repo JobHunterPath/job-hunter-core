@@ -34,6 +34,26 @@ _HEADERS = {
 }
 
 
+def _extract_items(data: object) -> list:
+    """Return Glints job items across API response shape variants."""
+    if isinstance(data, list):
+        return data
+    if not isinstance(data, dict):
+        return []
+
+    nested = data.get("data") or {}
+    if isinstance(nested, list):
+        return nested
+    if isinstance(nested, dict):
+        items = nested.get("jobs") or nested.get("data") or []
+        if isinstance(items, dict):
+            items = items.get("data") or items.get("jobs") or []
+        return items if isinstance(items, list) else []
+
+    items = data.get("jobs") or []
+    return items if isinstance(items, list) else []
+
+
 class GlintsSource(JobSourceAdapter):
     @property
     def name(self) -> str:
@@ -99,26 +119,22 @@ class GlintsSource(JobSourceAdapter):
                         )
                         break
 
-                    # Glints nests data under various keys depending on version
-                    items = (
-                        (data.get("data") or {}).get("jobs")
-                        or data.get("jobs")
-                        or data.get("data")
-                        or []
-                    )
-                    if isinstance(items, dict):
-                        items = items.get("data") or []
+                    items = _extract_items(data)
                     if not items:
                         break
 
                     before = len(jobs)
                     for item in items:
+                        if not isinstance(item, dict):
+                            continue
                         job_title = str(item.get("title") or item.get("name") or "")
                         if not title_matches(job_title, title_filters, _excluded):
                             continue
 
                         company_obj = item.get("company") or item.get("organisation") or {}
-                        company = str(company_obj.get("name") or "")
+                        company = str(
+                            company_obj.get("name") if isinstance(company_obj, dict) else ""
+                        )
                         job_id = str(item.get("id") or item.get("uuid") or "")
                         job_url = f"{_JOB_BASE}/{job_id}" if job_id else ""
 

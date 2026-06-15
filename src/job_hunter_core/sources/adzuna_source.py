@@ -14,7 +14,6 @@ Required env vars (both optional — source skips silently if absent):
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime
 
 import requests
@@ -24,7 +23,7 @@ from job_hunter_core.core.api_budget import (
     mark_api_exhausted,
     reserve_api_call,
 )
-from job_hunter_core.core.config import get_timeout, load_api_config
+from job_hunter_core.core.config import ADZUNA_API_KEY, ADZUNA_APP_ID, get_timeout, load_api_config
 from job_hunter_core.core.utils import location_matches, title_matches
 from job_hunter_core.models import JobPosting
 from job_hunter_core.sources.base import JobSourceAdapter
@@ -71,8 +70,8 @@ def _parse_date(value: str | None) -> str:
 
 class AdzunaSource(JobSourceAdapter):
     def __init__(self) -> None:
-        self._app_id: str = os.environ.get("ADZUNA_APP_ID", "")
-        self._api_key: str = os.environ.get("ADZUNA_API_KEY", "")
+        self._app_id: str = ADZUNA_APP_ID
+        self._api_key: str = ADZUNA_API_KEY
 
     @property
     def name(self) -> str:

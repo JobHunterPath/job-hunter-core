@@ -11,10 +11,14 @@ from job_hunter_core.sources import scraper
 
 @pytest.fixture(autouse=True)
 def _no_preflight(monkeypatch):
-    """Prevent probe_search_providers from making live HTTP calls in scraper tests."""
+    """Prevent run-start preflight from making live HTTP calls in scraper tests."""
     monkeypatch.setattr(
         "job_hunter_core.sources.scraper.probe_search_providers",
         lambda: set(),
+    )
+    monkeypatch.setattr(
+        "job_hunter_core.sources.scraper.probe_job_sources",
+        lambda *_args: {},
     )
 
 

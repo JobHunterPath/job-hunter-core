@@ -189,6 +189,10 @@ JOOBLE_API_KEY = get_secret(
     _secrets.get("jooble", {}).get("env_var", "JOOBLE_API_KEY"),
     required=False,
 )
+FIRECRAWL_API_KEY = get_secret(
+    _secrets.get("firecrawl", {}).get("env_var", "FIRECRAWL_API_KEY"),
+    required=False,
+)
 
 
 _TIMEOUT_DEFAULTS: dict[str, int] = {
