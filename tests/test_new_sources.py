@@ -816,5 +816,3 @@ class TestWorkingNomadsSource:
         ):
             jobs = WorkingNomadsSource().fetch(["Software Engineer"], _DE, _CONFIG)
         assert len(jobs) == 1
-
-

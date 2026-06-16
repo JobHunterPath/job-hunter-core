@@ -72,7 +72,8 @@ def fetch_bamboohr_jobs(
                 "url": url,
                 "posted": posted,
                 "location": location,
-                "snippet": " — ".join(snippet_parts[:2]) + (f"\n{description[:_SNIPPET_CHARS]}" if description else ""),
+                "snippet": " — ".join(snippet_parts[:2])
+                + (f"\n{description[:_SNIPPET_CHARS]}" if description else ""),
                 "source": "BambooHR",
             }
         )
