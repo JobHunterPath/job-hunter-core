@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "job-hunter-core"
-version = "1.14"
+version = "1.15"
 description = "Job Hunting Automation Engine."
 license = {text = "MIT"}
 classifiers = [
