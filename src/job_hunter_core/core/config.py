@@ -70,7 +70,7 @@ def profile_path(key: str, default: str) -> Path:
     return path
 
 
-def get_secret(env_var: str, required: bool = True) -> str:
+def get_secret(env_var: str | None, required: bool = True) -> str:
     """
     Retrieve a secret by its environment-variable name.
 
@@ -79,9 +79,13 @@ def get_secret(env_var: str, required: bool = True) -> str:
       2. keyring / system keychain (local runs)
 
     Args:
-        env_var:  The environment variable name (e.g. "ANTHROPIC_API_KEY").
+        env_var:  The environment variable name from api_config.yml secrets block.
         required: Raise if the secret is not found anywhere.
     """
+    if not env_var:
+        if required:
+            raise RuntimeError("No env_var configured for this secret in api_config.yml.")
+        return ""
     value = os.environ.get(env_var)
     if value:
         return value
