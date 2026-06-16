@@ -314,6 +314,8 @@ The pipeline skips each keyed source silently if its key is absent.
 | Reed | `REED_API_KEY` (free) | GB / IE |
 | JSearch | `RAPIDAPI_KEY` | Global via RapidAPI |
 | JobSpy | None (scraper library) | Google Jobs + Indeed (auto-selected per region country) |
+| BambooHR | None | ATS direct fetch — public careers list API |
+| Softgarden, Rippling | None | Discovered via `ai_web_search` query templates — no direct fetcher |
 | Firecrawl | `FIRECRAWL_API_KEY` | Optional cloud markdown fallback after local career-page extraction fails |
 
 To disable a no-key source, set `http.job_boards.<name>.enabled: false` in `config/api_config.yml`.

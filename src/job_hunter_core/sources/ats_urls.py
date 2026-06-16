@@ -19,6 +19,7 @@ ATS_CAREER_PATTERNS: tuple[AtsCareerPattern, ...] = (
         "greenhouse", r"(?:boards|job-boards)\.greenhouse\.io/([^/?#]+)", "boards.greenhouse.io/{0}"
     ),
     AtsCareerPattern("lever", r"jobs\.lever\.co/([^/?#]+)", "jobs.lever.co/{0}"),
+    AtsCareerPattern("bamboohr", r"([^/.]+)\.bamboohr\.com", "{0}.bamboohr.com"),
     AtsCareerPattern(
         "smartrecruiters", r"jobs\.smartrecruiters\.com/([^/?#]+)", "jobs.smartrecruiters.com/{0}"
     ),
@@ -44,6 +45,7 @@ _DIRECT_ATS_NAMES = {
     "recruitee",
     "teamtailor",
     "workday",
+    "bamboohr",
 }
 
 

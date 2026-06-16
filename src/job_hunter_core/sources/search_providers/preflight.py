@@ -39,7 +39,6 @@ from job_hunter_core.sources import (
     remoteok_source,
     remotive_source,
     the_muse_source,
-    usajobs_source,
     weworkremotely_source,
     workingnomads_source,
 )
@@ -625,30 +624,6 @@ def _probe_workingnomads(
     )
 
 
-def _probe_usajobs(
-    title: str, regions: dict[str, dict], cfg: dict, _config: dict
-) -> SourceProbeResult:
-    region = _first_region(regions, countries={"US"})
-    if region is None:
-        return _not_applicable("usajobs", "no US region")
-    api_key, user_agent = usajobs_source._get_usajobs_creds()
-    if not api_key or not user_agent:
-        return _missing_key("usajobs", "USAJOBS_API_KEY or USAJOBS_USER_AGENT not set")
-    return _probe_json(
-        "usajobs",
-        lambda: requests.get(
-            usajobs_source._API_URL,
-            headers={
-                "Authorization-Key": api_key,
-                "User-Agent": user_agent,
-                "Host": "data.usajobs.gov",
-            },
-            params={"Keyword": title, "ResultsPerPage": 1, "Page": 1},
-            timeout=_timeout(cfg),
-        ),
-    )
-
-
 def _probe_jobspy(
     _title: str, _regions: dict[str, dict], _cfg: dict, _config: dict
 ) -> SourceProbeResult:
@@ -680,5 +655,4 @@ def _source_probes() -> dict[
         "jobspy": _probe_jobspy,
         "careerjet": _probe_careerjet,
         "workingnomads": _probe_workingnomads,
-        "usajobs": _probe_usajobs,
     }

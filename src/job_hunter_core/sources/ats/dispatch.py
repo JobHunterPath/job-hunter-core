@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from job_hunter_core.sources.ats.ashby import fetch_ashby_jobs
+from job_hunter_core.sources.ats.bamboohr import fetch_bamboohr_jobs
 from job_hunter_core.sources.ats.breezy import fetch_breezy_jobs
 from job_hunter_core.sources.ats.greenhouse import fetch_greenhouse_jobs
 from job_hunter_core.sources.ats.hibob import fetch_hibob_jobs
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 _FETCHERS = {
     "greenhouse": fetch_greenhouse_jobs,
     "lever": fetch_lever_jobs,
+    "bamboohr": fetch_bamboohr_jobs,
     "smartrecruiters": fetch_smartrecruiters_jobs,
     "workable": fetch_workable_jobs,
     "ashby": fetch_ashby_jobs,

@@ -14,7 +14,6 @@ from job_hunter_core.sources.jooble_source import JoobleSource
 from job_hunter_core.sources.mycareersfuture_source import MyCareersFutureSource
 from job_hunter_core.sources.reed_source import ReedSource
 from job_hunter_core.sources.remoteok_source import RemoteOKSource
-from job_hunter_core.sources.usajobs_source import USAJobsSource
 from job_hunter_core.sources.weworkremotely_source import WeWorkRemotelySource
 from job_hunter_core.sources.workingnomads_source import WorkingNomadsSource
 
@@ -819,75 +818,3 @@ class TestWorkingNomadsSource:
         assert len(jobs) == 1
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# USAJOBS
-# ═══════════════════════════════════════════════════════════════════════════
-
-_US = {"us": {"country": "US", "location": "Washington DC"}}
-
-_USAJOBS_CFG = {"http": {"job_boards": {"usajobs": {"enabled": True, "timeout_seconds": 10}}}}
-
-_USAJOBS_ITEM = {
-    "MatchedObjectDescriptor": {
-        "PositionTitle": "Software Engineer",
-        "OrganizationName": "Department of Defense",
-        "PositionURI": "https://usajobs.gov/job/1",
-        "PublicationStartDate": "2026-06-01",
-        "PositionLocationDisplay": "Washington, DC",
-        "UserArea": {"Details": {"JobSummary": "Build federal systems."}},
-    }
-}
-
-_USAJOBS_RESPONSE = {"SearchResult": {"SearchResultItems": [_USAJOBS_ITEM]}}
-
-
-class TestUSAJobsSource:
-    def test_name(self):
-        assert USAJobsSource().name == "usajobs"
-
-    def test_fetch_skips_non_us_regions(self):
-        with (
-            patch(
-                "job_hunter_core.sources.usajobs_source.load_api_config",
-                return_value=_USAJOBS_CFG,
-            ),
-            patch(
-                "job_hunter_core.sources.usajobs_source._get_usajobs_creds",
-                return_value=("key", "user@example.com"),
-            ),
-        ):
-            jobs = USAJobsSource().fetch(["Software Engineer"], _DE, _CONFIG)
-        assert jobs == []
-
-    def test_fetch_returns_job_postings(self):
-        get_mock = MagicMock(return_value=_mock_get(_USAJOBS_RESPONSE))
-        with (
-            patch(
-                "job_hunter_core.sources.usajobs_source.load_api_config",
-                return_value=_USAJOBS_CFG,
-            ),
-            patch(
-                "job_hunter_core.sources.usajobs_source._get_usajobs_creds",
-                return_value=("key", "user@example.com"),
-            ),
-            patch("job_hunter_core.sources.usajobs_source.requests.get", get_mock),
-        ):
-            jobs = USAJobsSource().fetch(["Software Engineer"], _US, _CONFIG)
-        assert len(jobs) == 1
-        assert isinstance(jobs[0], JobPosting)
-        assert jobs[0].source == "USAJOBS"
-        assert jobs[0].company == "Department of Defense"
-
-    def test_fetch_returns_empty_without_creds(self):
-        with (
-            patch(
-                "job_hunter_core.sources.usajobs_source.load_api_config",
-                return_value=_USAJOBS_CFG,
-            ),
-            patch(
-                "job_hunter_core.sources.usajobs_source._get_usajobs_creds",
-                return_value=("", ""),
-            ),
-        ):
-            jobs = USAJobsSource().fetch(["Software Engineer"], _US, _CONFIG)
-        assert jobs == []

@@ -9,6 +9,7 @@ continues to work in tests.
 import requests  # noqa: F401 — required for test patch compatibility
 
 from job_hunter_core.sources.ats.ashby import fetch_ashby_jobs
+from job_hunter_core.sources.ats.bamboohr import fetch_bamboohr_jobs
 from job_hunter_core.sources.ats.breezy import fetch_breezy_jobs
 from job_hunter_core.sources.ats.dispatch import _FETCHERS, fetch_ats_jobs
 from job_hunter_core.sources.ats.greenhouse import fetch_greenhouse_jobs
@@ -28,6 +29,7 @@ __all__ = [
     "_FETCHERS",
     "fetch_greenhouse_jobs",
     "fetch_lever_jobs",
+    "fetch_bamboohr_jobs",
     "fetch_smartrecruiters_jobs",
     "fetch_workable_jobs",
     "fetch_ashby_jobs",

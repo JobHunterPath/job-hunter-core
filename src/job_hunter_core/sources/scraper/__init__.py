@@ -74,7 +74,6 @@ from job_hunter_core.sources.search_providers.preflight import (
 )
 from job_hunter_core.sources.search_providers.router import set_run_disabled
 from job_hunter_core.sources.the_muse_source import TheMuseSource
-from job_hunter_core.sources.usajobs_source import USAJobsSource
 from job_hunter_core.sources.weworkremotely_source import WeWorkRemotelySource
 from job_hunter_core.sources.workingnomads_source import WorkingNomadsSource
 from job_hunter_core.tracking.discovery_cache import (
@@ -350,11 +349,6 @@ def scrape(region: str | None = None) -> list[dict]:
     _collect_source(
         "workingnomads",
         lambda: WorkingNomadsSource().fetch(title_filters, enabled_regions, config),
-        cache_candidate=False,
-    )
-    _collect_source(
-        "usajobs",
-        lambda: USAJobsSource().fetch(title_filters, enabled_regions, config),
         cache_candidate=False,
     )
 
