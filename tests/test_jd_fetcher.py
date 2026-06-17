@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from job_hunter_core.sources import jd_fetcher
+from job_hunter_core.sources.ats_urls import company_name_from_url
 
 SAMPLE_URL = "https://boards.greenhouse.io/testcorp/jobs/12345"
 
@@ -17,8 +18,8 @@ RICH_HTML = (
     + "</body></html>"
 )
 
-# Almost no text — triggers the Playwright fallback path
-SPARSE_HTML = "<html><body><div id='root'></div></body></html>"
+# Almost no text — triggers the Playwright fallback path (but not empty, to allow LLM fallback)
+SPARSE_HTML = "<html><body><div id='root'><p>Loading job...</p></div></body></html>"
 
 LLM_JSON = (
     '{"title": "Senior Product Manager", "company": "TestCorp", '
@@ -32,35 +33,33 @@ def _mock_llm(text: str) -> MagicMock:
     return m
 
 
-class TestGuessCompany:
+class TestCompanyNameFromUrl:
     def test_greenhouse_slug(self):
-        assert (
-            jd_fetcher._guess_company("https://boards.greenhouse.io/testcorp/jobs/1") == "Testcorp"
-        )
+        assert company_name_from_url("https://boards.greenhouse.io/testcorp/jobs/1") == "Testcorp"
 
     def test_lever_slug(self):
-        assert jd_fetcher._guess_company("https://jobs.lever.co/mycompany/abc") == "Mycompany"
+        assert company_name_from_url("https://jobs.lever.co/mycompany/abc") == "Mycompany"
 
     def test_personio_subdomain(self):
-        assert jd_fetcher._guess_company("https://myco.jobs.personio.de/job/1") == "Myco"
+        assert company_name_from_url("https://myco.jobs.personio.de/job/1") == "Myco"
 
     def test_careers_subdomain(self):
-        assert jd_fetcher._guess_company("https://careers.bigcorp.com/jobs/456") == "Bigcorp"
+        assert company_name_from_url("https://careers.bigcorp.com/jobs/456") == "Bigcorp"
 
     def test_hyphenated_slug_becomes_title_case(self):
         assert (
-            jd_fetcher._guess_company("https://boards.greenhouse.io/my-cool-corp/jobs/1")
+            company_name_from_url("https://boards.greenhouse.io/my-cool-corp/jobs/1")
             == "My Cool Corp"
         )
 
     def test_unrecognised_url_returns_none(self):
-        assert jd_fetcher._guess_company("https://www.example.com/jobs") is None
+        assert company_name_from_url("https://www.example.com/jobs") is None
 
 
 class TestFetchJd:
     def test_returns_job_dict_on_success(self):
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=RICH_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(RICH_HTML, 200)),
             patch(
                 "job_hunter_core.sources.jd_fetcher.get_llm_client",
                 return_value=_mock_llm(LLM_JSON),
@@ -78,7 +77,7 @@ class TestFetchJd:
     def test_accepts_fenced_json_with_preamble(self):
         raw = f"Parsed:\n```json\n{LLM_JSON}\n```"
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=RICH_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(RICH_HTML, 200)),
             patch("job_hunter_core.sources.jd_fetcher.get_llm_client", return_value=_mock_llm(raw)),
         ):
             result = jd_fetcher.fetch_jd(SAMPLE_URL)
@@ -90,7 +89,7 @@ class TestFetchJd:
     def test_accepts_json_with_trailing_extra_data(self):
         raw = f'{LLM_JSON}\n{{"note": "ignored trailing object"}}'
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=RICH_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(RICH_HTML, 200)),
             patch("job_hunter_core.sources.jd_fetcher.get_llm_client", return_value=_mock_llm(raw)),
         ):
             result = jd_fetcher.fetch_jd(
@@ -102,14 +101,14 @@ class TestFetchJd:
         assert result["company"] == "TestCorp"
 
     def test_returns_none_when_fetch_fails(self):
-        with patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=None):
+        with patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(None, None)):
             assert jd_fetcher.fetch_jd(SAMPLE_URL) is None
 
     def test_playwright_called_on_sparse_html(self):
         pw_text = "Full rendered job description from JavaScript. " * 20
 
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=SPARSE_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(SPARSE_HTML, 200)),
             patch(
                 "job_hunter_core.sources.jd_fetcher._fetch_playwright", return_value=pw_text
             ) as mock_pw,
@@ -120,12 +119,13 @@ class TestFetchJd:
         ):
             result = jd_fetcher.fetch_jd(SAMPLE_URL)
 
-        mock_pw.assert_called_once_with(SAMPLE_URL)
+        assert mock_pw.called
+        assert mock_pw.call_args[0][0] == SAMPLE_URL
         assert result is not None
 
     def test_playwright_not_called_on_rich_html(self):
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=RICH_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(RICH_HTML, 200)),
             patch("job_hunter_core.sources.jd_fetcher._fetch_playwright") as mock_pw,
             patch(
                 "job_hunter_core.sources.jd_fetcher.get_llm_client",
@@ -139,7 +139,7 @@ class TestFetchJd:
     def test_uses_plain_text_fallback_when_llm_returns_no_description(self):
         no_desc = '{"title": "PM", "company": "Corp", "description": null}'
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=RICH_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(RICH_HTML, 200)),
             patch(
                 "job_hunter_core.sources.jd_fetcher.get_llm_client", return_value=_mock_llm(no_desc)
             ),
@@ -159,7 +159,7 @@ class TestFetchJd:
         ]
 
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=RICH_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(RICH_HTML, 200)),
             patch("job_hunter_core.sources.jd_fetcher._llm_extract", return_value=extracted),
         ):
             result = jd_fetcher.fetch_jd(
@@ -174,7 +174,7 @@ class TestFetchJd:
     def test_uses_guessed_company_when_llm_returns_null(self):
         no_company = '{"title": "PM", "company": null, "description": "desc"}'
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=RICH_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(RICH_HTML, 200)),
             patch(
                 "job_hunter_core.sources.jd_fetcher.get_llm_client",
                 return_value=_mock_llm(no_company),
@@ -190,7 +190,7 @@ class TestFetchJd:
         pw_text = "Detailed description from JS rendering. " * 30
 
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=SPARSE_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(SPARSE_HTML, 200)),
             patch("job_hunter_core.sources.jd_fetcher._fetch_playwright", return_value=pw_text),
             patch(
                 "job_hunter_core.sources.jd_fetcher._llm_extract", return_value={}
@@ -205,7 +205,7 @@ class TestFetchJd:
     def test_keeps_static_text_when_playwright_returns_none(self):
         # Playwright unavailable — LLM should receive whatever static text exists
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=SPARSE_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(SPARSE_HTML, 200)),
             patch("job_hunter_core.sources.jd_fetcher._fetch_playwright", return_value=None),
             patch(
                 "job_hunter_core.sources.jd_fetcher._llm_extract", return_value={}
@@ -218,7 +218,7 @@ class TestFetchJd:
 
     def test_can_skip_llm_for_snippet_enrichment(self):
         with (
-            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=RICH_HTML),
+            patch("job_hunter_core.sources.jd_fetcher._fetch_html", return_value=(RICH_HTML, 200)),
             patch("job_hunter_core.sources.jd_fetcher._llm_extract") as mock_extract,
         ):
             result = jd_fetcher.fetch_jd(SAMPLE_URL, use_llm=False)

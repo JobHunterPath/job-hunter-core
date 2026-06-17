@@ -159,7 +159,7 @@ def _verify_ats_location(url: str, source: str, location_filter: str) -> bool:
 
         elif source == "greenhouse":
             if len(parts) < 3:
-                return True
+                return False  # not a valid JD URL; valid paths always have ≥3 parts
             slug, job_id = parts[0], parts[2]
             resp = requests.get(
                 f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs/{job_id}",

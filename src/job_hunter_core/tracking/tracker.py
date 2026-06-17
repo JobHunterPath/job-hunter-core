@@ -10,6 +10,7 @@ import os
 import yaml
 
 from job_hunter_core.core.config import ROOT as REPO_ROOT
+from job_hunter_core.sources.search_providers import canonicalize_url
 
 ROOT = str(REPO_ROOT)
 TRACKER_FILE = os.path.join(ROOT, "config", "applied_jobs.yml")
@@ -21,7 +22,7 @@ def load_processed() -> tuple[set[str], set[str]]:
         return set(), set()
     with open(TRACKER_FILE, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    urls = set(data.get("processed", []))
+    urls = {canonicalize_url(u) for u in data.get("processed", []) if u}
     return urls, set()
 
 
@@ -35,7 +36,7 @@ def save_processed(urls: set[str], title_keys: set[str]) -> None:
     with open(TRACKER_FILE, "w", encoding="utf-8") as f:
         f.write(header)
         yaml.dump(
-            {"processed": sorted(list(urls))},
+            {"processed": sorted(canonicalize_url(u) for u in urls if u)},
             f,
             default_flow_style=False,
             allow_unicode=True,
@@ -53,7 +54,7 @@ def filter_new_jobs(jobs: list[dict]) -> tuple[list[dict], set[str], set[str]]:
 
     for job in jobs:
         url = job.get("url", "")
-        if url and url in processed_urls:
+        if url and canonicalize_url(url) in processed_urls:
             print(f"  [tracker] Already processed (URL): {job['title'][:50]} @ {job['company']}")
             skipped += 1
         else:
@@ -67,7 +68,7 @@ def filter_new_jobs(jobs: list[dict]) -> tuple[list[dict], set[str], set[str]]:
 
 def mark_processed(jobs: list[dict], existing_urls: set[str], existing_titles: set[str]) -> None:
     """Add newly processed job URLs to the tracker and save. existing_titles retained for compatibility."""
-    new_urls = {j["url"] for j in jobs if j.get("url")}
+    new_urls = {canonicalize_url(j["url"]) for j in jobs if j.get("url")}
     updated_urls = existing_urls | new_urls
     save_processed(updated_urls, set())
     print(f"[tracker] Saved {len(new_urls)} new URLs ({len(updated_urls)} total tracked)")

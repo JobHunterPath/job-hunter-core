@@ -19,7 +19,7 @@ def test_load_processed_returns_urls_from_file(tmp_path):
     f.write_text(yaml.dump({"processed": ["https://a.com", "https://b.com"]}))
     with patch.object(tracker, "TRACKER_FILE", str(f)):
         urls, titles = tracker.load_processed()
-    assert urls == {"https://a.com", "https://b.com"}
+    assert urls == {"https://a.com/", "https://b.com/"}
     assert titles == set()
 
 
@@ -37,7 +37,7 @@ def test_save_processed_writes_sorted_urls(tmp_path):
     with patch.object(tracker, "TRACKER_FILE", str(f)):
         tracker.save_processed({"https://b.com", "https://a.com"}, set())
     data = yaml.safe_load(f.read_text())
-    assert data["processed"] == ["https://a.com", "https://b.com"]
+    assert data["processed"] == ["https://a.com/", "https://b.com/"]
 
 
 def test_save_and_reload_roundtrip(tmp_path):
@@ -61,7 +61,7 @@ def test_filter_new_jobs_removes_already_processed(tmp_path):
         new_jobs, existing_urls, existing_titles = tracker.filter_new_jobs(jobs)
     assert len(new_jobs) == 1
     assert new_jobs[0]["url"] == "https://new.com"
-    assert "https://seen.com" in existing_urls
+    assert "https://seen.com/" in existing_urls
 
 
 def test_filter_new_jobs_all_new_when_no_tracker(tmp_path):
@@ -84,7 +84,7 @@ def test_mark_processed_merges_with_existing(tmp_path):
     with patch.object(tracker, "TRACKER_FILE", str(f)):
         tracker.mark_processed(jobs, existing_urls, existing_titles)
         reloaded_urls, _ = tracker.load_processed()
-    assert reloaded_urls == {"https://old.com", "https://new.com"}
+    assert reloaded_urls == {"https://old.com/", "https://new.com/"}
 
 
 def test_mark_processed_deduplicates(tmp_path):
@@ -98,7 +98,7 @@ def test_mark_processed_deduplicates(tmp_path):
     with patch.object(tracker, "TRACKER_FILE", str(f)):
         tracker.mark_processed(jobs, existing_urls, existing_titles)
         reloaded_urls, _ = tracker.load_processed()
-    assert reloaded_urls == {"https://a.com", "https://b.com"}
+    assert reloaded_urls == {"https://a.com/", "https://b.com/"}
 
 
 def test_filter_new_jobs_does_not_skip_by_title_key(tmp_path):

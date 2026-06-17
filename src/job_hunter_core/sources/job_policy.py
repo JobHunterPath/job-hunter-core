@@ -183,34 +183,34 @@ class JobPolicy:
         excluded_title_terms = self.exclusion_rules.get("excluded_title_terms", [])
 
         if title_filters and not title_matches(title, title_filters, excluded_title_terms):
-            logger.debug("[skip] Title not in filters: %s", title[:60])
+            logger.info("[skip] Title not in filters: %s", title[:60])
             return False
         if self.is_excluded_company(company):
-            logger.debug("[skip] Excluded company: %s", company[:60])
+            logger.info("[skip] Excluded company: %s", company[:60])
             return False
         if self.is_stale_posting(title, snippet):
-            logger.debug("[skip] Stale/closed posting: %s", title[:60])
+            logger.info("[skip] Stale/closed posting: %s", title[:60])
             return False
         if self.is_excluded_language(title, snippet):
-            logger.debug("[skip] Excluded-language posting: %s", title[:60])
+            logger.info("[skip] Excluded-language posting: %s", title[:60])
             return False
         if self.is_too_senior(title, snippet):
-            logger.debug("[skip] Too senior: %s", title[:60])
+            logger.info("[skip] Too senior: %s", title[:60])
             return False
         if self.is_excluded_industry(snippet):
-            logger.debug("[skip] Excluded industry: %s", title[:60])
+            logger.info("[skip] Excluded industry: %s", title[:60])
             return False
         return True
 
     def accepts_search_result_url(self, url: str, title: str, snippet: str) -> bool:
         if self.is_excluded_url(url):
-            logger.debug("[skip] Excluded URL pattern: %s", url[:80])
+            logger.info("[skip] Excluded URL pattern: %s", url[:80])
             return False
         if not self.is_valid_job_url(url):
-            logger.debug("[skip] Not a job posting URL: %s", url[:80])
+            logger.info("[skip] Not a job posting URL: %s", url[:80])
             return False
         if self.is_stale_posting(title, snippet):
-            logger.debug("[skip] Stale/closed posting: %s", title[:60])
+            logger.info("[skip] Stale/closed posting: %s", title[:60])
             return False
         return True
 
@@ -243,7 +243,7 @@ class JobAccumulator:
             return False
 
         if not allow_excluded_urls and self.policy.is_excluded_url(url):
-            logger.debug("[skip] Excluded URL pattern: %s", url[:80])
+            logger.info("[skip] Excluded URL pattern: %s", url[:80])
             return False
         if not self.policy.accepts_job_content(job, self.title_filters):
             return False
@@ -265,7 +265,7 @@ class JobAccumulator:
     def _is_cached_candidate(self, canonical_url: str, url: str) -> bool:
         with self.lock:
             if canonical_url in self.cached_candidate_urls:
-                logger.debug("[skip] Cached discovery candidate: %s", url[:80])
+                logger.info("[skip] Cached discovery candidate: %s", url[:80])
                 return True
             self.candidate_cache_updates.add(canonical_url)
         return False
