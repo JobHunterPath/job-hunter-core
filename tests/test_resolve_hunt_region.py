@@ -14,8 +14,8 @@ def _config(regions):
 def test_scheduled_primary_slot_uses_primary_region():
     config = _config(
         {
-            "berlin": {"enabled": True, "primary": True, "companies": [{"name": "A"}]},
-            "oman": {"enabled": True, "companies": [{"name": "B"}]},
+            "berlin": {"enabled": True, "primary": True, "country": "DE"},
+            "oman": {"enabled": True, "country": "OM"},
         }
     )
 
@@ -32,9 +32,9 @@ def test_scheduled_primary_slot_uses_primary_region():
 def test_scheduled_secondary_slots_follow_config_order():
     config = _config(
         {
-            "berlin": {"enabled": True, "primary": True, "companies": [{"name": "A"}]},
-            "malaysia": {"enabled": True, "companies": [{"name": "B"}]},
-            "indonesia": {"enabled": True, "companies": [{"name": "C"}]},
+            "berlin": {"enabled": True, "primary": True, "country": "DE"},
+            "malaysia": {"enabled": True, "country": "MY"},
+            "indonesia": {"enabled": True, "country": "ID"},
         }
     )
 
@@ -52,7 +52,7 @@ def test_scheduled_secondary_slots_follow_config_order():
 def test_scheduled_empty_template_config_skips_cleanly():
     config = _config(
         {
-            "primary": {"enabled": False, "primary": True, "companies": []},
+            "primary": {"enabled": False, "primary": True, "country": "DE"},
         }
     )
 
@@ -68,7 +68,7 @@ def test_scheduled_empty_template_config_skips_cleanly():
 def test_manual_all_preserves_all_region_behavior():
     config = _config(
         {
-            "berlin": {"enabled": True, "companies": [{"name": "A"}]},
+            "berlin": {"enabled": True, "country": "DE"},
         }
     )
 
@@ -88,8 +88,8 @@ def test_manual_all_preserves_all_region_behavior():
 def test_manual_unknown_region_errors_with_enabled_regions():
     config = _config(
         {
-            "berlin": {"enabled": True, "companies": [{"name": "A"}]},
-            "disabled": {"enabled": False, "companies": [{"name": "B"}]},
+            "berlin": {"enabled": True, "country": "DE"},
+            "disabled": {"enabled": False, "country": "DE"},
         }
     )
 
@@ -99,5 +99,16 @@ def test_manual_unknown_region_errors_with_enabled_regions():
 
     assert status == 1
     assert "missing" in outputs["error"]
-    enabled_list = outputs["error"].split("Enabled regions with companies: ", 1)[1]
+    enabled_list = outputs["error"].split("Enabled regions: ", 1)[1]
     assert enabled_list == "berlin"
+
+
+def test_enabled_regions_do_not_require_company_lists():
+    config = _config(
+        {
+            "berlin": {"enabled": True, "primary": True, "country": "DE"},
+            "disabled": {"enabled": False, "country": "DE"},
+        }
+    )
+
+    assert [name for name, _region in resolver.enabled_regions(config)] == ["berlin"]

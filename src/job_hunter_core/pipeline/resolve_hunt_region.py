@@ -18,11 +18,7 @@ DEFAULT_CONFIG_PATH = ROOT / "config" / "search_config.yml"
 
 def enabled_regions(config: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     regions = config.get("regions") or {}
-    return [
-        (name, region)
-        for name, region in regions.items()
-        if region.get("enabled", True) and region.get("companies")
-    ]
+    return [(name, region) for name, region in regions.items() if region.get("enabled", True)]
 
 
 def hunt_schedules(raw: str) -> list[str]:
@@ -58,7 +54,7 @@ def resolve_hunt_region(
             if not primary_region:
                 return 0, {
                     "should_run": "false",
-                    "reason": "No enabled region with companies configured for the primary slot",
+                    "reason": "No enabled region configured for the primary slot",
                 }
             region = primary_region
         else:
@@ -92,7 +88,7 @@ def resolve_hunt_region(
     if requested not in region_names:
         return 1, {
             "error": (
-                f"Unknown or disabled region '{requested}'. Enabled regions with companies: "
+                f"Unknown or disabled region '{requested}'. Enabled regions: "
                 f"{', '.join(region_names) or '(none)'}"
             )
         }
