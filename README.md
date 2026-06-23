@@ -1,5 +1,7 @@
 # Job Hunter Core
 
+> **This repository is archived.** Development has moved to [abdulrbasit/job-hunter](https://github.com/abdulrbasit/job-hunter).
+
 Open-source engine behind the job-hunt template. It scrapes jobs, deduplicates URLs, enriches job descriptions, validates fit, scores with an LLM, tailors resumes and cover letters, compiles PDFs, updates the README job table, and tracks processed URLs.
 
 ## User View
